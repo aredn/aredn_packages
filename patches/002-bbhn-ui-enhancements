@@ -1,0 +1,247 @@
+diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib/httpinfo/src/olsrd_httpinfo.c
+--- olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c	2013-08-17 02:03:40.000000000 -0700
++++ olsrd-0.6.6-patched/lib/httpinfo/src/olsrd_httpinfo.c	2013-11-15 22:22:05.527071810 -0800
+@@ -203,7 +203,7 @@ static void section_title(struct autobuf
+ 
+ static void httpinfo_write_data(void *foo);
+ 
+-static struct timeval start_time;
++static time_t start_time;
+ static struct http_stats stats;
+ static int http_socket;
+ 
+@@ -215,6 +215,19 @@ static int outbuffer_count;
+ 
+ static struct timer_entry *writetimer_entry;
+ 
++/* updates for BroadbandHamnet */
++/* hostname enhancements */
++/* uptime fix            */
++/* add a Node Status tab */
++
++#define HOSTSIZE 2048
++static int get_hostname(char *host, const union olsr_ip_addr *const ipaddr, int tactical);
++static time_t get_uptime(void);
++static char hostname[65];
++static char status_link[128];
++
++/******/
++
+ static const struct tab_entry tab_entries[] = {
+   {"Configuration", "config", build_config_body, true},
+   {"Routes", "routes", build_routes_body, true},
+@@ -227,6 +240,7 @@ static const struct tab_entry tab_entrie
+   {"Admin", "admin", build_admin_body, true},
+ #endif /* ADMIN_INTERFACE */
+   {"About", "about", build_about_body, true},
++  {"Node Status", status_link, NULL, true},
+   {"FOO", "cfgfile", build_cfgfile_body, false},
+   {NULL, NULL, NULL, false}
+ };
+@@ -307,7 +321,7 @@ int
+ olsrd_plugin_init(void)
+ {
+   /* Get start time */
+-  gettimeofday(&start_time, NULL);
++  start_time = get_uptime();
+ 
+   /* set up HTTP socket */
+   http_socket = get_http_socket(http_port != 0 ? http_port : DEFAULT_TCP_PORT);
+@@ -320,6 +334,10 @@ olsrd_plugin_init(void)
+   /* Register socket */
+   add_olsr_socket(http_socket, &parse_http_request, NULL, NULL, SP_PR_READ);
+ 
++  /* create the node status link text */
++  gethostname(hostname, 64);
++  snprintf(status_link, sizeof(status_link), "http://%s:8080/", hostname);
++
+   return 1;
+ }
+ 
+@@ -482,16 +500,16 @@ parse_http_request(int fd, void *data __
+       abuf_appendf(&body_abuf,
+                  "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n" "<head>\n"
+                  "<meta http-equiv=\"Content-type\" content=\"text/html; charset=ISO-8859-1\">\n"
+-                 "<title>olsr.org httpinfo plugin</title>\n" "<link rel=\"icon\" href=\"favicon.ico\" type=\"image/x-icon\">\n"
++                 "<title>%s OLSR status</title>\n" "<link rel=\"icon\" href=\"favicon.ico\" type=\"image/x-icon\">\n"
+                  "<link rel=\"shortcut icon\" href=\"favicon.ico\" type=\"image/x-icon\">\n"
+                  "<link rel=\"stylesheet\" type=\"text/css\" href=\"httpinfo.css\">\n" "</head>\n"
+                  "<body bgcolor=\"#ffffff\" text=\"#000000\">\n"
+                  "<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"%d\">\n"
+                  "<tbody><tr bgcolor=\"#ffffff\">\n" "<td align=\"left\" height=\"69\" valign=\"middle\" width=\"80%%\">\n"
+-                 "<font color=\"black\" face=\"timesroman\" size=\"6\">&nbsp;&nbsp;&nbsp;<a href=\"http://www.olsr.org/\">olsr.org OLSR daemon</a></font></td>\n"
++                 "<font color=\"black\" face=\"timesroman\" size=\"6\">&nbsp;&nbsp;&nbsp;<a href=\"http://www.olsr.org/\">olsr.org OLSR daemon</a> on %s</font></td>\n"
+                  "<td height=\"69\" valign=\"middle\" width=\"20%%\">\n"
+                  "<a href=\"http://www.olsr.org/\"><img border=\"0\" src=\"/logo.gif\" alt=\"olsrd logo\"></a></td>\n" "</tr>\n"
+-                 "</tbody>\n" "</table>\n", FRAMEWIDTH);
++                 "</tbody>\n" "</table>\n", hostname, FRAMEWIDTH, hostname);
+ 
+       build_tabs(&body_abuf, i);
+       build_frame(&body_abuf, "Current Routes", "routes", FRAMEWIDTH, tab_entries[i].build_body_cb);
+@@ -714,7 +732,8 @@ build_frame(struct autobuf *abuf, const
+ static void
+ fmt_href(struct autobuf *abuf, const char *const ipaddr)
+ {
+-  abuf_appendf(abuf, "<a href=\"http://%s:%d/all\">", ipaddr, http_port);
++  /* redirect to the node's main web interface */
++  abuf_appendf(abuf, "<a href=\"http://%s:8080/\">", ipaddr);
+ }
+ 
+ static void
+@@ -740,12 +759,8 @@ build_ipaddr_link(struct autobuf *abuf,
+                   const int prefix_len)
+ {
+   struct ipaddr_str ipaddrstr;
+-  const struct hostent *const hp =
+-#ifndef _WIN32
+-    resolve_ip_addresses ? gethostbyaddr((const void *)ipaddr, olsr_cnf->ipsize,
+-                                         olsr_cnf->ip_version) :
+-#endif /* _WIN32 */
+-    NULL;
++  char hostname1[HOSTSIZE];
++
+   /* Print the link only if there is no prefix_len and ip_version is AF_INET */
+   const int print_link = want_link && (prefix_len == -1 || prefix_len == olsr_cnf->maxplen) && (olsr_cnf->ip_version == AF_INET);
+   olsr_ip_to_string(&ipaddrstr, ipaddr);
+@@ -754,21 +769,19 @@ build_ipaddr_link(struct autobuf *abuf,
+   build_ip_txt(abuf, print_link, ipaddrstr.buf, prefix_len);
+   abuf_puts(abuf, "</td>");
+ 
+-  if (resolve_ip_addresses) {
+-    if (hp) {
+-      abuf_puts(abuf, "<td>(");
+-      if (print_link) {
+-        fmt_href(abuf, ipaddrstr.buf);
+-      }
+-      abuf_puts(abuf, hp->h_name);
+-      if (print_link) {
+-        abuf_puts(abuf, "</a>");
+-      }
++  if(resolve_ip_addresses && get_hostname(hostname1, ipaddr, 0)) /* without tactical name */
++    {
++      abuf_puts(abuf, "<td width=\"30%\">(");
++      if (print_link) fmt_href(abuf, hostname1);
++      get_hostname(hostname1, ipaddr, 1); /* with tactical name */
++      abuf_puts(abuf, hostname1);
++      if (print_link) abuf_puts(abuf, "</a>");
+       abuf_puts(abuf, ")</td>");
+-    } else {
++    }
++  else
++    {
+       abuf_puts(abuf, "<td/>");
+     }
+-  }
+ }
+ 
+ #define build_ipaddr_with_link(buf, ipaddr, plen) \
+@@ -829,30 +842,32 @@ build_config_body(struct autobuf *abuf)
+   }
+ 
+   {
+-    struct timeval now, uptime;
+-    int hours, mins, days;
+-    gettimeofday(&now, NULL);
+-    timersub(&now, &start_time, &uptime);
+-
+-    days = uptime.tv_sec / 86400;
+-    uptime.tv_sec %= 86400;
+-    hours = uptime.tv_sec / 3600;
+-    uptime.tv_sec %= 3600;
+-    mins = uptime.tv_sec / 60;
+-    uptime.tv_sec %= 60;
++    time_t uptime;
++    int hours, mins, days, secs;
++
++    uptime = get_uptime() - start_time;
++    days = uptime / 86400;
++    uptime %= 86400;
++    hours = uptime / 3600;
++    uptime %= 3600;
++    mins = uptime / 60;
++    uptime %= 60;
++    secs = uptime;
+ 
+     abuf_puts(abuf, "Olsrd uptime: <em>");
+     if (days) {
+       abuf_appendf(abuf, "%d day(s) ", days);
+     }
+-    abuf_appendf(abuf, "%02d hours %02d minutes %02d seconds</em><br/>\n", hours, mins, (int)uptime.tv_sec);
++    abuf_appendf(abuf, "%02d hours %02d minutes %02d seconds</em><br/>\n", hours, mins, secs);
+   }
+ 
+   abuf_appendf(abuf, "HTTP stats(ok/dyn/error/illegal): <em>%d/%d/%d/%d</em><br>\n", stats.ok_hits,
+              stats.dyn_hits, stats.err_hits, stats.ill_hits);
+ 
++  /*
+   abuf_puts(abuf,
+              "Click <a href=\"/cfgfile\">here</a> to <em>generate a configuration file for this node</em>.\n");
++  */
+ 
+   abuf_puts(abuf, "<h2>Variables</h2>\n");
+ 
+@@ -1510,6 +1525,64 @@ check_allowed_ip(const struct allowed_ne
+   return 0;
+ }
+ 
++
++/* convert an IP address into a hostname */
++/* use the hosts_olsr file instead of the system resolver */
++
++int
++get_hostname(char *host, const union olsr_ip_addr *const ipaddr, int tactical)
++{
++  int count;
++  char hostname1[HOSTSIZE];
++  char match[HOSTSIZE];
++  char str[160];
++  FILE *fp;
++  struct ipaddr_str ipaddrstr;
++
++  /* return null hostname unless a match is found */
++  host[0] = 0;
++
++  if((fp = fopen("/var/run/hosts_olsr", "r")) == NULL)
++    return 0;
++
++  olsr_ip_to_string(&ipaddrstr, ipaddr);
++  snprintf(match, sizeof(match), "%s %%s #", ipaddrstr.buf);
++  count = 0;
++
++  while(fgets(str, 160, fp) != NULL)
++    {
++      if(sscanf(str, match, hostname1))
++        {
++          if(count) /* add the tactical name */
++            strcat(host, " / ");
++          strcat(host, hostname1);
++          ++count;
++          if(!tactical)
++            break;
++        }
++    }
++
++  fclose(fp);
++  return strlen(host);
++}
++
++
++/* return the uptime in seconds */
++
++time_t
++get_uptime(void)
++{
++  FILE *fp;
++  long seconds;
++
++  if((fp = fopen("/proc/uptime", "r")) == NULL)
++    return 0;
++
++  fscanf(fp, "%ld", &seconds);
++  fclose(fp);
++  return seconds;
++}
++
+ /*
+  * Local Variables:
+  * c-basic-offset: 2
