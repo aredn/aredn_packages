@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=olsrd
-PKG_VERSION:=0.6.6
-PKG_RELEASE:=5
+PKG_VERSION:=0.6.4
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_URL:=http://www.olsr.org/releases/0.6
 
-PKG_MD5SUM:=f98e5a10f1842f6028023da114bf1e1a
+PKG_MD5SUM:=03b1c3660e823d906234c578057f3851
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -25,7 +25,7 @@ define Package/olsrd/template
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=Routing and Redirection
-  MAINTAINER:=Conrad Lara <KG6JEI@amsat.org>
+  MAINTAINER:=Saverio Proto <zioproto@gmail.com>
   TITLE:=OLSR (Optimized Link State Routing) daemon
   URL:=http://www.olsr.org/
 endef
@@ -107,12 +107,6 @@ define Package/olsrd-mod-pgraph
   TITLE:=output network topology for pgraph
 endef
 
-define Package/olsrd-mod-pud
-  $(call Package/olsrd/template)
-  DEPENDS:=olsrd
-  TITLE:=Position Update Distribution plugin
-endef
-
 define Package/olsrd-mod-quagga
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
@@ -125,10 +119,10 @@ define Package/olsrd-mod-secure
   TITLE:=Message signing plugin to secure routing domain
 endef
 
-define Package/olsrd-mod-sgwdynspeed
+define Package/olsrd-mod-tas
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
-  TITLE:=Smart Gateway dynamic speed plugin
+  TITLE:=tas - tiny appliation server programming example
 endef
 
 define Package/olsrd-mod-txtinfo
@@ -143,16 +137,8 @@ define Package/olsrd-mod-watchdog
   TITLE:=Watchdog plugin
 endef
 
-define Package/olsrd-mod-pud/conffiles
-/etc/olsrd.d/olsrd.pud.position.conf
-endef
-
 define Package/olsrd-mod-secure/conffiles
 /etc/olsrd.d/olsrd_secure_key
-endef
-
-define Package/olsrd-mod-sgwdynspeed/conffiles
-/etc/olsrd.d/olsrd.sgw.speed.conf
 endef
 
 MAKE_FLAGS+= \
@@ -161,7 +147,7 @@ MAKE_FLAGS+= \
 	DESTDIR="$(PKG_INSTALL_DIR)" \
 	STRIP="true" \
 	INSTALL_LIB="true" \
-	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph pud quagga secure sgwdynspeed txtinfo watchdog"
+	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph quagga secure tas txtinfo watchdog"
 
 define Build/Compile
 	$(call Build/Compile/Default,all)
@@ -175,8 +161,6 @@ define Package/olsrd/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/olsrd $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/olsrd.init $(1)/etc/init.d/olsrd
-	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
-	$(INSTALL_BIN) ./files/olsrd.hotplug.sh $(1)/etc/hotplug.d/iface/50-olsrd
 endef
 
 define Package/olsrd-mod-arprefresh/install
@@ -234,15 +218,6 @@ define Package/olsrd-mod-pgraph/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pgraph/olsrd_pgraph.so.* $(1)/usr/lib/
 endef
 
-define Package/olsrd-mod-pud/install
-	$(INSTALL_DIR) $(1)/etc/olsrd.d
-	$(CP) ./files/olsrd.pud.position.conf $(1)/etc/olsrd.d/
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/nmealib/lib/libnmea.so $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/wireformat/lib/libOlsrdPudWireFormat.so $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/olsrd_pud.so.* $(1)/usr/lib/
-endef
-
 define Package/olsrd-mod-quagga/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/quagga/olsrd_quagga.so.* $(1)/usr/lib/
@@ -255,11 +230,9 @@ define Package/olsrd-mod-secure/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/secure/olsrd_secure.so.* $(1)/usr/lib/
 endef
 
-define Package/olsrd-mod-sgwdynspeed/install
-	$(INSTALL_DIR) $(1)/etc/olsrd.d
-	$(CP) ./files/olsrd.sgw.speed.conf $(1)/etc/olsrd.d/
+define Package/olsrd-mod-tas/install
 	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/sgwdynspeed/olsrd_sgwdynspeed.so.* $(1)/usr/lib/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/tas/olsrd_tas.so.* $(1)/usr/lib/
 endef
 
 define Package/olsrd-mod-txtinfo/install
@@ -284,9 +257,8 @@ $(eval $(call BuildPackage,olsrd-mod-mdns))
 $(eval $(call BuildPackage,olsrd-mod-nameservice))
 $(eval $(call BuildPackage,olsrd-mod-p2pd))
 $(eval $(call BuildPackage,olsrd-mod-pgraph))
-$(eval $(call BuildPackage,olsrd-mod-pud))
 $(eval $(call BuildPackage,olsrd-mod-quagga))
 $(eval $(call BuildPackage,olsrd-mod-secure))
-$(eval $(call BuildPackage,olsrd-mod-sgwdynspeed))
+$(eval $(call BuildPackage,olsrd-mod-tas))
 $(eval $(call BuildPackage,olsrd-mod-txtinfo))
 $(eval $(call BuildPackage,olsrd-mod-watchdog))

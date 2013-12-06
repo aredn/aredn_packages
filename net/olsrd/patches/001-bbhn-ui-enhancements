@@ -1,7 +1,7 @@
-diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib/httpinfo/src/olsrd_httpinfo.c
---- olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c	2013-08-17 02:03:40.000000000 -0700
-+++ olsrd-0.6.6-patched/lib/httpinfo/src/olsrd_httpinfo.c	2013-11-15 22:22:05.527071810 -0800
-@@ -203,7 +203,7 @@ static void section_title(struct autobuf
+diff -rupN olsrd-0.6.4/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.4-bbhnpatched/lib/httpinfo/src/olsrd_httpinfo.c
+--- olsrd-0.6.4/lib/httpinfo/src/olsrd_httpinfo.c	2012-10-30 11:59:44.000000000 -0700
++++ olsrd-0.6.4-bbhnpatched/lib/httpinfo/src/olsrd_httpinfo.c	2013-12-05 16:10:27.787715959 -0800
+@@ -202,7 +202,7 @@ static void section_title(struct autobuf
  
  static void httpinfo_write_data(void *foo);
  
@@ -10,9 +10,9 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  static struct http_stats stats;
  static int http_socket;
  
-@@ -215,6 +215,19 @@ static int outbuffer_count;
- 
- static struct timer_entry *writetimer_entry;
+@@ -222,6 +222,19 @@ static int netsprintf_error = 0;
+ #define NETDIRECT
+ #endif
  
 +/* updates for BroadbandHamnet */
 +/* hostname enhancements */
@@ -30,15 +30,15 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  static const struct tab_entry tab_entries[] = {
    {"Configuration", "config", build_config_body, true},
    {"Routes", "routes", build_routes_body, true},
-@@ -227,6 +240,7 @@ static const struct tab_entry tab_entrie
+@@ -234,6 +247,7 @@ static const struct tab_entry tab_entrie
    {"Admin", "admin", build_admin_body, true},
- #endif /* ADMIN_INTERFACE */
+ #endif
    {"About", "about", build_about_body, true},
 +  {"Node Status", status_link, NULL, true},
    {"FOO", "cfgfile", build_cfgfile_body, false},
    {NULL, NULL, NULL, false}
  };
-@@ -307,7 +321,7 @@ int
+@@ -314,7 +328,7 @@ int
  olsrd_plugin_init(void)
  {
    /* Get start time */
@@ -47,7 +47,7 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  
    /* set up HTTP socket */
    http_socket = get_http_socket(http_port != 0 ? http_port : DEFAULT_TCP_PORT);
-@@ -320,6 +334,10 @@ olsrd_plugin_init(void)
+@@ -327,6 +341,10 @@ olsrd_plugin_init(void)
    /* Register socket */
    add_olsr_socket(http_socket, &parse_http_request, NULL, NULL, SP_PR_READ);
  
@@ -58,7 +58,7 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
    return 1;
  }
  
-@@ -482,16 +500,16 @@ parse_http_request(int fd, void *data __
+@@ -489,16 +507,16 @@ parse_http_request(int fd, void *data __
        abuf_appendf(&body_abuf,
                   "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n" "<head>\n"
                   "<meta http-equiv=\"Content-type\" content=\"text/html; charset=ISO-8859-1\">\n"
@@ -78,7 +78,7 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  
        build_tabs(&body_abuf, i);
        build_frame(&body_abuf, "Current Routes", "routes", FRAMEWIDTH, tab_entries[i].build_body_cb);
-@@ -714,7 +732,8 @@ build_frame(struct autobuf *abuf, const
+@@ -715,7 +733,8 @@ build_frame(struct autobuf *abuf, const
  static void
  fmt_href(struct autobuf *abuf, const char *const ipaddr)
  {
@@ -88,22 +88,22 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  }
  
  static void
-@@ -740,12 +759,8 @@ build_ipaddr_link(struct autobuf *abuf,
+@@ -741,12 +760,8 @@ build_ipaddr_link(struct autobuf *abuf,
                    const int prefix_len)
  {
    struct ipaddr_str ipaddrstr;
 -  const struct hostent *const hp =
--#ifndef _WIN32
+-#ifndef WIN32
 -    resolve_ip_addresses ? gethostbyaddr((const void *)ipaddr, olsr_cnf->ipsize,
 -                                         olsr_cnf->ip_version) :
--#endif /* _WIN32 */
+-#endif
 -    NULL;
 +  char hostname1[HOSTSIZE];
 +
    /* Print the link only if there is no prefix_len and ip_version is AF_INET */
    const int print_link = want_link && (prefix_len == -1 || prefix_len == olsr_cnf->maxplen) && (olsr_cnf->ip_version == AF_INET);
    olsr_ip_to_string(&ipaddrstr, ipaddr);
-@@ -754,21 +769,19 @@ build_ipaddr_link(struct autobuf *abuf,
+@@ -755,21 +770,19 @@ build_ipaddr_link(struct autobuf *abuf,
    build_ip_txt(abuf, print_link, ipaddrstr.buf, prefix_len);
    abuf_puts(abuf, "</td>");
  
@@ -135,7 +135,7 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  }
  
  #define build_ipaddr_with_link(buf, ipaddr, plen) \
-@@ -829,30 +842,32 @@ build_config_body(struct autobuf *abuf)
+@@ -830,30 +843,32 @@ build_config_body(struct autobuf *abuf)
    }
  
    {
@@ -180,7 +180,7 @@ diff -rupN olsrd-0.6.6/lib/httpinfo/src/olsrd_httpinfo.c olsrd-0.6.6-patched/lib
  
    abuf_puts(abuf, "<h2>Variables</h2>\n");
  
-@@ -1510,6 +1525,64 @@ check_allowed_ip(const struct allowed_ne
+@@ -1513,6 +1528,64 @@ check_allowed_ip(const struct allowed_ne
    return 0;
  }
  
