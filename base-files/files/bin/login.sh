@@ -2,15 +2,14 @@
 # Copyright (C) 2006-2010 OpenWrt.org
 
 if grep -qs '^root:[^!]' /etc/passwd /etc/shadow && [ -z "$FAILSAFE" ]; then
-	echo "Login failed."
-	exit 0
+	echo "WARNING: passwords are sent unencrypted."
+	busybox login
 else
 cat << EOF
  === IMPORTANT ============================
   Use 'passwd' to set your login password
-  this will disable telnet and enable SSH
+  this will enable telnet login with password
  ------------------------------------------
 EOF
-fi
-
 exec /bin/ash --login
+fi
