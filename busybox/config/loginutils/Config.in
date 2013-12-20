@@ -199,7 +199,7 @@ config BUSYBOX_CONFIG_FEATURE_WTMP
 
 config BUSYBOX_CONFIG_LOGIN
 	bool "login"
-	default n
+	default y
 	select BUSYBOX_CONFIG_FEATURE_SUID
 	select BUSYBOX_CONFIG_FEATURE_SYSLOG
 	help
