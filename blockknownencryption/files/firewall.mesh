@@ -1,0 +1,250 @@
+config defaults
+        option syn_flood        1
+        option input            ACCEPT
+        option output           ACCEPT
+        option forward          REJECT
+# Uncomment this line to disable ipv6 rules
+#       option disable_ipv6     1
+
+config zone
+        option name             lan
+        option network          'lan'
+        option input            ACCEPT
+        option output           ACCEPT
+        option forward          REJECT
+
+config zone
+        option name             wan
+        option network          'wan'
+        option input            REJECT
+        option output           ACCEPT
+        option forward          REJECT
+        option masq             1
+        option mtu_fix          1
+
+config zone
+        option name             wifi
+        option network          'wifi'
+        option input            REJECT
+        option output           ACCEPT
+        option forward          REJECT
+        option masq             1
+        option mtu_fix          1
+
+
+config forwarding
+        option src              lan
+        option dest             wan
+
+config forwarding
+        option src              lan
+        option dest             wifi
+
+config forwarding
+        option src              wifi
+        option dest             wifi
+
+
+# Allow IPv4 ping
+config rule
+        option name             Allow-Ping
+        option src              wifi
+        option proto            icmp
+        option icmp_type        echo-request
+        option family           ipv4
+        option target           ACCEPT
+
+config include
+        option path /etc/firewall.user
+
+
+config rule
+       option src              wan
+       option dest_port        2222
+       option proto    tcp
+       option target   ACCEPT
+
+config rule
+       option src              wan
+       option dest_port        8080
+       option proto    tcp
+       option target   ACCEPT
+
+config rule
+       option src              wifi
+       option dest_port        2222
+       option proto    tcp
+       option target   REJECT
+
+config rule
+       option src              wifi
+       option dest_port        8080
+       option proto    tcp
+       option target   ACCEPT
+
+config rule
+       option src              wifi
+       option dest_port        698
+       option proto    udp
+       option target   ACCEPT
+
+config rule
+       option src              wifi
+       option dest_port        1978
+       option proto    tcp
+       option target   ACCEPT
+
+config rule
+       option src              wifi
+       option dest_port        23
+       option proto    tcp
+       option target   ACCEPT
+
+#  Begin rules to block Encrypted Traffic
+
+## SSH
+config rule
+       option src               lan 
+       option dst               wifi
+       option dest_port         22
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         22
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan
+       option dest_port         22
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wan
+       option dest_port         22
+       option proto             tcp
+       option target            REJECT
+
+# HTTPS
+config rule
+       option src               lan
+       option dst               wifi
+       option dest_port         443
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         443
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan 
+       option dest_port         443
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wan 
+       option dest_port         443
+       option proto             tcp
+       option target            REJECT
+
+# SMTP over SSL
+config rule
+       option src               lan
+       option dst               wifi
+       option dest_port         465
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         465
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan 
+       option dest_port         465
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               465 
+       option dest_port         22
+       option proto             tcp
+       option target            REJECT
+
+# IMAP over SSL
+config rule
+       option src               lan
+       option dst               wifi
+       option dest_port         993
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         993
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan 
+       option dest_port         993
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wan 
+       option dest_port         993
+       option proto             tcp
+       option target            REJECT
+
+# POP3 over SSL
+config rule
+       option src               lan
+       option dst               wifi
+       option dest_port         995
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         995
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan 
+       option dest_port         995
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wan 
+       option dest_port         995
+       option proto             tcp
+       option target            REJECT
+
+# End encrypted traffic blocks
