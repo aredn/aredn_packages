@@ -247,4 +247,33 @@ config rule
        option proto             tcp
        option target            REJECT
 
+# NODE SSH 
+config rule
+       option src               lan
+       option dst               wifi
+       option dest_port         2222
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wifi
+       option dest_port         2222
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               lan
+       option dest_port         2222
+       option proto             tcp
+       option target            REJECT
+
+config rule
+       option src               wifi
+       option dst               wan
+       option dest_port         2222
+       option proto             tcp
+       option target            REJECT
+
 # End encrypted traffic blocks
