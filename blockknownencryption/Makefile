@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=blockknownencryption
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -28,6 +28,7 @@ endef
 define Package/blockknownencryption/install
 	$(INSTALL_DIR) $(1)/etc/config.mesh/
 	$(INSTALL_DATA) ./files/firewall.mesh $(1)/etc/config.mesh/firewall
+	$(INSTALL_DATA) ./files/firewall.user.mesh $(1)/etc/config.mesh/firewall.user
 endef
 
 define Package/blockknownencryption/postinst
@@ -154,6 +155,13 @@ config rule
        option proto    tcp
        option target   ACCEPT
 EOF
+
+cat > /etc/config.mesh/firewall.user << "EOF"
+# This file is interpreted as shell script.
+# Put your custom iptables rules here, they will
+# be executed with each firewall (re-)start.
+EOF
+
 echo ""
 echo ""
 CONFMODE=`uci -q -c /etc/local/uci get hsmmmesh.settings.config`

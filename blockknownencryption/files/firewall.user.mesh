@@ -1,0 +1,31 @@
+
+# Known encrypted traffic
+iptables -N mesh_block_known_encryption
+iptables -I FORWARD -j mesh_block_known_encryption
+iptables -I OUTPUT -j mesh_block_known_encryption
+
+# SSH
+iptables -I mesh_block_known_encryption -p tcp --dport 22 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 22 -i wlan0 -j REJECT
+
+# HTTPS
+iptables -I mesh_block_known_encryption -p tcp --dport 443 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 443 -i wlan0 -j REJECT
+
+# SMTP over SSL
+iptables -I mesh_block_known_encryption -p tcp --dport 465 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 465 -i wlan0 -j REJECT
+
+# IMAP over SSL
+iptables -I mesh_block_known_encryption -p tcp --dport 993 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 993 -i wlan0 -j REJECT
+
+# POP3 over SSL
+iptables -I mesh_block_known_encryption -p tcp --dport 995 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 995 -i wlan0 -j REJECT
+
+# NODE SSH 
+iptables -I mesh_block_known_encryption -p tcp --dport 2222 -o wlan0 -j REJECT
+iptables -I mesh_block_known_encryption -p tcp --dport 2222 -i wlan0 -j REJECT
+
+# End encrypted traffic blocks
