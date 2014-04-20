@@ -1,0 +1,14 @@
+ssidident
+Conrad Lara <kg6jei@amsat.org>
+
+ssidident send a beacon packet out at ~500ms interval on the wireless (monitor mode) interface it has been attached to.
+
+This program was designed for the Broadband-Hamnnet project to ensure compliance with rules about identification.
+
+This program also allows for remote aiming into a specific node when used alongside aimer.
+
+Usage is ssidident INTERFACE
+
+Based on:
+Packetspammer
+Andy Green <andy@warmcat.com>

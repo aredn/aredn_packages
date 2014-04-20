@@ -1,0 +1,32 @@
+#!/bin/sh
+
+configmode=`uci -q -c /etc/local/uci/ get hsmmmesh.settings.config`
+
+if [ "$configmode" != "mesh" ] ; then exit 0; fi
+
+if [ "$ACTION" = "ifdown" ] || [ "$ACTION" = "ifup" ] ; then
+
+  if [ "$INTERFACE" == "wifi_mon" ] ; then
+    if [ -e "/var/run/ssidident-$DEVICE.pid" ] ; then
+      echo "Stopping previous ssidident instance on $DEVICE"
+      kill `cat "/var/run/ssidident-$DEVICE.pid"`
+      rm "/var/run/ssidident-$DEVICE.pid"
+    fi  
+  fi
+fi
+
+if [ "$ACTION" = "ifup" ] ; then
+
+  echo "Setting routing rules."
+
+  if [ "$INTERFACE" == "wifi_mon" ] ; then
+    echo "Starting ssidident on $DEVICE"
+    /bin/ssidident "$DEVICE"  > /dev/null 2>&1 &
+    echo $! > "/var/run/ssidident-$DEVICE.pid"
+  fi
+
+fi
+
+# Ensure we send a good exit code
+exit 0;
+
