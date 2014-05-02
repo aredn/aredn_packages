@@ -1,0 +1,12 @@
+diff -rupN olsrd-0.6.4/lib/secure/src/olsrd_secure.c olsrd-0.6.4.patch/lib/secure/src/olsrd_secure.c
+--- olsrd-0.6.4/lib/secure/src/olsrd_secure.c	2012-10-30 11:59:44.000000000 -0700
++++ olsrd-0.6.4.patch/lib/secure/src/olsrd_secure.c	2014-04-21 12:37:20.027487876 -0700
+@@ -529,7 +529,7 @@ check_timestamp(struct interface *olsr_i
+   }
+ 
+   /* ok - update diff */
+-  entry->diff = ((now.tv_sec - tstamp) + entry->diff) ? ((now.tv_sec - tstamp) + entry->diff) / 2 : 0;
++  entry->diff = now.tv_sec - tstamp;
+ 
+   olsr_printf(3, "[ENC]Diff set to : %d\n", entry->diff);
+ 

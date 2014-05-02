@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=olsrd
 PKG_VERSION:=0.6.4
-PKG_RELEASE:=1
+PKG_RELEASE:=bbhn-2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_URL:=http://www.olsr.org/releases/0.6
@@ -25,7 +25,7 @@ define Package/olsrd/template
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=Routing and Redirection
-  MAINTAINER:=Saverio Proto <zioproto@gmail.com>
+  MAINTAINER:=Conrad Lara <kg6jei@amsat.org>
   TITLE:=OLSR (Optimized Link State Routing) daemon
   URL:=http://www.olsr.org/
 endef
