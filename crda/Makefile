@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=crda
-PKG_RELEASE:=1
+PKG_RELEASE:=bbhn1
 PKG_VERSION:=1.1.2
 PKG_SOURCE_URL:=http://wireless.kernel.org/download/crda
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2

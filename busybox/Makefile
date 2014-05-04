@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=busybox
 PKG_VERSION:=1.19.4
-PKG_RELEASE:=6
+PKG_RELEASE:=bbhn1
 PKG_FLAGS:=essential
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
@@ -40,7 +40,7 @@ init-$(CONFIG_BUSYBOX_CONFIG_TELNETD) += telnet
 define Package/busybox
   SECTION:=base
   CATEGORY:=Base system
-  MAINTAINER:=Nicolas Thill <nico@openwrt.org>
+  MAINTAINER:=Conrad Lara <KG6JEI@amsat.org>
   TITLE:=Core utilities for embedded Linux
   URL:=http://busybox.net/
   DEPENDS:=+BUSYBOX_CONFIG_FEATURE_HAVE_RPC:librpc
