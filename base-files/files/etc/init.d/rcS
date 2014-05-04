@@ -7,10 +7,19 @@ run_scripts() {
 	done | $LOGGER
 }
 
+system_config() {
+	config_get_bool foreground $1 foreground 0
+}
+
 LOGGER="cat"
 [ -x /usr/bin/logger ] && LOGGER="logger -s -p 6 -t sysinit"
 
-if [ "$1" = "S" ]; then
+. /lib/functions.sh
+
+config_load system
+config_foreach system_config system
+
+if [ "$1" = "S" -a "$foreground" != "1" ]; then
 	run_scripts "$1" "$2" &
 else
 	run_scripts "$1" "$2"

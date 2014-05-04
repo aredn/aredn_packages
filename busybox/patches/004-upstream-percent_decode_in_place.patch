@@ -1,7 +1,25 @@
+http://git.busybox.net/busybox/commit/?id=dd1061b6a79b0161597799e825bfefc27993ace5
+
+From dd1061b6a79b0161597799e825bfefc27993ace5 Mon Sep 17 00:00:00 2001
+From: Denys Vlasenko <vda.linux@googlemail.com>
+Date: Sun, 11 Sep 2011 21:04:02 +0200
+Subject: [PATCH] wget: URL-decode user:password before base64-encoding it into auth hdr. Closes 3625.
+
+function                                             old     new   delta
+percent_decode_in_place                                -     152    +152
+parse_url                                            304     317     +13
+handle_incoming_and_exit                            2795    2798      +3
+httpd_main                                           763     760      -3
+decodeString                                         152       -    -152
+------------------------------------------------------------------------------
+(add/remove: 2/1 grow/shrink: 2/1 up/down: 168/-155)           Total: 13 bytes
+
+Signed-off-by: Denys Vlasenko <vda.linux@googlemail.com>
+
 --- a/include/libbb.h
 +++ b/include/libbb.h
-@@ -1368,6 +1368,15 @@ pid_t *find_pid_by_name(const char* proc
- pid_t *pidlist_reverse(pid_t *pidList) FAST_FUNC;
+@@ -1570,6 +1570,15 @@ int starts_with_cpu(const char *str) FAS
+ unsigned get_cpu_count(void) FAST_FUNC;
  
  
 +/* Use strict=1 if you process input from untrusted source:
@@ -16,16 +34,6 @@
  extern const char bb_uuenc_tbl_base64[];
  extern const char bb_uuenc_tbl_std[];
  void bb_uuencode(char *store, const void *s, int length, const char *tbl) FAST_FUNC;
---- a/libbb/Kbuild
-+++ b/libbb/Kbuild
-@@ -66,6 +66,7 @@ lib-y += mtab_file.o
- lib-y += obscure.o
- lib-y += parse_mode.o
- lib-y += parse_config.o
-+lib-y += percent_decode.o
- lib-y += perror_msg.o
- lib-y += perror_msg_and_die.o
- lib-y += perror_nomsg.o
 --- /dev/null
 +++ b/libbb/percent_decode.c
 @@ -0,0 +1,69 @@
@@ -100,9 +108,9 @@
 +}
 --- a/networking/httpd.c
 +++ b/networking/httpd.c
-@@ -785,78 +785,6 @@ static char *encodeString(const char *st
+@@ -820,78 +820,6 @@ static char *encodeString(const char *st
  }
- #endif          /* FEATURE_HTTPD_ENCODE_URL_STR */
+ #endif
  
 -/*
 - * Given a URL encoded string, convert it to plain ascii.
@@ -129,12 +137,12 @@
 -	if (v <= 5)
 -		return v + 10;
 -	return ~0;
--}
 -/* For testing:
 -void t(char c) { printf("'%c'(%u) %u\n", c, c, hex_to_bin(c)); }
 -int main() { t(0x10); t(0x20); t('0'); t('9'); t('A'); t('F'); t('a'); t('f');
 -t('0'-1); t('9'+1); t('A'-1); t('F'+1); t('a'-1); t('f'+1); return 0; }
 -*/
+-}
 -static char *decodeString(char *orig, int option_d)
 -{
 -	/* note that decoded string is always shorter than original */
@@ -179,7 +187,7 @@
  #if ENABLE_FEATURE_HTTPD_BASIC_AUTH
  /*
   * Decode a base64 data stream as per rfc1521.
-@@ -1876,7 +1804,7 @@ static void handle_incoming_and_exit(con
+@@ -1949,7 +1877,7 @@ static void handle_incoming_and_exit(con
  	}
  
  	/* Decode URL escape sequences */
@@ -188,7 +196,7 @@
  	if (tptr == NULL)
  		send_headers_and_exit(HTTP_BAD_REQUEST);
  	if (tptr == urlcopy + 1) {
-@@ -2319,7 +2247,7 @@ int httpd_main(int argc UNUSED_PARAM, ch
+@@ -2408,7 +2336,7 @@ int httpd_main(int argc UNUSED_PARAM, ch
  			, &verbose
  		);
  	if (opt & OPT_DECODE_URL) {
@@ -199,9 +207,9 @@
  #if ENABLE_FEATURE_HTTPD_ENCODE_URL_STR
 --- a/networking/wget.c
 +++ b/networking/wget.c
-@@ -373,8 +373,13 @@ static void parse_url(char *src_url, str
+@@ -298,8 +298,13 @@ static void parse_url(const char *src_ur
+ 
  	sp = strrchr(h->host, '@');
- 	h->user = NULL;
  	if (sp != NULL) {
 -		h->user = h->host;
 +		// URL-decode "user:password" string before base64-encoding:
@@ -214,3 +222,16 @@
  		h->host = sp + 1;
  	}
  
+@@ -661,12 +666,6 @@ static void download_one_url(const char 
+ 
+ #if ENABLE_FEATURE_WGET_AUTHENTICATION
+ 		if (target.user) {
+-//TODO: URL-decode "user:password" string before base64-encoding:
+-//wget http://test:my%20pass@example.com should send
+-// Authorization: Basic dGVzdDpteSBwYXNz
+-//which decodes to "test:my pass", instead of what we send now:
+-// Authorization: Basic dGVzdDpteSUyMHBhc3M=
+-//Can reuse decodeString() from httpd.c
+ 			fprintf(sfp, "Proxy-Authorization: Basic %s\r\n"+6,
+ 				base64enc(target.user));
+ 		}

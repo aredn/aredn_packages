@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009 OpenWrt.org
+# Copyright (C) 2009-2012 OpenWrt.org
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -9,16 +9,17 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
 PKG_NAME:=crda
-PKG_RELEASE:=bbhn-2
-PKG_VERSION:=1.1.1
+PKG_RELEASE:=1
+PKG_VERSION:=1.1.2
 PKG_SOURCE_URL:=http://wireless.kernel.org/download/crda
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_MD5SUM:=5fc77af68b3e21736b8ef2f8b061c810
-PKG_BUILD_DEPENDS:=mac80211
+PKG_MD5SUM:=5226f65aebacf94baaf820f8b4e06df4
 
 PKG_REGULATORY_NAME:=regulatory
-PKG_REGULATORY_VERSION:=bbhn-2014.04.11
+PKG_REGULATORY_VERSION:=2011.04.28
+PKG_REGULATORY_SOURCE_URL:=http://wireless.kernel.org/download/wireless-regdb/regulatory.bins
 PKG_REGULATORY_SOURCE:=$(PKG_REGULATORY_VERSION)-$(PKG_REGULATORY_NAME).bin
+PKG_REGULATORY_MD5SUM:=1535e98bcaba732e2f8e8f62dac6f369
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -26,9 +27,17 @@ define Package/crda
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Central Regulatory Domain Agent (CRDA)
-  DEPENDS:=+libnl-tiny @!LINUX_2_4
+  DEPENDS:=+libnl-tiny
   URL:=http://wireless.kernel.org/en/developers/Regulatory/CRDA
 endef
+
+define Download/wireless-regdb
+  FILE:=$(PKG_REGULATORY_SOURCE)
+  URL:=$(PKG_REGULATORY_SOURCE_URL)
+  VERSION:=$(PKG_REGULATORY_VERSION)
+  MD5SUM:=$(PKG_REGULATORY_MD5SUM)
+endef
+$(eval $(call Download,wireless-regdb))
 
 define Package/crda/description
  This is the Central Regulatory Domain Agent for Linux. It serves one
@@ -58,7 +67,7 @@ define Package/crda/install
 	$(INSTALL_DIR) $(1)/usr/lib/crda
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/crda $(1)/sbin/
 	$(INSTALL_DATA) ./files/hotplug.rule $(1)/etc/hotplug.d/platform/10-regulatory
-	$(INSTALL_DATA) ./files/$(PKG_REGULATORY_SOURCE) $(1)/usr/lib/crda/regulatory.bin
+	$(INSTALL_DATA) $(DL_DIR)/$(PKG_REGULATORY_SOURCE) $(1)/usr/lib/crda/regulatory.bin
 endef
 
 $(eval $(call BuildPackage,crda))
