@@ -208,7 +208,7 @@ config BUSYBOX_CONFIG_GETTY
 
 config BUSYBOX_CONFIG_LOGIN
 	bool "login"
-	default n
+	default y
 	select BUSYBOX_CONFIG_FEATURE_SYSLOG
 	help
 	  login is used when signing onto a system.

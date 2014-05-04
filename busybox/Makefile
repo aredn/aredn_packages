@@ -110,6 +110,7 @@ define Package/busybox/install
 		$(INSTALL_BIN) ./files/$$$$tmp $(1)/etc/init.d/$$$$tmp; \
 	done
 	-rm -rf $(1)/lib64
+	chmod u+s $(TARGET_DIR)/bin/busybox
 endef
 
 $(eval $(call BuildPackage,busybox))

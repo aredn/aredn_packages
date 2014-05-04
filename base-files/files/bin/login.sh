@@ -5,13 +5,13 @@ if ( ! grep -qs '^root:[!x]\?:' /etc/shadow || \
      ! grep -qs '^root:[!x]\?:' /etc/passwd ) && \
    [ -z "$FAILSAFE" ]
 then
-	echo "Login failed."
-	exit 0
+        echo "WARNING: passwords are sent unencrypted."
+        busybox login
 else
 cat << EOF
  === IMPORTANT ============================
   Use 'passwd' to set your login password
-  this will disable telnet and enable SSH
+  this will enable telnet login with password
  ------------------------------------------
 EOF
 fi

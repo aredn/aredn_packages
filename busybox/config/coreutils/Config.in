@@ -819,7 +819,7 @@ config BUSYBOX_CONFIG_UNIQ
 
 config BUSYBOX_CONFIG_USLEEP
 	bool "usleep"
-	default n
+	default y
 	help
 	  usleep is used to pause for a specified number of microseconds.
 
