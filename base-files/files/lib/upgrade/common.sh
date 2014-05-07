@@ -35,12 +35,14 @@ install_bin() { # <file> [ <symlink> ... ]
 
 pivot() { # <new_root> <old_root>
 	mount | grep "on $1 type" 2>&- 1>&- || mount -o bind $1 $1
-	mkdir -p $1$2 $1/proc $1/dev $1/tmp $1/overlay && \
+	mkdir -p $1$2 $1/proc $1/sys $1/dev $1/tmp $1/overlay && \
 	mount -o move /proc $1/proc && \
 	pivot_root $1 $1$2 || {
         umount $1 $1
 		return 1
 	}
+
+	mount -o move $2/sys /sys
 	mount -o move $2/dev /dev
 	mount -o move $2/tmp /tmp
 	mount -o move $2/overlay /overlay 2>&-
@@ -48,12 +50,17 @@ pivot() { # <new_root> <old_root>
 }
 
 run_ramfs() { # <command> [...]
-	install_bin /bin/busybox /bin/ash /bin/sh /bin/mount /bin/umount /sbin/pivot_root /usr/bin/wget /sbin/reboot /bin/sync /bin/dd /bin/grep /bin/cp /bin/mv /bin/tar /usr/bin/md5sum "/usr/bin/[" /bin/vi /bin/ls /bin/cat /usr/bin/awk /usr/bin/hexdump /bin/sleep /bin/zcat /usr/bin/bzcat
+	install_bin /bin/busybox /bin/ash /bin/sh /bin/mount /bin/umount        \
+		/sbin/pivot_root /usr/bin/wget /sbin/reboot /bin/sync /bin/dd   \
+		/bin/grep /bin/cp /bin/mv /bin/tar /usr/bin/md5sum "/usr/bin/[" \
+		/bin/vi /bin/ls /bin/cat /usr/bin/awk /usr/bin/hexdump          \
+		/bin/sleep /bin/zcat /usr/bin/bzcat /usr/bin/printf /usr/bin/wc
+
 	install_bin /sbin/mtd
 	for file in $RAMFS_COPY_BIN; do
 		install_bin $file
 	done
-	install_file /etc/resolv.conf /etc/functions.sh /lib/upgrade/*.sh $RAMFS_COPY_DATA
+	install_file /etc/resolv.conf /lib/functions.sh /lib/functions.sh /lib/upgrade/*.sh $RAMFS_COPY_DATA
 
 	pivot $RAM_ROOT /mnt || {
 		echo "Failed to switch over to ramfs. Please reboot."
@@ -70,6 +77,40 @@ run_ramfs() { # <command> [...]
 
 	# spawn a new shell from ramdisk to reduce the probability of cache issues
 	exec /bin/busybox ash -c "$*"
+}
+
+kill_remaining() { # [ <signal> ]
+	local sig="${1:-TERM}"
+	echo -n "Sending $sig to remaining processes ... "
+
+	local stat
+	for stat in /proc/[0-9]*/stat; do
+		[ -f "$stat" ] || continue
+
+		local pid name state ppid rest
+		read pid name state ppid rest < $stat
+		name="${name#(}"; name="${name%)}"
+
+		local cmdline
+		read cmdline < /proc/$pid/cmdline
+
+		# Skip kernel threads 
+		[ -n "$cmdline" ] || continue
+
+		case "$name" in
+			# Skip essential services
+			*ash*|*init*|*watchdog*|*ssh*|*dropbear*|*telnet*|*login*|*hostapd*|*wpa_supplicant*) : ;;
+
+			# Killable process
+			*)
+				if [ $pid -ne $$ ] && [ $ppid -ne $$ ]; then
+					echo -n "$name "
+					kill -$sig $pid 2>/dev/null
+				fi
+			;;
+		esac
+	done
+	echo ""
 }
 
 run_hooks() {

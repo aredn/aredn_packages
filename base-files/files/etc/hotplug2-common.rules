@@ -1,57 +1,43 @@
 
-DEVICENAME ~~ (null|full|ptmx|zero|gpio|hvc) {
-	nothrottle
-	makedev /dev/%DEVICENAME% 0666
-	next
+# uncomment me to log hotplug events
+# DEVPATH is set {
+# 	exec logger -s -t hotplug -p daemon.info "name=%DEVNAME%, path=%DEVPATH%"
+# }
+
+$include /etc/hotplug2-platform.rules
+
+DEVNAME ~~ (^null$|^full$|^ptmx$|^zero$|^gpio|^hvc) {
+	makedev /dev/%DEVNAME% 0666
+	next-event
 }
 
-DEVICENAME ~~ (tun|tap[0-9]) {
-	nothrottle
-	makedev /dev/net/%DEVICENAME% 0644
-}
-
-DEVICENAME ~~ (controlC[0-9]|pcmC0D0*|timer) {
-	nothrottle
-	makedev /dev/snd/%DEVICENAME% 0644
-	next
-}
-
-DEVICENAME ~~ (lp[0-9]) {
-	nothrottle
-	makedev /dev/%DEVICENAME% 0644
-	next
-}
-
-DEVPATH is set, SUBSYSTEM ~~ (input) {
-	nothrottle
-	makedev /dev/input/%DEVICENAME% 0644
-}
-
-DEVICENAME == device-mapper {
-	nothrottle
-	makedev /dev/mapper/control 0600
-	next
+DEVNAME == mapper/control {
+	makedev /dev/%DEVNAME% 0600
+	next-event
 }
 
 ACTION == add, DEVPATH is set {
-	nothrottle
-	makedev /dev/%DEVICENAME% 0644
+	makedev /dev/%DEVNAME% 0644
 }
 
-ACTION == add, DEVPATH is set, DEVICENAME ~~ ^tty {
-	chmod 0666 /dev/%DEVICENAME%
+ACTION == add, DEVPATH is set, DEVNAME ~~ ^tty {
+	chmod 0666 /dev/%DEVNAME%
 }
 
-ACTION == add, DEVPATH is set, DEVICENAME ~~ ^ppp {
-	chmod 0600 /dev/%DEVICENAME%
+ACTION == add, DEVPATH is set, DEVNAME ~~ ^ppp {
+	chmod 0600 /dev/%DEVNAME%
 }
 
 ACTION == remove, DEVPATH is set, MAJOR is set, MINOR is set {
-	remove /dev/%DEVICENAME%
+	remove /dev/%DEVNAME%
 }
 
 FIRMWARE is set, ACTION == add {
-	nothrottle
+	exec /sbin/hotplug-call firmware
 	load-firmware /lib/firmware
-	next
+	next-event
+}
+
+SUBSYSTEM == platform {
+	exec /sbin/hotplug-call %SUBSYSTEM%
 }

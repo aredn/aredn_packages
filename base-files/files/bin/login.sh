@@ -1,9 +1,12 @@
 #!/bin/sh
-# Copyright (C) 2006-2010 OpenWrt.org
+# Copyright (C) 2006-2011 OpenWrt.org
 
-if grep -qs '^root:[^!]' /etc/passwd /etc/shadow && [ -z "$FAILSAFE" ]; then
-	echo "WARNING: passwords are sent unencrypted."
-	busybox login
+if ( ! grep -qs '^root:[!x]\?:' /etc/shadow || \
+     ! grep -qs '^root:[!x]\?:' /etc/passwd ) && \
+   [ -z "$FAILSAFE" ]
+then
+        echo "WARNING: passwords are sent unencrypted."
+        busybox login
 else
 cat << EOF
  === IMPORTANT ============================
@@ -11,5 +14,6 @@ cat << EOF
   this will enable telnet login with password
  ------------------------------------------
 EOF
+
 exec /bin/ash --login
 fi
