@@ -1,6 +1,6 @@
 --- a/libbb/dump.c
 +++ b/libbb/dump.c
-@@ -304,7 +304,7 @@ static void rewrite(priv_dumper_t *dumpe
+@@ -301,7 +301,7 @@ static NOINLINE void rewrite(priv_dumper
  		) {
  			fu->reps += (dumper->blocksize - fs->bcnt) / fu->bcnt;
  		}

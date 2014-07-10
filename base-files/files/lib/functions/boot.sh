@@ -3,7 +3,7 @@
 # Copyright (C) 2010 Vertical Communications
 
 mount() {
-	/bin/busybox mount "$@"
+	/bin/busybox mount -o noatime "$@"
 }
 
 boot_hook_splice_start() {
@@ -71,28 +71,28 @@ boot_run_hook() {
 find_mtd_part() {
 	local PART="$(grep "\"$1\"" /proc/mtd | awk -F: '{print $1}')"
 	local PREFIX=/dev/mtdblock
-	
+
 	PART="${PART##mtd}"
 	[ -d /dev/mtdblock ] && PREFIX=/dev/mtdblock/
 	echo "${PART:+$PREFIX$PART}"
 }
 
 jffs2_ready () {
-    mtdpart="$(find_mtd_part rootfs_data)"
-    [ -z "$mtdpart" ] && return 1
-    magic=$(hexdump $mtdpart -n 4 -e '4/1 "%02x"')
-    [ "$magic" != "deadc0de" ]
+	mtdpart="$(find_mtd_part rootfs_data)"
+	[ -z "$mtdpart" ] && return 1
+	magic=$(hexdump $mtdpart -n 4 -e '4/1 "%02x"')
+	[ "$magic" != "deadc0de" ]
 }
 
 dupe() { # <new_root> <old_root>
 	cd $1
 	echo -n "creating directories... "
 	{
-		cd $2 
+		cd $2
 		find . -xdev -type d
 		echo "./dev ./overlay ./mnt ./proc ./tmp"
 		# xdev skips mounted directories
-		cd $1 
+		cd $1
 	} | xargs mkdir -p
 	echo "done"
 
@@ -125,11 +125,13 @@ pivot() { # <new_root> <old_root>
 fopivot() { # <rw_root> <ro_root> <dupe?>
 	root=$1
 	{
-		if grep -q mini_fo /proc/filesystems; then
+		if grep -q overlay /proc/filesystems; then
+			mount -t overlayfs -olowerdir=/,upperdir=$1 "overlayfs:$1" /mnt && root=/mnt
+		elif grep -q mini_fo /proc/filesystems; then
 			mount -t mini_fo -o base=/,sto=$1 "mini_fo:$1" /mnt 2>&- && root=/mnt
 		else
 			mount --bind / /mnt
-			mount --bind -o union "$1" /mnt && root=/mnt 
+			mount --bind -o union "$1" /mnt && root=/mnt
 		fi
 	} || {
 		[ "$3" = "1" ] && {
