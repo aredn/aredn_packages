@@ -224,11 +224,6 @@ define Package/olsrd-mod-secure/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/secure/olsrd_secure.so.* $(1)/usr/lib/
 endef
 
-define Package/olsrd-mod-tas/install
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/tas/olsrd_tas.so.* $(1)/usr/lib/
-endef
-
 define Package/olsrd-mod-txtinfo/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/txtinfo/olsrd_txtinfo.so.* $(1)/usr/lib/
@@ -253,6 +248,5 @@ $(eval $(call BuildPackage,olsrd-mod-p2pd))
 $(eval $(call BuildPackage,olsrd-mod-pgraph))
 $(eval $(call BuildPackage,olsrd-mod-quagga))
 $(eval $(call BuildPackage,olsrd-mod-secure))
-$(eval $(call BuildPackage,olsrd-mod-tas))
 $(eval $(call BuildPackage,olsrd-mod-txtinfo))
 $(eval $(call BuildPackage,olsrd-mod-watchdog))
