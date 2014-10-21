@@ -1,7 +1,7 @@
-diff -rupN olsrd-0.6.4/lib/secure/src/olsrd_secure.c olsrd-0.6.4.patch/lib/secure/src/olsrd_secure.c
---- olsrd-0.6.4/lib/secure/src/olsrd_secure.c	2012-10-30 11:59:44.000000000 -0700
-+++ olsrd-0.6.4.patch/lib/secure/src/olsrd_secure.c	2014-04-21 12:37:20.027487876 -0700
-@@ -529,7 +529,7 @@ check_timestamp(struct interface *olsr_i
+diff -rupN a/lib/secure/src/olsrd_secure.c b/lib/secure/src/olsrd_secure.c
+--- a/lib/secure/src/olsrd_secure.c	2014-10-05 03:35:41.000000000 -0700
++++ b/lib/secure/src/olsrd_secure.c	2014-10-20 08:17:19.652646585 -0700
+@@ -504,7 +504,7 @@ check_timestamp(struct interface *olsr_i
    }
  
    /* ok - update diff */
@@ -9,4 +9,54 @@ diff -rupN olsrd-0.6.4/lib/secure/src/olsrd_secure.c olsrd-0.6.4.patch/lib/secur
 +  entry->diff = now.tv_sec - tstamp;
  
    olsr_printf(3, "[ENC]Diff set to : %d\n", entry->diff);
+ 
+@@ -512,6 +512,11 @@ check_timestamp(struct interface *olsr_i
+ 
+   entry->valtime = GET_TIMESTAMP(TIMESTAMP_HOLD_TIME * 1000);
+ 
++  /* KG6JEI: drag conftime forward if expired to avoid rollover */
++  if (TIMED_OUT(entry->conftime)) {
++    entry->conftime = GET_TIMESTAMP(0);
++  }
++
+   return 1;
+ }
+ 
+@@ -586,7 +591,9 @@ send_challenge(struct interface *olsr_if
+ 
+   /* update validtime - not validated */
+   entry->conftime = GET_TIMESTAMP(EXCHANGE_HOLD_TIME * 1000);
+-
++  /* AE6XE and KG6JEI uninitialized variable under some conditions */
++  entry->valtime  = GET_TIMESTAMP(0);
++  
+   hash = olsr_ip_hashing(new_host);
+ 
+   /* Queue */
+@@ -863,6 +870,8 @@ parse_challenge(struct interface *olsr_i
+ 
+   /* update validtime - not validated */
+   entry->conftime = GET_TIMESTAMP(EXCHANGE_HOLD_TIME * 1000);
++  /* AE6XE and KG6JEI uninitialized variable under some conditions */
++  entry->valtime  = GET_TIMESTAMP(0);
+ 
+   /* Build and send response */
+ 
+Binary files a/lib/secure/src/.olsrd_secure.c.swp and b/lib/secure/src/.olsrd_secure.c.swp differ
+diff -rupN a/lib/secure/src/olsrd_secure.h b/lib/secure/src/olsrd_secure.h
+--- a/lib/secure/src/olsrd_secure.h	2014-10-05 03:35:41.000000000 -0700
++++ b/lib/secure/src/olsrd_secure.h	2014-10-20 08:20:22.228655426 -0700
+@@ -63,8 +63,11 @@
+ 
+ #define KEYLENGTH      16
+ 
+-#define UPPER_DIFF 3
+-#define LOWER_DIFF -3
++/* AE6XE and KG6JEI - prior logic averaged the delta between 2 samples had overflow */
++/* to correct, delta between 2 samples now actual, updated bounds accordingly */
++
++#define UPPER_DIFF 6
++#define LOWER_DIFF -6
+ 
+ extern char aes_key[16];
  

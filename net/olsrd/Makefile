@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=olsrd
-PKG_VERSION:=0.6.4
-PKG_RELEASE:=bbhn-2
+PKG_VERSION:=0.6.7
+PKG_RELEASE:=bbhn-1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
 PKG_SOURCE_URL:=http://www.olsr.org/releases/0.6
 
-PKG_MD5SUM:=03b1c3660e823d906234c578057f3851
+PKG_MD5SUM:=ad46cb0a6b361f4790527da5566a076f
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -25,7 +25,7 @@ define Package/olsrd/template
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=Routing and Redirection
-  MAINTAINER:=Conrad Lara <kg6jei@amsat.org>
+  MAINTAINER:=Conrad Lara <kg6jei@amsat.org> and Joe Ayers <ae6xe@soara.org>
   TITLE:=OLSR (Optimized Link State Routing) daemon
   URL:=http://www.olsr.org/
 endef
@@ -119,12 +119,6 @@ define Package/olsrd-mod-secure
   TITLE:=Message signing plugin to secure routing domain
 endef
 
-define Package/olsrd-mod-tas
-  $(call Package/olsrd/template)
-  DEPENDS:=olsrd
-  TITLE:=tas - tiny appliation server programming example
-endef
-
 define Package/olsrd-mod-txtinfo
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
@@ -147,7 +141,7 @@ MAKE_FLAGS+= \
 	DESTDIR="$(PKG_INSTALL_DIR)" \
 	STRIP="true" \
 	INSTALL_LIB="true" \
-	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph quagga secure tas txtinfo watchdog"
+	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph quagga secure txtinfo watchdog"
 
 define Build/Compile
 	$(call Build/Compile/Default,all)
@@ -230,11 +224,6 @@ define Package/olsrd-mod-secure/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/secure/olsrd_secure.so.* $(1)/usr/lib/
 endef
 
-define Package/olsrd-mod-tas/install
-	$(INSTALL_DIR) $(1)/usr/lib
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/tas/olsrd_tas.so.* $(1)/usr/lib/
-endef
-
 define Package/olsrd-mod-txtinfo/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/txtinfo/olsrd_txtinfo.so.* $(1)/usr/lib/
@@ -259,6 +248,5 @@ $(eval $(call BuildPackage,olsrd-mod-p2pd))
 $(eval $(call BuildPackage,olsrd-mod-pgraph))
 $(eval $(call BuildPackage,olsrd-mod-quagga))
 $(eval $(call BuildPackage,olsrd-mod-secure))
-$(eval $(call BuildPackage,olsrd-mod-tas))
 $(eval $(call BuildPackage,olsrd-mod-txtinfo))
 $(eval $(call BuildPackage,olsrd-mod-watchdog))
