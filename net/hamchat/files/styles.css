@@ -1,0 +1,85 @@
+.page1 {
+  background-color: #C0B0A0;
+}
+page2 {
+  background-color: ##E0E0C0;
+}
+.control {
+  display: inline-block;
+  width: 160px;  
+  padding-right: 10px;
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #0000FF;  
+  text-align: right;  
+}
+.callsign {
+  display: inline-block;
+  width: 80px;
+  padding-left: 5px;
+  padding-right: 10px;
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #0000FF;
+  text-align: right;
+}
+.message {
+  padding-left: 2px;
+  padding-right: 5px;
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-size: 16px;
+  font-style: italic;
+  color: ##504030;  
+}
+.screen {
+  margin-left: auto ;
+  margin-right: auto ;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  width: 650px;
+  height: 100%;
+  padding: 20px 20px 20px 20px;
+}
+.title {
+  width: 602px;
+  padding: 10px 10px 10px 10px;
+  font-weight: bold;
+  font-style: italic;
+  font-size: 20px;          
+  color: #F0F0D0;
+  text-align: center;
+  background-color: #504030;
+:q  border-top-left-radius: 20px 20px;
+  border-top-right-radius: 20px 20px;  
+}
+.messages {
+  height: 75%;
+  width: 600px;
+  padding: 10px 10px 10px 10px;
+  border: 1px solid;
+  border-color: #504030;  
+  background-color: #E0E0C0;  
+}
+.frame {
+  width: 100%;
+  height: 100%;
+}
+.sender {
+  width: 600px;
+  padding: 10px 10px 10px 10px;
+  border: 1px solid;
+  border-color: #504030;    
+  background-color: #E0E0C0;
+  border-bottom-left-radius: 20px 20px;
+  border-bottom-right-radius: 20px 20px;    
+}
+.longtext {
+  width: 500px;
+}
+.copyright {
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-size: 9px;
+  color: #504030;
+}
