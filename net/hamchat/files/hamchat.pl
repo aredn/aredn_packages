@@ -22,7 +22,7 @@ $self_addr = '/cgi-bin/hamchat.pl';   # URL path to this script
 $css_addr  = '/hamchat/styles.css';   # Absolute path to the css styles file
 $dir_name  = '/www/hamchat/data';     # Absolute path to the data directory
 $lock_name = 'lock';                  # Name of the lock file inside the directory
-$max_file_size = 5;                   # Maximum number of messages per file
+$max_file_size = 20;                   # Maximum number of messages per file
 $max_files     = 10;                  # Maximum number of files
 
 # ---------------------------------------------------------------------------- #
@@ -51,11 +51,12 @@ if (defined $parms{message}) {
  
 if ($post_request_type eq 'connect') {
 
-# Here we have been send a callsign. Check that it is correct.
+# Here we have been sent a callsign. Check that it is correct.
 
   if (length($post_callsign) > 0) {
     
     &display_chat($post_callsign, 'AutoRefresh');
+    &write_msg($post_callsign, "Has joined the chat");
     
   } else {
     
@@ -153,8 +154,15 @@ sub write_msg {
 		} else {
 		  open(FILE, ">$current_path");
 		}
+    $now_string = `date +"%m/%d %H:%M"`;
+    printf FILE '<span class="date">' . $now_string . '</span><span class="callsign">' . $name . ':</span>';
+    if( $msg =~ "Has joined the chat") {
+      printf FILE '<span class="joined">' . special_chars($msg) . '</span><br>'; # . "\r\n";
+    } else {  
+      printf FILE '<span class="message">' . special_chars($msg) . '</span><br>'; # . "\a\r\n";
+    }
     
-    printf FILE '<p><span class="callsign">' . $name . ':</span><span class="message">' . special_chars($msg) . '</span></p>' . "\r\n";
+  #  printf FILE '<p><span class="callsign">' . $name . ':</span><span class="message">' . special_chars($msg) . '</span></p>' . "\r\n";
     close(FILE);
 
 # If we appended the message to the last file we need to rename it to reflect the new
@@ -232,7 +240,7 @@ sub read_data {
 
 sub display_login {
   $errmsg = $_[0];
-  print "HTTP/1.0 200 OK\r\nContent-type: text/html\r\n";
+  print "Content-type: text/html\r\n";
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print '  <html>';
@@ -264,7 +272,7 @@ sub display_login {
 }
 
 sub display_messages {
-  print "HTTP/1.0 200 OK\r\nContent-type: text/html\r\n";
+  print "Content-type: text/html\r\n";
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
@@ -287,7 +295,7 @@ sub display_messages {
 
 sub display_chat {
   my $callsign = $_[0];
-  my $refresh  = $_[1];
+  my $refresh  = $_[10];
   my $chk;
   my $rfr;
   if ((defined $refresh) && ($refresh ne '')) {
@@ -297,7 +305,7 @@ sub display_chat {
     $chk = "";
     $rfr = '0';
   };
-  print "HTTP/1.0 200 OK\r\nContent-type: text/html\r\n";
+  print "Content-type: text/html\r\n";
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
@@ -349,6 +357,7 @@ sub display_chat {
   print '         <span class="control"><input type="checkbox" id="cb-auto" name="auto" value="AutoRefresh" onclick="checkboxClicked();" ' . $chk . '>Auto-Refresh</span>';
   print '         <span class="message">To refresh manually press SEND with no text entered.</span><br/>';
   print '       </form>';
+  print "	  <center><button type=button class='button' onClick='window.location=\"status\"' title='Return to the status page'>Quit</button></center>\n";
   print '       <form name="refresh" action="' . $self_addr . '" method="post" target="result">';
   print '         <input type="hidden" name="request_type" value="message" />';
   print '         <input type="hidden" name="callsign" value="' . $callsign . '" />';
@@ -406,3 +415,4 @@ sub read_form_vars {
   };
 
 }
+

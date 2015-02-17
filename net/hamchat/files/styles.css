@@ -14,23 +14,44 @@ page2 {
   color: #0000FF;  
   text-align: right;  
 }
+.joined {
+  padding-left: 1px;
+  padding-right: 2px;
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-style: italic;
+  font-size: 16px;
+  text-align: left;
+  color: #770177;
+}
+.date {
+  display: inline-block;
+  width: 60px;
+  padding-left: 1px;
+  padding-right: 2px;
+  font-family: "monospace";
+  /*font-family: "arrial-narrow", arial, sans-serif;*/
+  font-size: 10px;
+  color: #555555;
+  text-align: left;
+}
 .callsign {
   display: inline-block;
-  width: 80px;
+  width: 70px;
   padding-left: 5px;
   padding-right: 10px;
   font-family: "arrial-narrow", arial, sans-serif;
   font-size: 16px;
   font-weight: bold;
   color: #0000FF;
-  text-align: right;
+  text-align: left;
 }
 .message {
   padding-left: 2px;
   padding-right: 5px;
   font-family: "arrial-narrow", arial, sans-serif;
   font-size: 16px;
-  font-style: italic;
+  /*font-style: italic;*/
+  text-align: left;
   color: ##504030;  
 }
 .screen {
@@ -51,7 +72,7 @@ page2 {
   color: #F0F0D0;
   text-align: center;
   background-color: #504030;
-:q  border-top-left-radius: 20px 20px;
+  border-top-left-radius: 20px 20px;
   border-top-right-radius: 20px 20px;  
 }
 .messages {
@@ -83,3 +104,38 @@ page2 {
   font-size: 9px;
   color: #504030;
 }
+.button {
+   border-top: 1px solid #96d1f8;
+/*   background: #65a9d7;
+   background: -webkit-gradient(linear, left top, left bottom, from(#3e779d), to(#65a9d7));
+   background: -webkit-linear-gradient(top, #3e779d, #65a9d7);
+   background: -moz-linear-gradient(top, #3e779d, #65a9d7);
+   background: -ms-linear-gradient(top, #3e779d, #65a9d7);
+   background: -o-linear-gradient(top, #3e779d, #65a9d7);*/
+  /* padding: 5px 10px;*/
+   -webkit-border-radius: 8px;
+   -moz-border-radius: 8px;
+   border-radius: 8px;
+   -webkit-box-shadow: rgba(0,0,0,1) 0 1px 0;
+   -moz-box-shadow: rgba(0,0,0,1) 0 1px 0;
+   box-shadow: rgba(0,0,0,1) 0 1px 0;
+   text-shadow: rgba(0,0,0,.4) 0 1px 0;
+   color: white;
+   /* font-size: 14px;
+   font-family: Georgia, serif;*/
+   text-decoration: none;
+   vertical-align: middle;
+  font-family: "arrial-narrow", arial, sans-serif;
+  font-size: 14px;
+  color: #000000;  
+   }
+   }
+.button:hover {
+   border-top-color: #28597a;
+   background: #28597a;
+   color: #ccc;
+   }
+.button:active {
+   border-top-color: #1b435e;
+   background: #1b435e;
+   }
