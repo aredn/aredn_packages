@@ -2,6 +2,7 @@
 PKG_NAME:=hamchat
 PKG_VERSION:=0.1.1
 PKG_RELEASE:=1
+PKG_
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
@@ -11,6 +12,7 @@ define Package/hamchat
   CATEGORY:=Network
   TITLE:=hamchat -- A simple chat script
   URL:=http://www.bbhndev.org/
+  DEPENDS:=+perl
 endef
 
 define Package/hamchat/description
