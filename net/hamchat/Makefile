@@ -1,7 +1,7 @@
 # Name and release number of this package
 PKG_NAME:=hamchat
 PKG_VERSION:=0.1.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
@@ -9,6 +9,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/hamchat
   SECTION:=net
   CATEGORY:=Network
+  MAINTAINER:=BBHN Dev Team
   TITLE:=hamchat -- A simple chat script
   URL:=http://www.bbhndev.org/
   DEPENDS:=+perl
