@@ -1,7 +1,7 @@
 # Name and release number of this package
 PKG_NAME:=hamchat
 PKG_VERSION:=0.1.1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
@@ -23,7 +23,8 @@ endef
 define Package/hamchat/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin/hamchat/
 	$(INSTALL_BIN) ./files/hamchat.pl $(1)/www/cgi-bin/hamchat/
-	$(CP) ./files/styles.css $(1)/www/cgi-bin/hamchat/
+	$(INSTALL_DIR) $(1)/www/hamchat/
+	$(CP) ./files/styles.css $(1)/www/hamchat/
 endef
 
 

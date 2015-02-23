@@ -20,7 +20,7 @@
 
 $srv_name  = '';                      # Server name or empty string for auto-detect
 $self_addr = '/cgi-bin/hamchat/hamchat.pl';   # URL path to this script
-$css_addr  = '/cgi-bin/hamchat/styles.css';   # Absolute path to the css styles file
+$css_addr  = '/hamchat/styles.css';   # Absolute path to the css styles file
 $dir_name  = '/tmp/hamchatdata/';     # Absolute path to the data directory, root path must exist
 $lock_name = 'lock';                  # Name of the lock file inside the directory
 $max_file_size = 20;                   # Maximum number of messages per file
