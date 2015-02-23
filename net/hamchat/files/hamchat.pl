@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # Copyright 2012 Nikolai Ozerov (VE3NKL)
+# Modified by Conrad Lara (KG6JEI) 2015
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +19,9 @@
 # following variables:
 
 $srv_name  = '';                      # Server name or empty string for auto-detect
-$self_addr = '/cgi-bin/hamchat.pl';   # URL path to this script
+$self_addr = '/cgi-bin/hamchat/hamchat.pl';   # URL path to this script
 $css_addr  = '/hamchat/styles.css';   # Absolute path to the css styles file
-$dir_name  = '/www/hamchat/data';     # Absolute path to the data directory
+$dir_name  = '/tmp/hamchatdata/';     # Absolute path to the data directory, root path must exist
 $lock_name = 'lock';                  # Name of the lock file inside the directory
 $max_file_size = 20;                   # Maximum number of messages per file
 $max_files     = 10;                  # Maximum number of files
@@ -28,6 +29,13 @@ $max_files     = 10;                  # Maximum number of files
 # ---------------------------------------------------------------------------- #
 
 read_form_vars();
+
+if ( ! -d "${dir_name}/${lock_name}" ) {
+  mkdir ${dir_name};
+  open(FILE, ">${dir_name}/${lock_name}") || die("Unable to continue. Can not create lock file: " . $!);
+  close(FILE);
+}
+
 
 if ($srv_name eq '') {
   chomp ($srv_name = `uname -n`);
@@ -72,7 +80,7 @@ if ($post_request_type eq 'connect') {
     
   } else {
 
-    if (length($post_message) > 0) {
+    if (length($post_message) > 0 && length($post_message) < 500) {
       &write_msg($post_callsign, $post_message);
     };
    
@@ -265,6 +273,7 @@ sub display_login {
   print '      </form>';
   print '    </div>';
   print '    <div class="copyright">(C) Copyright 2012, VE3NKL</div>';
+  print '    <div class="copyright">(C) Copyright 2015, KG6JEI</div>';
   print '  </div>';
   print '</body>';
   print '</html>';
@@ -366,6 +375,7 @@ sub display_chat {
   print '       </form>';
   print '     </div>';
   print '     <div class="copyright">(C) Copyright 2012, VE3NKL</div>';
+  print '     <div class="copyright">(C) Copyright 2015, KG6JEI</div>';
   print '   </div>';
   print ' </body>';
   print ' </html>';
