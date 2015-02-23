@@ -2,7 +2,6 @@
 PKG_NAME:=hamchat
 PKG_VERSION:=0.1.1
 PKG_RELEASE:=1
-PKG_
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
@@ -22,8 +21,12 @@ endef
 
 define Package/hamchat/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin/hamchat/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hamchat.pl $(1)/www/cgi-bin/hamchat/
+	$(INSTALL_BIN) ./files/hamchat.pl $(1)/www/cgi-bin/hamchat/
 	$(CP) ./files/styles.css $(1)/www/cgi-bin/hamchat/
+endef
+
+
+define Build/Compile
 endef
 
 $(eval $(call BuildPackage,hamchat))
