@@ -1,5 +1,5 @@
---- olsrd-0.6.7/lib/httpinfo/src/olsrd_httpinfo.c
-+++ olsrd-0.6.7-patch/lib/httpinfo/src/olsrd_httpinfo.c
+--- a/lib/httpinfo/src/olsrd_httpinfo.c
++++ b/lib/httpinfo/src/olsrd_httpinfo.c
 @@ -48,7 +48,7 @@
  #include <stdlib.h>
  #include <unistd.h>
