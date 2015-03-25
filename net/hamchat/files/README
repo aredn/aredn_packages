@@ -1,0 +1,216 @@
+HAMCHAT Chat Server 0.1
+=======================
+
+What is it ?
+------------
+
+HamChat Chat server is essentially a Perl script that provides simple chat
+functionality. It is supposed to be used as a CGI script so no specific client
+software is necessary - any modern browser can be used for that purpose.
+
+It was developed primary for Linux-driven routers that can be turned into
+HSMM-MESH nodes used by ham radio operators (hence the name HamChat). Having
+said that, nothing prevents it from being used in any other suitable environment.
+
+Because of targeting small router devices HamChat was developed to be:
+
+  - Database independent. It does not rely on any database and keeps all
+    recent messages in the regular sequentially accessed files.
+
+  - Light on resources. All the code is in the single Perl script less than
+    500 lines long with the addition of a small css file containing browser
+    page formatting instructions.
+
+  - Light on using disk space. Yes, it keeps messages in the regular files
+    but the files do not grow indefinitely. As soon as some predefined limit
+    is exceeded the older messages are discarded.
+
+  - Simple installation. Installation is very simple and consists of copying
+    few files, creating a directory and taking care of the file attributes.
+    The details are covered in the **Installation** section below.
+
+  - Using is extremely simple. Point your browser to the URL of the perl
+    script. Enter your callsign on the login panel and your are in the
+    chat room. As simple as that.
+
+  - Free software. HamChat is Free Software distributed under the
+    Apache License.
+
+
+
+Installation.
+-------------
+
+This installation instruction are for installing HamChat 0.1 on the WRT45GL
+router running HMSS-MESH 0.4.3. Installing on other devices and/or other
+operating system may be different.
+
+Brief Description
+..................
+
+These installation instruction are for computer experts. If you are not
+comfortable with these instructions skip to the **Detailed Description**
+sub-section.
+
+Connect to your router with SSH client and create the following directory structure
+in the /www directory:
+
+  ./hamchat
+  ./hamchat/data
+
+Create file ./hamchat/data/lock in the data directory. Make sure all directories and
+the file have full access permissions.
+
+Copy file styles.css to the hamchat directory. Copy file hamchat.pl to the
+/www/cgi-bin directory. Assign executable permissions to it.
+
+That's it ! Point your browser to the /cgi-bin/hamchat.pl on your router and start
+using the server.
+
+
+Detailed Description
+....................
+
+0. It is assumed that your router is running and your computer is connected
+   to it. 
+
+1. Download and unpack the archive which will create the *hamchat* directory
+   somewhere on your computer's filesystem. As you are reading this file there
+   is a good chance you have already done that :)
+
+2. Connect to the router using an SSH client (PUTTY, for example).
+   After entering your user name (root) and password (the password you
+   set up for the device) you are ready to issue the commands. These commands
+   are going to be executed on the device operating system. Issue the following
+   command:
+
+   cd /www
+
+   followed by
+
+   ls -l
+
+   You should see index.html file, cgi-bin directory and other entries.
+   What you now need to do is to create a new directory:
+
+   mkdir hamchat
+
+   Now go inside this directory and create a sub-directory *data* having
+   full access at all levels:
+
+   cd hamchat
+
+   mkdir data
+
+   chmod 777 data
+
+   Finally, create an empty lock file that is going to be used by the
+   Perl script. The chmod command makes sure the file is accessible for
+   reading and writing:
+
+   touch lock
+   
+   chmod 666 lock
+
+   return back to the www directory:
+
+   cd /www
+
+3. We have created directory structure for the server. Now it is time to
+   copy the files. To do that we could use the scp command which is a file
+   transfer client that works with SSH servers. As we already have the SSH
+   server running on the router all we need is the client. Those of you
+   who has Linux installed probably already have the *scp* command available.
+   For Windows users I could point you to the PSCP command line client (available
+   from the same web-site as PUTTY mentioned above).
+
+   scp -P 2222 ./hamchat/hamchat.pl root@192.168.nnn.mmm:/www/cgi-bin/hamchat.pl
+
+   I assume that your ssh server is listening on port 2222 and 192.168.nnn.mmm
+   is the IP address of your router on the local network. The operand next to the
+   port number is a path to the local copy of hamchat.pl and the next operand is
+   the remote location where the local copy will be copied to.
+
+   Most likely the client will ask you a password for user root which should
+   be given to it. Remember, this is the root user on the router's Linux operating
+   system.
+
+   In a similar way we copy the styles.ccs file:
+
+   scp -P 2222 ./hamchat/styles.css root@192.168.nnn.mmm:/www/hamchat/styles.css
+
+4. One last thing to do is to give executable permissions to the copied hamchat.pl script.
+   On the SSH client terminal go to the cgi-bin directory:
+
+   cd /www/cgi-bin
+
+   Make sure the script has been copied successfully and give it executable permissions:
+
+   ls -l
+
+   chmod 755 hamchat.pl
+
+We are done ! Point your browser to the router's /cgi-bin/hamchat.pl location
+and start using the server.
+
+Customizing HamChat
+-------------------
+
+If you follow the installation instructions you can use the script without any
+changes. However, there are few things that can be customized. The customization
+can be done by changing values of a few variables at the top section of the script.
+Here is the detailed description of the variables and the effect that changing
+the values is going to have on the HamChat.
+
+$srv_name  = '';                      # Server name or empty string for auto-detect
+
+On the main HamChat page the title tells you what server are you connected to.
+The server name is taken automatically from the output of the following command:
+
+uname -n
+
+If it is not satisfactory, one can provide another name in the $srv_name variable.
+
+$self_addr = '/cgi-bin/hamchat.pl';   # URL path to this script
+
+Path part of the URL specifying location of the HamChat script. If you move your script
+this value has to be updated.
+
+$css_addr  = '/hamchat/styles.css';   # Absolute path to the css styles file
+
+Path part of the URL specifying location of the styles.css file. If you move the file
+this value has to be updated.
+
+$dir_name  = '/www/hamchat/data';     # Absolute path to the data directory
+
+Absolute path to the data directory as seen from the router box. If you choose
+another location for your directory this value has to be updated.
+
+$lock_name = 'lock';                  # Name of the lock file inside the directory
+
+Name of the empty lock file. The file is supposed to be located in the
+data directory. If you decide to rename the file this value has to be updated.
+
+$max_file_size = 5;                   # Maximum number of messages per file
+$max_files     = 10;                  # Maximum number of files
+
+HamChat messages are stored in the text files in the data directory. Each file
+name has the following naming convention:
+
+data_nnnnnnnnnnnn_m
+
+where nnnnnnnnnnnn is time in seconds from Jan 1, 1970 (Unix epoch time) represented
+as 12 digits with leading zeros and m is the number of messages the file contains
+represented by variable number of digits (yes, a file gets renamed after a new message
+is written into it). The new messages are written either to the last file if the number
+of messages it already contains is not more than $max_file_size or into the newly
+created file. In the latter case, if the total number of files with messages becomes
+greater than $max_files the oldest file with message gets deleted.
+
+More Information
+----------------
+
+If you still have questions, or would like to report a bug, please, contact me by email.
+The up-to-date email address can be found on my QRZ page.
+
+Nikolai (VE3NKL)
