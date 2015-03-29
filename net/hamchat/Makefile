@@ -1,7 +1,7 @@
 # Name and release number of this package
 PKG_NAME:=hamchat
 PKG_VERSION:=0.1.1
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk

@@ -366,7 +366,7 @@ sub display_chat {
   print '         <span class="control"><input type="checkbox" id="cb-auto" name="auto" value="AutoRefresh" onclick="checkboxClicked();" ' . $chk . '>Auto-Refresh</span>';
   print '         <span class="message">To refresh manually press SEND with no text entered.</span><br/>';
   print '       </form>';
-  print "	  <center><button type=button class='button' onClick='window.location=\"status\"' title='Return to the status page'>Quit</button></center>\n";
+  print "	  <center><button type=button class='button' onClick='window.location=\"/cgi-bin/status\"' title='Return to the status page'>Quit</button></center>\n";
   print '       <form name="refresh" action="' . $self_addr . '" method="post" target="result">';
   print '         <input type="hidden" name="request_type" value="message" />';
   print '         <input type="hidden" name="callsign" value="' . $callsign . '" />';
