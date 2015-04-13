@@ -38,6 +38,7 @@ endef
 
 define Package/olsrd/conffiles
 /etc/config/olsrd
+/etc/config/olsrd6
 endef
 
 define Package/olsrd-mod-arprefresh
@@ -107,6 +108,12 @@ define Package/olsrd-mod-pgraph
   TITLE:=output network topology for pgraph
 endef
 
+define Package/olsrd-mod-pud
+  $(call Package/olsrd/template)
+  DEPENDS:=olsrd
+  TITLE:=Position Update Distribution plugin
+endef
+
 define Package/olsrd-mod-quagga
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
@@ -117,6 +124,12 @@ define Package/olsrd-mod-secure
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
   TITLE:=Message signing plugin to secure routing domain
+endef
+
+define Package/olsrd-mod-sgwdynspeed
+  $(call Package/olsrd/template)
+  DEPENDS:=olsrd
+  TITLE:=Smart Gateway dynamic speed plugin
 endef
 
 define Package/olsrd-mod-txtinfo
@@ -131,8 +144,16 @@ define Package/olsrd-mod-watchdog
   TITLE:=Watchdog plugin
 endef
 
+define Package/olsrd-mod-pud/conffiles
+/etc/olsrd.d/olsrd.pud.position.conf
+endef
+
 define Package/olsrd-mod-secure/conffiles
 /etc/olsrd.d/olsrd_secure_key
+endef
+
+define Package/olsrd-mod-sgwdynspeed/conffiles
+/etc/olsrd.d/olsrd.sgw.speed.conf
 endef
 
 MAKE_FLAGS+= \
@@ -141,7 +162,7 @@ MAKE_FLAGS+= \
 	DESTDIR="$(PKG_INSTALL_DIR)" \
 	STRIP="true" \
 	INSTALL_LIB="true" \
-	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph quagga secure txtinfo watchdog"
+	SUBDIRS="arprefresh bmf dot_draw dyn_gw dyn_gw_plain httpinfo jsoninfo mdns nameservice p2pd pgraph pud quagga secure sgwdynspeed txtinfo watchdog"
 
 define Build/Compile
 	$(call Build/Compile/Default,all)
@@ -149,12 +170,18 @@ define Build/Compile
 endef
 
 define Package/olsrd/install
+	$(INSTALL_DIR) $(1)/lib/functions
+	$(INSTALL_DATA) ./files/olsrd.sh $(1)/lib/functions/olsrd.sh
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/olsrd.config $(1)/etc/config/olsrd
+	$(INSTALL_DATA) ./files/olsrd6.config $(1)/etc/config/olsrd6
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/olsrd $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/olsrd.init $(1)/etc/init.d/olsrd
+	$(INSTALL_BIN) ./files/olsrd4.init $(1)/etc/init.d/olsrd
+	$(INSTALL_BIN) ./files/olsrd6.init $(1)/etc/init.d/olsrd6
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
+	$(INSTALL_BIN) ./files/olsrd.hotplug.sh $(1)/etc/hotplug.d/iface/50-olsrd
 endef
 
 define Package/olsrd-mod-arprefresh/install
@@ -212,6 +239,15 @@ define Package/olsrd-mod-pgraph/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pgraph/olsrd_pgraph.so.* $(1)/usr/lib/
 endef
 
+define Package/olsrd-mod-pud/install
+	$(INSTALL_DIR) $(1)/etc/olsrd.d
+	$(CP) ./files/olsrd.pud.position.conf $(1)/etc/olsrd.d/
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/nmealib/lib/libnmea.so $(1)/usr/lib/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/wireformat/lib/libOlsrdPudWireFormat.so $(1)/usr/lib/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/pud/olsrd_pud.so.* $(1)/usr/lib/
+endef
+
 define Package/olsrd-mod-quagga/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/quagga/olsrd_quagga.so.* $(1)/usr/lib/
@@ -222,6 +258,13 @@ define Package/olsrd-mod-secure/install
 	$(CP) ./files/olsrd_secure_key $(1)/etc/olsrd.d/
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/secure/olsrd_secure.so.* $(1)/usr/lib/
+endef
+
+define Package/olsrd-mod-sgwdynspeed/install
+	$(INSTALL_DIR) $(1)/etc/olsrd.d
+	$(CP) ./files/olsrd.sgw.speed.conf $(1)/etc/olsrd.d/
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lib/sgwdynspeed/olsrd_sgwdynspeed.so.* $(1)/usr/lib/
 endef
 
 define Package/olsrd-mod-txtinfo/install
@@ -246,7 +289,9 @@ $(eval $(call BuildPackage,olsrd-mod-mdns))
 $(eval $(call BuildPackage,olsrd-mod-nameservice))
 $(eval $(call BuildPackage,olsrd-mod-p2pd))
 $(eval $(call BuildPackage,olsrd-mod-pgraph))
+$(eval $(call BuildPackage,olsrd-mod-pud))
 $(eval $(call BuildPackage,olsrd-mod-quagga))
 $(eval $(call BuildPackage,olsrd-mod-secure))
+$(eval $(call BuildPackage,olsrd-mod-sgwdynspeed))
 $(eval $(call BuildPackage,olsrd-mod-txtinfo))
 $(eval $(call BuildPackage,olsrd-mod-watchdog))
