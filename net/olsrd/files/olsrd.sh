@@ -637,6 +637,8 @@ olsrd_write_config() {
 	config_foreach olsrd_write_interface_defaults InterfaceDefaults
 	config_foreach olsrd_write_interface Interface
 	echo
+	/usr/local/bin/olsrd-config $UCI_CONF_NAME
+	echo
 
 	return 0
 }
