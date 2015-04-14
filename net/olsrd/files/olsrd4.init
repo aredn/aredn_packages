@@ -1,6 +1,8 @@
 #!/bin/sh /etc/rc.common
 # Copyright (C) 2008-2013 OpenWrt.org
 
+START=65
+
 . $IPKG_INSTROOT/lib/functions/olsrd.sh
 
 CONF=/var/etc/olsrd.conf
