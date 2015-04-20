@@ -46,6 +46,7 @@ fi
 if [ "$$NODEMODE" = "mesh" ]; then
   echo "Applying service announcement"
   /usr/local/bin/node-setup -a -p mesh &> /dev/null
+  /etc/init.d/olsrd restart &> /dev/null
   echo "<br><br>"
 fi
 
