@@ -61,7 +61,7 @@
  
 +  /* create the node status link text */
 +  gethostname(hostname, 64);
-+  snprintf(status_link, sizeof(status_link), "http://%s:8080/", hostname);
++  snprintf(status_link, sizeof(status_link), "http://%s.local.mesh:8080/", hostname);
 +
    return 1;
  }
@@ -86,17 +86,23 @@
  
        build_tabs(&body_abuf, i);
        build_frame(&body_abuf, "Current Routes", "routes", FRAMEWIDTH, tab_entries[i].build_body_cb);
-@@ -722,7 +740,8 @@ build_frame(struct autobuf *abuf, const
+@@ -722,7 +740,14 @@ build_frame(struct autobuf *abuf, const
  static void
  fmt_href(struct autobuf *abuf, const char *const ipaddr)
  {
 -  abuf_appendf(abuf, "<a href=\"http://%s:%d/all\">", ipaddr, http_port);
++  char fqhost[HOSTSIZE];
++  char * pch;
++
++  strcpy(fqhost,ipaddr);
++  pch=strchr(fqhost,'.');
++  if (pch==NULL) strcat(fqhost,".local.mesh");
 +  /* redirect to the node's main web interface */
-+  abuf_appendf(abuf, "<a href=\"http://%s:8080/\">", ipaddr);
++  abuf_appendf(abuf, "<a href=\"http://%s:8080/\">", fqhost);
  }
  
  static void
-@@ -748,12 +767,8 @@ build_ipaddr_link(struct autobuf *abuf,
+@@ -748,12 +773,8 @@ build_ipaddr_link(struct autobuf *abuf,
                    const int prefix_len)
  {
    struct ipaddr_str ipaddrstr;
@@ -111,7 +117,7 @@
    /* Print the link only if there is no prefix_len and ip_version is AF_INET */
    const int print_link = want_link && (prefix_len == -1 || prefix_len == olsr_cnf->maxplen) && (olsr_cnf->ip_version == AF_INET);
    olsr_ip_to_string(&ipaddrstr, ipaddr);
-@@ -762,21 +777,19 @@ build_ipaddr_link(struct autobuf *abuf,
+@@ -762,21 +783,19 @@ build_ipaddr_link(struct autobuf *abuf,
    build_ip_txt(abuf, print_link, ipaddrstr.buf, prefix_len);
    abuf_puts(abuf, "</td>");
  
@@ -143,7 +149,7 @@
  }
  
  #define build_ipaddr_with_link(buf, ipaddr, plen) \
-@@ -837,30 +850,32 @@ build_config_body(struct autobuf *abuf)
+@@ -837,30 +856,32 @@ build_config_body(struct autobuf *abuf)
    }
  
    {
@@ -188,7 +194,7 @@
  
    abuf_puts(abuf, "<h2>Variables</h2>\n");
  
-@@ -1700,6 +1715,64 @@ check_allowed_ip(const struct allowed_ne
+@@ -1700,6 +1721,64 @@ check_allowed_ip(const struct allowed_ne
    return 0;
  }
  
