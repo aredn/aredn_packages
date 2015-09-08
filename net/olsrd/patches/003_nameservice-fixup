@@ -1,6 +1,16 @@
 --- a/lib/nameservice/src/nameservice.c
 +++ b/lib/nameservice/src/nameservice.c
-@@ -825,11 +825,29 @@ decap_namemsg(struct name *from_packet,
+@@ -328,6 +328,9 @@ name_init(void)
+   /* periodic message generation */
+   msg_gen_timer = olsr_start_timer(my_interval * MSEC_PER_SEC, EMISSION_JITTER, OLSR_TIMER_PERIODIC, &olsr_namesvc_gen, NULL, 0);
+ 
++  /* write output files once after startup to write local definitions */
++  write_file_timer = olsr_start_timer(5 * MSEC_PER_SEC, 5, OLSR_TIMER_ONESHOT, olsr_expire_write_file_timer, NULL, 0);
++
+   return 1;
+ }
+ 
+@@ -825,11 +828,29 @@ decap_namemsg(struct name *from_packet,
    // Instead only the validity time is set in insert_new_name_in_list function, which calls this one
    for (already_saved_name_entries = (*to); already_saved_name_entries != NULL;
         already_saved_name_entries = already_saved_name_entries->next) {
