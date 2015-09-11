@@ -17,6 +17,11 @@
 
 # If necessary you can customize your installation by changing the 
 # following variables:
+BEGIN {push @INC, '/www/cgi-bin'};
+use perlfunc;
+$node=nvram_get("node");
+chomp($node);
+
 
 $srv_name  = '';                      # Server name or empty string for auto-detect
 $self_addr = '/cgi-bin/hamchat/hamchat.pl';   # URL path to this script
@@ -158,10 +163,10 @@ sub write_msg {
     my $current_path = $dir_name .  '/' . $current_file;
     
     if ($current_file eq $last_file) {
-		  open(FILE, ">>$current_path");
-		} else {
-		  open(FILE, ">$current_path");
-		}
+      open(FILE, ">>$current_path");
+    } else {
+      open(FILE, ">$current_path");
+    }
     $now_string = `date +"%m/%d %H:%M"`;
     printf FILE '<span class="date">' . $now_string . '</span><span class="callsign">' . $name . ':</span>';
     if( $msg =~ "Has joined the chat") {
@@ -252,7 +257,7 @@ sub display_login {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print '  <html>';
-  print '  <head><title>Connect to HamChat Server</title>';
+  print '  <head><title>Connect to HamChat - ' . $node . '</title>';
   print '    <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '  </head>';
   print '  <body onload="document.login.callsign.focus();" class="page1">';
@@ -285,7 +290,7 @@ sub display_messages {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
-  print '   <head><title>HamChat Server</title>';
+  print '   <head><title>HamChat - ' . $node . '</title>';
   print '     <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '     <script lang="JavaScript">';
   print '       function frameReady() {';
@@ -318,7 +323,7 @@ sub display_chat {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
-  print '   <head><title>HamChat Server</title>';
+  print '   <head><title>HamChat - ' . $node . '</title>';
   print '     <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '     <script lang="JavaScript">';
   print '       var AutoRefresh = ' . $rfr .';';
@@ -366,7 +371,7 @@ sub display_chat {
   print '         <span class="control"><input type="checkbox" id="cb-auto" name="auto" value="AutoRefresh" onclick="checkboxClicked();" ' . $chk . '>Auto-Refresh</span>';
   print '         <span class="message">To refresh manually press SEND with no text entered.</span><br/>';
   print '       </form>';
-  print "	  <center><button type=button class='button' onClick='window.location=\"/cgi-bin/status\"' title='Return to the status page'>Quit</button></center>\n";
+  print "   <center><button type=button class='button' onClick='window.location=\"/cgi-bin/status\"' title='Return to the status page'>Quit</button></center>\n";
   print '       <form name="refresh" action="' . $self_addr . '" method="post" target="result">';
   print '         <input type="hidden" name="request_type" value="message" />';
   print '         <input type="hidden" name="callsign" value="' . $callsign . '" />';
@@ -388,10 +393,10 @@ sub display_chat {
 # Strip all leading and trailing spaces
 
 sub trim($) {
-	my $string = shift;
-	$string =~ s/^\s+//;
-	$string =~ s/\s+$//;
-	return $string;
+  my $string = shift;
+  $string =~ s/^\s+//;
+  $string =~ s/\s+$//;
+  return $string;
 }
 
 # Take care of special HTML characters
