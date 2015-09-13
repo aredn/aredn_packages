@@ -26,6 +26,8 @@ $lock_name = 'lock';                  # Name of the lock file inside the directo
 $max_file_size = 20;                   # Maximum number of messages per file
 $max_files     = 10;                  # Maximum number of files
 
+chomp($node = `uname -n`);
+
 # ---------------------------------------------------------------------------- #
 
 read_form_vars();
@@ -252,7 +254,7 @@ sub display_login {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print '  <html>';
-  print '  <head><title>Connect to HamChat Server</title>';
+  print '  <head><title>Connect to HamChat - ' . $node . '</title>';
   print '    <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '  </head>';
   print '  <body onload="document.login.callsign.focus();" class="page1">';
@@ -285,7 +287,7 @@ sub display_messages {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
-  print '   <head><title>HamChat Server</title>';
+  print '   <head><title>HamChat - ' . $node . '</title>';
   print '     <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '     <script lang="JavaScript">';
   print '       function frameReady() {';
@@ -318,7 +320,7 @@ sub display_chat {
   print "Cache-Control: no-store\r\n";
   print "\r\n";
   print ' <html>';
-  print '   <head><title>HamChat Server</title>';
+  print '   <head><title>HamChat - ' . $node . '</title>';
   print '     <link rel="stylesheet" type="text/css" href="' . $css_addr . '">';
   print '     <script lang="JavaScript">';
   print '       var AutoRefresh = ' . $rfr .';';
