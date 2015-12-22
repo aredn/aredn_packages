@@ -9,7 +9,6 @@ include $(INCLUDE_DIR)/package.mk
 define Package/blockknownencryption
   SECTION:=base
   CATEGORY:=Network
-  DEFAULT:=y
   TITLE:=Block Known Encryption
   #DESCRIPTION:=This variable is obsolete. use the Package/name/description define instead!
   URL:=http://bridge.sourceforge.net/

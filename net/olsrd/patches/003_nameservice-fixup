@@ -1,0 +1,43 @@
+--- a/lib/nameservice/src/nameservice.c
++++ b/lib/nameservice/src/nameservice.c
+@@ -328,6 +328,9 @@ name_init(void)
+   /* periodic message generation */
+   msg_gen_timer = olsr_start_timer(my_interval * MSEC_PER_SEC, EMISSION_JITTER, OLSR_TIMER_PERIODIC, &olsr_namesvc_gen, NULL, 0);
+ 
++  /* write output files once after startup to write local definitions */
++  write_file_timer = olsr_start_timer(5 * MSEC_PER_SEC, 5, OLSR_TIMER_ONESHOT, olsr_expire_write_file_timer, NULL, 0);
++
+   return 1;
+ }
+ 
+@@ -825,11 +828,29 @@ decap_namemsg(struct name *from_packet,
+   // Instead only the validity time is set in insert_new_name_in_list function, which calls this one
+   for (already_saved_name_entries = (*to); already_saved_name_entries != NULL;
+        already_saved_name_entries = already_saved_name_entries->next) {
+-    if ((type_of_from_packet == NAME_HOST || type_of_from_packet == NAME_SERVICE)
++    if (type_of_from_packet == NAME_HOST
++        && strncmp(already_saved_name_entries->name, name, len_of_name) == 0) {
++      if (ipequal(&already_saved_name_entries->ip, &from_packet->ip)) {
++        OLSR_PRINTF(4, "NAME PLUGIN: received name entry %s (%s) already in hash table\n", name,
++                olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
++        return;
++      }
++
++      // Entry needs to be updated
++      OLSR_PRINTF(4, "NAME PLUGIN: updating name %s -> %s (%s)\n", already_saved_name_entries->name, name,
++                  olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
++      already_saved_name_entries->ip = from_packet->ip;
++
++      *this_table_changed = true;
++      olsr_start_write_file_timer();
++      return;
++
++    } else if (type_of_from_packet == NAME_SERVICE
+         && strncmp(already_saved_name_entries->name, name, len_of_name) == 0) {
+       OLSR_PRINTF(4, "NAME PLUGIN: received name or service entry %s (%s) already in hash table\n", name,
+                   olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
+       return;
++
+     } else if (type_of_from_packet == NAME_FORWARDER && ipequal(&already_saved_name_entries->ip, &from_packet->ip)) {
+       OLSR_PRINTF(4, "NAME PLUGIN: received forwarder entry %s (%s) already in hash table\n", name,
+                   olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
