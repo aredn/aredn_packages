@@ -1,0 +1,7 @@
+#!/bin/sh
+
+vtunduciport=$(uci get vtun.options.port 2>/dev/null)
+vtundport=${vtunduciport:-5525}
+
+iptables -I zone_wan_input -p tcp -m tcp --dport $vtundport -j ACCEPT
+
