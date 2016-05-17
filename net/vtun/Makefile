@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=vtun
 PKG_VERSION:=3.0.3
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=@SF/vtun
@@ -73,6 +73,8 @@ define Package/vtun/install
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/vtund.conf $(1)/etc/
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/vtund $(1)/usr/sbin/
+	$(INSTALL_DIR) $(1)/etc/local/mesh-firewall
+	$(INSTALL_BIN) ./files/vtund.firewall $(1)/etc/local/mesh-firewall/02-vtund
 endef
 
 $(eval $(call BuildPackage,vtun))
