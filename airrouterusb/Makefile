@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=AirRouterUSB
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -23,7 +23,10 @@ define Build/Compile
 endef
 
 define Package/airrouterusb/install
+	$(INSTALL_DIR) $(1)/etc/config/
 	$(INSTALL_DATA) ./files/fstab $(1)/etc/config/fstab
+	$(INSTALL_DIR) $(1)/etc/config.mesh/
+	$(INSTALL_DATA) ./files/fstab $(1)/etc/config.mesh/fstab
 endef
 
 define Package/airrouterusb/postinst
