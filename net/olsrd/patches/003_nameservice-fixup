@@ -10,7 +10,25 @@
    return 1;
  }
  
-@@ -825,11 +828,29 @@ decap_namemsg(struct name *from_packet,
+@@ -532,6 +535,17 @@ olsr_expire_write_file_timer(void *conte
+ {
+   write_file_timer = NULL;
+ 
++  /**
++   * Make sure our names are initalized
++   * so we don't write bogus IP's for local names.
++   */
++  if (!nameservice_configured) {
++    name_lazy_init();
++    if (!nameservice_configured) {
++      return;
++    }
++  }
++
+   write_resolv_file();             /* if forwarder_table_changed */
+   write_hosts_file();              /* if name_table_changed */
+   write_services_file(false); /* if service_table_changed */
+@@ -825,11 +839,29 @@ decap_namemsg(struct name *from_packet,
    // Instead only the validity time is set in insert_new_name_in_list function, which calls this one
    for (already_saved_name_entries = (*to); already_saved_name_entries != NULL;
         already_saved_name_entries = already_saved_name_entries->next) {
