@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=AirRouterUSB
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -34,6 +34,7 @@ define Package/airrouterusb/postinst
 if [ -z "$${IPKG_INSTROOT}" ]; then
   echo ""
   echo ""
+  mkdir -p /mnt/usb > /dev/null 2>&1
   /etc/init.d/fstab enable > /dev/null 2>&1
   touch /tmp/reboot-required
   echo "Please reboot your node now"
