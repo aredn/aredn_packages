@@ -11,10 +11,10 @@ PKG_NAME:=olsrd
 PKG_VERSION:=0.6.7
 PKG_RELEASE:=bbhn-4
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_SOURCE_URL:=http://www.olsr.org/releases/0.6
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=http://github.com/OLSR/olsrd/archive/v0.6.7
 
-PKG_MD5SUM:=ad46cb0a6b361f4790527da5566a076f
+PKG_MD5SUM:=69fe58bb04f6b3e0c101be0ddc07f4fc
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
