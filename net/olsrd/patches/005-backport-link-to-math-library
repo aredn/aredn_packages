@@ -1,0 +1,109 @@
+From 42f8417095531f152311c79d8c8c986be98ac0fd Mon Sep 17 00:00:00 2001
+From: Ferry Huberts <ferry.huberts@pelagic.nl>
+Date: Tue, 21 Nov 2017 08:05:59 +0100
+Subject: [PATCH] all: link with -lm where <math.h> is included.
+
+Otherwise we'll get crashes on OpenWRT
+
+Signed-off-by: Ferry Huberts <ferry.huberts@pelagic.nl>
+---
+ Makefile              | 2 +-
+ lib/dot_draw/Makefile | 2 ++
+ lib/httpinfo/Makefile | 2 ++
+ lib/jsoninfo/Makefile | 2 ++
+ lib/netjson/Makefile  | 2 ++
+ lib/secure/Makefile   | 2 ++
+ lib/txtinfo/Makefile  | 2 ++
+ 7 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index fc38917e1..05e3cc7ec 100644
+--- a/Makefile
++++ b/Makefile
+@@ -89,7 +89,7 @@ $(EXENAME):	$(OBJS) $(ANDROIDREGEX) src/builddata.o
+ ifeq ($(VERBOSE),0)
+ 		@echo "[LD] $@"
+ endif
+-		$(MAKECMDPREFIX)$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
++		$(MAKECMDPREFIX)$(CC) $(LDFLAGS) -lm -o $@ $^ $(LIBS)
+ 
+ cfgparser:	$(CFGDEPS) src/builddata.o
+ 		$(MAKECMDPREFIX)$(MAKECMD) -C $(CFGDIR)
+diff --git a/lib/dot_draw/Makefile b/lib/dot_draw/Makefile
+index d0860ad6d..72fff7f52 100644
+--- a/lib/dot_draw/Makefile
++++ b/lib/dot_draw/Makefile
+@@ -48,6 +48,8 @@ PLUGIN_VER =	0.3
+ TOPDIR =	../..
+ include $(TOPDIR)/Makefile.inc
+ 
++LDFLAGS += -lm
++
+ default_target: $(PLUGIN_FULLNAME)
+ 
+ $(PLUGIN_FULLNAME): $(OBJS) version-script.txt
+diff --git a/lib/httpinfo/Makefile b/lib/httpinfo/Makefile
+index 8efc7a103..0f07aa433 100644
+--- a/lib/httpinfo/Makefile
++++ b/lib/httpinfo/Makefile
+@@ -52,6 +52,8 @@ ifdef ADMIN_INTERFACE
+ CPPFLAGS +=	-DADMIN_INTERFACE
+ endif
+ 
++LDFLAGS += -lm
++
+ OBJS += $(TOPDIR)/src/cfgparser/cfgfile_gen.o
+ 
+ default_target: $(PLUGIN_FULLNAME)
+diff --git a/lib/jsoninfo/Makefile b/lib/jsoninfo/Makefile
+index 485187273..cd96ce671 100644
+--- a/lib/jsoninfo/Makefile
++++ b/lib/jsoninfo/Makefile
+@@ -48,6 +48,8 @@ PLUGIN_VER =	1.1
+ TOPDIR =	../..
+ include $(TOPDIR)/Makefile.inc
+ 
++LDFLAGS += -lm
++
+ COMMONINFO = $(wildcard ../info/*.c)
+ OBJS += $(COMMONINFO:%.c=%.o)
+ 
+diff --git a/lib/netjson/Makefile b/lib/netjson/Makefile
+index 2474830a8..dd344f292 100644
+--- a/lib/netjson/Makefile
++++ b/lib/netjson/Makefile
+@@ -48,6 +48,8 @@ PLUGIN_VER =	1.1
+ TOPDIR =	../..
+ include $(TOPDIR)/Makefile.inc
+ 
++LDFLAGS += -lm
++
+ COMMONINFO = $(wildcard ../info/*.c)
+ OBJS += $(COMMONINFO:%.c=%.o)
+ 
+diff --git a/lib/secure/Makefile b/lib/secure/Makefile
+index ec1794a9c..dfb5e5e9e 100644
+--- a/lib/secure/Makefile
++++ b/lib/secure/Makefile
+@@ -48,6 +48,8 @@ PLUGIN_VER =	0.6
+ TOPDIR = ../..
+ include $(TOPDIR)/Makefile.inc
+ 
++LDFLAGS += -lm
++
+ ifdef USE_OPENSSL
+ CPPFLAGS +=	-DUSE_OPENSSL
+ LIBS +=		-lssl -lcrypto
+diff --git a/lib/txtinfo/Makefile b/lib/txtinfo/Makefile
+index e53b280a7..a4525643e 100644
+--- a/lib/txtinfo/Makefile
++++ b/lib/txtinfo/Makefile
+@@ -48,6 +48,8 @@ PLUGIN_VER =	1.1
+ TOPDIR =	../..
+ include $(TOPDIR)/Makefile.inc
+ 
++LDFLAGS += -lm
++
+ COMMONINFO = $(wildcard ../info/*.c)
+ OBJS += $(COMMONINFO:%.c=%.o)
+ 

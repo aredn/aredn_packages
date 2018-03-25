@@ -1,0 +1,60 @@
+From 6d7b04b71c6854bb01ba97d318a4d7ba639fa705 Mon Sep 17 00:00:00 2001
+From: Ferry Huberts <ferry.huberts@pelagic.nl>
+Date: Wed, 6 Dec 2017 18:03:40 +0100
+Subject: [PATCH] info: fix the previous commit: windows doesn't support
+ MSG_DONTWAIT
+
+Signed-off-by: Ferry Huberts <ferry.huberts@pelagic.nl>
+---
+ lib/info/olsrd_info.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/lib/info/olsrd_info.c b/lib/info/olsrd_info.c
+index 77100d0e7..294e14d6e 100644
+--- a/lib/info/olsrd_info.c
++++ b/lib/info/olsrd_info.c
+@@ -324,7 +324,13 @@ static void send_status_no_retries(const char * req, bool add_headers, int the_s
+     }
+   }
+ 
+-  (void) send(the_socket, abuf.buf, abuf.len, MSG_DONTWAIT);
++  (void) send(the_socket, abuf.buf, abuf.len,
++#ifdef _WIN32
++    0
++#else
++    MSG_DONTWAIT
++#endif
++  );
+   close(the_socket);
+   abuf_free(&abuf);
+ }
+@@ -368,7 +374,13 @@ static void write_data(void *unused __attribute__((unused))) {
+       continue;
+     }
+ 
+-    result = send(outbuffer.socket[i], outbuffer.buffer[i] + outbuffer.written[i], outbuffer.size[i] - outbuffer.written[i], MSG_DONTWAIT);
++    result = send(outbuffer.socket[i], outbuffer.buffer[i] + outbuffer.written[i], outbuffer.size[i] - outbuffer.written[i],
++#ifdef _WIN32
++    0
++#else
++    MSG_DONTWAIT
++#endif
++    );
+     if (result > 0) {
+       outbuffer.written[i] += result;
+     }
+@@ -761,6 +773,14 @@ static void ipc_action(int fd, void *data __attribute__ ((unused)), unsigned int
+     return;
+   }
+ 
++#ifdef _WIN32
++  /* set the connection socket to non-blocking */
++  {
++    u_long iMode = 1;
++    ioctlsocket(ipc_connection, FIONBIO, &iMode);
++  }
++#endif
++
+   /* Wait at most this much time for the request to arrive on the connection */
+   timeout.tv_sec = (outbuffer.count >= MAX_CLIENTS) ? 0 : config->request_timeout_sec;
+   timeout.tv_usec = (outbuffer.count >= MAX_CLIENTS) ? 0 : config->request_timeout_usec;

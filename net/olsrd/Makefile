@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=olsrd
-PKG_VERSION:=0.6.7
-PKG_RELEASE:=bbhn-6
+PKG_VERSION:=0.9.6.2
+PKG_RELEASE:=aredn-1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
-PKG_SOURCE_URL:=http://www.olsr.org/releases/0.6
+PKG_SOURCE:=v$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://github.com/OLSR/olsrd/archive
 
-PKG_MD5SUM:=ad46cb0a6b361f4790527da5566a076f
+PKG_MD5SUM:=9bf49e76c1e66e7f2c55aa39f4250930
 PKG_BUILD_PARALLEL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -33,7 +33,7 @@ endef
 define Package/olsrd
   $(call Package/olsrd/template)
   MENU:=1
-  DEPENDS:=+libpthread
+  DEPENDS:=+libpthread +librt
 endef
 
 define Package/olsrd/conffiles
@@ -101,7 +101,6 @@ define Package/olsrd-mod-p2pd
   TITLE:=Peer to Peer Discovery plugin
 endef
 
-
 define Package/olsrd-mod-pgraph
   $(call Package/olsrd/template)
   DEPENDS:=olsrd
@@ -110,7 +109,7 @@ endef
 
 define Package/olsrd-mod-pud
   $(call Package/olsrd/template)
-  DEPENDS:=olsrd
+  DEPENDS:=olsrd +libgps
   TITLE:=Position Update Distribution plugin
 endef
 
