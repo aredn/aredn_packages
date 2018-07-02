@@ -1,0 +1,158 @@
+--- a/lib/txtinfo/src/olsrd_txtinfo.c
++++ b/lib/txtinfo/src/olsrd_txtinfo.c
+@@ -254,6 +254,15 @@
+   return 1;
+ }
+ 
++static void drain_request(int ipc_connection) {
++  static char drain_buffer[1024];
++  ssize_t r;
++
++  do {
++    r = recv(ipc_connection, &drain_buffer, 1024, MSG_DONTWAIT);
++  }  while ((r > 0) && (r <= 1024));
++}
++
+ static void
+ ipc_action(int fd, void *data __attribute__ ((unused)), unsigned int flags __attribute__ ((unused)))
+ {
+@@ -278,7 +287,10 @@
+     return;
+   }
+ 
+-  tv.tv_sec = tv.tv_usec = 0;
++  /* Wait at most this much time for the request to arrive on the connection */
++  tv.tv_sec = 0;
++  tv.tv_usec = (outbuffer_count >= MAX_CLIENTS) ? 0 : (20 * 1000); /* 20 msec */
++
+   if (olsr_cnf->ip_version == AF_INET) {
+     if (inet_ntop(olsr_cnf->ip_version, &pin.in4.sin_addr, addr, INET6_ADDRSTRLEN) == NULL)
+       addr[0] = '\0';
+@@ -311,15 +323,25 @@
+   /* purge read buffer to prevent blocking on linux */
+   FD_ZERO(&rfds);
+   FD_SET((unsigned int)ipc_connection, &rfds);  /* Win32 needs the cast here */
+-  if (0 <= select(ipc_connection + 1, &rfds, NULL, NULL, &tv)) {
++
++  int r = select(ipc_connection + 1, &rfds, NULL, NULL, &tv);
++
++  if (r <= 0) {
++    /* = 0 there was a timeout */
++    /* < 0 there was an error  */
++    drain_request(ipc_connection);
++    close(ipc_connection);
++    return;
++  }
++
++  if (r > 0) {
++    /* there is something to read */
+     char requ[1024];
+-    ssize_t s = recv(ipc_connection, (void *)&requ, sizeof(requ)-1, 0);   /* Win32 needs the cast here */
++    ssize_t s = recv(ipc_connection, (void *)&requ, sizeof(requ)-1, MSG_DONTWAIT);
+ 
+     if (s == sizeof(requ)-1) {
+       /* input was much too long, just skip the rest */
+-      char dummy[1024];
+-
+-      while (recv(ipc_connection, (void *)&dummy, sizeof(dummy), 0) == sizeof(dummy));
++      drain_request(ipc_connection);
+     }
+     if (0 < s) {
+       requ[s] = 0;
+@@ -781,7 +803,7 @@
+   }
+ 
+   tv.tv_sec = 0;
+-  tv.tv_usec = 0;
++  tv.tv_usec = (outbuffer_count >= MAX_CLIENTS) ? 0 : (20 * 1000); /* 20 msec */
+ 
+   result = select(max + 1, NULL, &set, NULL, &tv);
+   if (result <= 0) {
+@@ -790,7 +812,7 @@
+ 
+   for (i=0; i<outbuffer_count; i++) {
+     if (FD_ISSET(outbuffer_socket[i], &set)) {
+-      result = send(outbuffer_socket[i], outbuffer[i] + outbuffer_written[i], outbuffer_size[i] - outbuffer_written[i], 0);
++      result = send(outbuffer_socket[i], outbuffer[i] + outbuffer_written[i], outbuffer_size[i] - outbuffer_written[i], MSG_DONTWAIT);
+       if (result > 0) {
+         outbuffer_written[i] += result;
+       }
+--- a/lib/jsoninfo/src/olsrd_jsoninfo.c
++++ b/lib/jsoninfo/src/olsrd_jsoninfo.c
+@@ -477,6 +477,15 @@
+   return r;
+ }
+ 
++static void drain_request(int ipc_connection) {
++  static char drain_buffer[1024];
++  ssize_t r;
++
++  do {
++    r = recv(ipc_connection, &drain_buffer, 1024, MSG_DONTWAIT);
++  }  while ((r > 0) && (r <= 1024));
++}
++
+ static void
+ ipc_action(int fd, void *data __attribute__ ((unused)), unsigned int flags __attribute__ ((unused)))
+ {
+@@ -497,7 +506,10 @@
+     return;
+   }
+ 
+-  tv.tv_sec = tv.tv_usec = 0;
++  /* Wait at most this much time for the request to arrive on the connection */
++  tv.tv_sec = 0;
++  tv.tv_usec = (outbuffer_count >= MAX_CLIENTS) ? 0 : (20 * 1000); /* 20 msec */
++
+   if (olsr_cnf->ip_version == AF_INET) {
+     if (inet_ntop(olsr_cnf->ip_version, &pin.in4.sin_addr, addr, INET6_ADDRSTRLEN) == NULL)
+       addr[0] = '\0';
+@@ -530,15 +542,25 @@
+   /* purge read buffer to prevent blocking on linux */
+   FD_ZERO(&rfds);
+   FD_SET((unsigned int)ipc_connection, &rfds);  /* Win32 needs the cast here */
+-  if (0 <= select(ipc_connection + 1, &rfds, NULL, NULL, &tv)) {
++
++  int r = select(ipc_connection + 1, &rfds, NULL, NULL, &tv);
++
++  if (r <= 0) {
++    /* = 0 there was a timeout */
++    /* < 0 there was an error  */
++    drain_request(ipc_connection);
++    close(ipc_connection);
++    return;
++  }
++
++  if (r > 0) {
++    /* there is something to read */
+     char requ[1024];
+-    ssize_t s = recv(ipc_connection, (void *)&requ, sizeof(requ)-1, 0);   /* Win32 needs the cast here */
++    ssize_t s = recv(ipc_connection, (void *)&requ, sizeof(requ)-1, MSG_DONTWAIT);
+ 
+     if (s == sizeof(requ)-1) {
+       /* input was too much long, just skip the rest */
+-      char dummy[1024];
+-
+-      while (recv(ipc_connection, (void *)&dummy, sizeof(dummy), 0) == sizeof(dummy));
++      drain_request(ipc_connection);
+     }
+     if (0 < s) {
+       requ[s] = 0;
+@@ -1264,7 +1286,7 @@
+   }
+ 
+   tv.tv_sec = 0;
+-  tv.tv_usec = 0;
++  tv.tv_usec = (outbuffer_count >= MAX_CLIENTS) ? 0 : (20 * 1000); /* 20 msec */
+ 
+   result = select(max + 1, NULL, &set, NULL, &tv);
+   if (result <= 0) {
+@@ -1276,7 +1298,7 @@
+       result = send(outbuffer_socket[i],
+                     outbuffer[i] + outbuffer_written[i],
+                     outbuffer_size[i] - outbuffer_written[i],
+-                    0);
++                    MSG_DONTWAIT);
+       if (result > 0) {
+         outbuffer_written[i] += result;
+       }
