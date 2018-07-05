@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=olsrd
 PKG_VERSION:=0.6.7
-PKG_RELEASE:=bbhn-5
+PKG_RELEASE:=bbhn-6
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=http://github.com/OLSR/olsrd/archive/v0.6.7
