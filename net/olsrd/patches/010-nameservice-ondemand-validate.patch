@@ -1,0 +1,165 @@
+--- a/lib/nameservice/src/nameservice.c
++++ b/lib/nameservice/src/nameservice.c
+@@ -425,48 +425,47 @@ static void name_lazy_init(void) {
+     }
+   }
+ 
+-  //check if entries I want to announce myself are valid and allowed
+-  my_names = remove_nonvalid_names_from_list(my_names, NAME_HOST);
+-  my_forwarders = remove_nonvalid_names_from_list(my_forwarders, NAME_FORWARDER);
+-  my_services = remove_nonvalid_names_from_list(my_services, NAME_SERVICE);
+-  my_macs = remove_nonvalid_names_from_list(my_macs, NAME_MACADDR);
+-
+   mapwrite_init(my_latlon_file);
+ 
+   return;
+ }
+ 
++bool
++is_nameentry_valid(struct name_entry *entry, int type)
++{
++  bool valid;
++  switch (type) {
++    case NAME_HOST:
++      valid = is_name_wellformed(entry->name) && allowed_ip(&entry->ip);
++      break;
++    case NAME_FORWARDER:
++      valid = allowed_ip(&entry->ip);
++      break;
++    case NAME_SERVICE:
++      valid = allowed_service(entry->name);
++      break;
++    case NAME_MACADDR:
++      valid = is_mac_wellformed(entry->name);
++      break;
++    case NAME_LATLON:
++      valid = is_latlon_wellformed(entry->name);
++      break;
++    default:
++      valid = false;
++      break;
++  }
++  return valid;
++}
++
+ struct name_entry *
+ remove_nonvalid_names_from_list(struct name_entry *my_list, int type)
+ {
+   struct name_entry *next = my_list;
+-  bool valid = false;
+   if (my_list == NULL) {
+     return NULL;
+   }
+ 
+-  switch (type) {
+-  case NAME_HOST:
+-    valid = is_name_wellformed(my_list->name) && allowed_ip(&my_list->ip);
+-    break;
+-  case NAME_FORWARDER:
+-    valid = allowed_ip(&my_list->ip);
+-    break;
+-  case NAME_SERVICE:
+-    valid = allowed_service(my_list->name);
+-    break;
+-  case NAME_MACADDR:
+-    valid = is_mac_wellformed(my_list->name);
+-    break;
+-  case NAME_LATLON:
+-    valid = is_latlon_wellformed(my_list->name);
+-    break;
+-  default:
+-	valid = false;
+-	break;
+-  }
+-
+-  if (!valid) {
++  if (!is_nameentry_valid(my_list, type)) {
+     struct ipaddr_str strbuf;
+     OLSR_PRINTF(1, "NAME PLUGIN: invalid or malformed parameter %s (%s), fix your config!\n", my_list->name,
+                 olsr_ip_to_string(&strbuf, &my_list->ip));
+@@ -742,23 +741,31 @@ encap_namemsg(struct namemsg *msg)
+ 
+   // names
+   for (my_name = my_names; my_name != NULL; my_name = my_name->next) {
+-    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    i++;
++    if (is_nameentry_valid(my_name, NAME_HOST)) {
++      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      i++;
++    }
+   }
+   // forwarders
+   for (my_name = my_forwarders; my_name != NULL; my_name = my_name->next) {
+-    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    i++;
++    if (is_nameentry_valid(my_name, NAME_FORWARDER)) {
++      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      i++;
++    }
+   }
+   // services
+   for (my_name = my_services; my_name != NULL; my_name = my_name->next) {
+-    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    i++;
++    if (is_nameentry_valid(my_name, NAME_SERVICE)) {
++      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      i++;
++    }
+   }
+   // macs
+   for (my_name = my_macs; my_name != NULL; my_name = my_name->next) {
+-    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    i++;
++    if (is_nameentry_valid(my_name, NAME_MACADDR)) {
++      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      i++;
++    }
+   }
+   // latlon
+   if ('\0' != latlon_in_file[0]) {
+@@ -1119,8 +1126,10 @@ write_hosts_file(void)
+   }
+   // write own names
+   for (name = my_names; name != NULL; name = name->next) {
+-    struct ipaddr_str strbuf;
+-    fprintf(hosts, "%s\t%s%s\t# myself\n", olsr_ip_to_string(&strbuf, &name->ip), name->name, my_suffix);
++    if (is_nameentry_valid(name, NAME_HOST)) {
++      struct ipaddr_str strbuf;
++      fprintf(hosts, "%s\t%s%s\t# myself\n", olsr_ip_to_string(&strbuf, &name->ip), name->name, my_suffix);
++    }
+   }
+ 
+   // write received names
+@@ -1222,7 +1231,9 @@ write_services_file(bool writemacs)
+ 
+   // write own services or macs
+   for (name = writemacs ? my_macs : my_services; name != NULL; name = name->next) {
+-    fprintf(file, "%s\t# my own %s\n", name->name, writemacs ? "mac" : "service");
++    if (is_nameentry_valid(name, writemacs ? NAME_MACADDR : NAME_SERVICE)) {
++      fprintf(file, "%s\t# my own %s\n", name->name, writemacs ? "mac" : "service");
++    }
+   }
+ 
+   // write received services or macs
+@@ -1538,7 +1549,7 @@ allowed_hostname_or_ip_in_service(const char *service_line, const regmatch_t * h
+   hostname_or_ip = strndup(&service_line[hostname_or_ip_match->rm_so], hostname_or_ip_match->rm_eo - hostname_or_ip_match->rm_so);
+   //hostname is one of the names, that I announce (i.e. one that i am allowed to announce)
+   for (name = my_names; name != NULL; name = name->next) {
+-    if (strncmp(name->name, hostname_or_ip, name->len - strlen(my_suffix)) == 0) {
++    if (is_nameentry_valid(name, NAME_HOST) && strncmp(name->name, hostname_or_ip, name->len - strlen(my_suffix)) == 0) {
+       OLSR_PRINTF(4, "NAME PLUGIN: hostname %s in service %s is OK\n", hostname_or_ip, service_line);
+       free(hostname_or_ip);
+       hostname_or_ip = NULL;
+diff --git a/lib/nameservice/src/nameservice.h b/lib/nameservice/src/nameservice.h
+index b1ea1c90..53ae49fc 100644
+--- a/lib/nameservice/src/nameservice.h
++++ b/lib/nameservice/src/nameservice.h
+@@ -143,6 +143,8 @@ int encap_namemsg(struct namemsg *);
+ 
+ struct name_entry *add_name_to_list(struct name_entry *my_list, const char *value, int type, const union olsr_ip_addr *ip);
+ 
++bool is_nameentry_valid(struct name_entry *entry, int type);
++
+ struct name_entry *remove_nonvalid_names_from_list(struct name_entry *my_list, int type);
+ 
+ void free_all_list_entries(struct list_node *);
