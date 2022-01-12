@@ -2,7 +2,7 @@ diff --git a/lib/nameservice/src/nameservice.c b/lib/nameservice/src/nameservice
 index 9dd6f3a5..e40d1151 100644
 --- a/lib/nameservice/src/nameservice.c
 +++ b/lib/nameservice/src/nameservice.c
-@@ -614,6 +614,7 @@ olsr_namesvc_gen(void *foo __attribute__ ((unused)))
+@@ -610,6 +614,7 @@
    union olsr_message *message = (union olsr_message *)buffer;
    struct interface_olsr *ifn;
    int namesize;
@@ -10,7 +10,7 @@ index 9dd6f3a5..e40d1151 100644
  
    if (!nameservice_configured) {
      name_lazy_init();
-@@ -621,46 +622,69 @@ olsr_namesvc_gen(void *foo __attribute__ ((unused)))
+@@ -617,46 +622,69 @@
        return;
      }
    }
@@ -23,10 +23,17 @@ index 9dd6f3a5..e40d1151 100644
 -    message->v4.ttl = MAX_TTL;
 -    message->v4.hopcnt = 0;
 -    message->v4.seqno = htons(get_msg_seqno());
--
+ 
 -    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message));
 -    namesize = namesize + sizeof(struct olsrmsg);
--
++  /* Calculate maxmimum packet size */
++  int maxsize = sizeof(buffer);
++  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
++    if (ifn->netbuf.maxsize < maxsize) {
++      maxsize = ifn->netbuf.maxsize;
++    }
++  }
+ 
 -    message->v4.olsr_msgsize = htons(namesize);
 -  } else {
 -    /* IPv6 */
@@ -36,22 +43,6 @@ index 9dd6f3a5..e40d1151 100644
 -    message->v6.ttl = MAX_TTL;
 -    message->v6.hopcnt = 0;
 -    message->v6.seqno = htons(get_msg_seqno());
- 
--    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message));
--    namesize = namesize + sizeof(struct olsrmsg6);
--
--    message->v6.olsr_msgsize = htons(namesize);
-+  /* Calculate maxmimum packet size */
-+  int maxsize = sizeof(buffer);
-+  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
-+    if (ifn->netbuf.maxsize < maxsize) {
-+      maxsize = ifn->netbuf.maxsize;
-+    }
-   }
- 
--  /* looping trough interfaces */
--  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
--    OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
 +  /* Encapsulate name messages into a set of packets (keeping track of our position with a cursor)
 +     While name messages can be large, the mtu limits how many we can send at a time. */
 +  for (cursor = 0; cursor != -1; ) {
@@ -66,10 +57,14 @@ index 9dd6f3a5..e40d1151 100644
 +      message->v4.ttl = MAX_TTL;
 +      message->v4.hopcnt = 0;
 +      message->v4.seqno = htons(get_msg_seqno());
-+
+ 
+-    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message));
+-    namesize = namesize + sizeof(struct olsrmsg6);
 +      namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message), maxsize - sizeof(struct olsrmsg), &cursor);
 +      namesize = namesize + sizeof(struct olsrmsg);
-+
+ 
+-    message->v6.olsr_msgsize = htons(namesize);
+-  }
 +      message->v4.olsr_msgsize = htons(namesize);
 +    } else {
 +      /* IPv6 */
@@ -92,7 +87,10 @@ index 9dd6f3a5..e40d1151 100644
 +      cursor++;
 +      continue;
 +    }
-+
+ 
+-  /* looping trough interfaces */
+-  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
+-    OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
 +    /* looping trough interfaces */
 +    for (ifn = ifnet; ifn; ifn = ifn->int_next) {
 +      OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
@@ -113,7 +111,7 @@ index 9dd6f3a5..e40d1151 100644
    }
  }
  
-@@ -732,32 +756,67 @@ olsr_parser(union olsr_message *m, struct interface_olsr *in_if __attribute__ ((
+@@ -723,41 +756,68 @@
   * Returns: the length of the message that was appended
   */
  int
@@ -131,7 +129,9 @@ index 9dd6f3a5..e40d1151 100644
 +
    // names
    for (my_name = my_names; my_name != NULL; my_name = my_name->next) {
--    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    if (is_nameentry_valid(my_name, NAME_HOST)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
 +      if (npos - pos > maxsize) {
@@ -140,12 +140,14 @@ index 9dd6f3a5..e40d1151 100644
 +        return pos - (char *)msg;     //length
 +      }
 +      pos = npos;
-+    }
-     i++;
+     }
++    i++;
    }
    // forwarders
    for (my_name = my_forwarders; my_name != NULL; my_name = my_name->next) {
--    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    if (is_nameentry_valid(my_name, NAME_FORWARDER)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
 +      if (npos - pos > maxsize) {
@@ -154,12 +156,14 @@ index 9dd6f3a5..e40d1151 100644
 +        return pos - (char *)msg;     //length
 +      }
 +      pos = npos;
-+    }
-     i++;
+     }
++    i++;
    }
    // services
    for (my_name = my_services; my_name != NULL; my_name = my_name->next) {
--    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    if (is_nameentry_valid(my_name, NAME_SERVICE)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
 +      if (npos - pos > maxsize) {
@@ -168,12 +172,14 @@ index 9dd6f3a5..e40d1151 100644
 +        return pos - (char *)msg;     //length
 +      }
 +      pos = npos;
-+    }
-     i++;
+     }
++    i++;
    }
    // macs
    for (my_name = my_macs; my_name != NULL; my_name = my_name->next) {
--    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-    if (is_nameentry_valid(my_name, NAME_MACADDR)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
 +      if (npos - pos > maxsize) {
@@ -182,11 +188,12 @@ index 9dd6f3a5..e40d1151 100644
 +        return pos - (char *)msg;     //length
 +      }
 +      pos = npos;
-+    }
-     i++;
+     }
++    i++;
    }
    // latlon
-@@ -779,12 +838,21 @@ encap_namemsg(struct namemsg *msg)
+   if ('\0' != latlon_in_file[0]) {
+@@ -778,12 +838,21 @@
      e.type = NAME_LATLON;
      e.name = s;
      lookup_defhna_latlon(&e.ip);
