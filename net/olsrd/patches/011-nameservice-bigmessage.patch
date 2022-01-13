@@ -26,13 +26,7 @@ index 9dd6f3a5..e40d1151 100644
  
 -    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message));
 -    namesize = namesize + sizeof(struct olsrmsg);
-+  /* Calculate maxmimum packet size */
-+  int maxsize = sizeof(buffer);
-+  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
-+    if (ifn->netbuf.maxsize < maxsize) {
-+      maxsize = ifn->netbuf.maxsize;
-+    }
-+  }
++  int maxsize = 1200;
  
 -    message->v4.olsr_msgsize = htons(namesize);
 -  } else {
