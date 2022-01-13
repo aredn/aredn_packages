@@ -1,5 +1,5 @@
---- nameservice.c.before	2022-01-12 20:04:17.436052808 -0800
-+++ nameservice.c	2022-01-12 20:06:50.430326197 -0800
+--- a/lib/nameservice/src/nameservice.c
++++ b/lib/nameservice/src/nameservice.c
 @@ -624,6 +624,7 @@
    union olsr_message *message = (union olsr_message *)buffer;
    struct interface_olsr *ifn;
