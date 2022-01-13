@@ -1,8 +1,6 @@
-diff --git a/lib/nameservice/src/nameservice.c b/lib/nameservice/src/nameservice.c
-index 9dd6f3a5..e40d1151 100644
---- a/lib/nameservice/src/nameservice.c
-+++ b/lib/nameservice/src/nameservice.c
-@@ -610,6 +614,7 @@
+--- nameservice.c.before	2022-01-12 20:04:17.436052808 -0800
++++ nameservice.c	2022-01-12 20:06:50.430326197 -0800
+@@ -624,6 +624,7 @@
    union olsr_message *message = (union olsr_message *)buffer;
    struct interface_olsr *ifn;
    int namesize;
@@ -10,7 +8,7 @@ index 9dd6f3a5..e40d1151 100644
  
    if (!nameservice_configured) {
      name_lazy_init();
-@@ -617,46 +622,69 @@
+@@ -631,46 +632,64 @@
        return;
      }
    }
@@ -26,17 +24,9 @@ index 9dd6f3a5..e40d1151 100644
  
 -    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message));
 -    namesize = namesize + sizeof(struct olsrmsg);
++  /* Limit maxmimum packet size */
 +  int maxsize = 1200;
- 
--    message->v4.olsr_msgsize = htons(namesize);
--  } else {
--    /* IPv6 */
--    message->v6.olsr_msgtype = MESSAGE_TYPE;
--    message->v6.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
--    memcpy(&message->v6.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
--    message->v6.ttl = MAX_TTL;
--    message->v6.hopcnt = 0;
--    message->v6.seqno = htons(get_msg_seqno());
++
 +  /* Encapsulate name messages into a set of packets (keeping track of our position with a cursor)
 +     While name messages can be large, the mtu limits how many we can send at a time. */
 +  for (cursor = 0; cursor != -1; ) {
@@ -51,14 +41,10 @@ index 9dd6f3a5..e40d1151 100644
 +      message->v4.ttl = MAX_TTL;
 +      message->v4.hopcnt = 0;
 +      message->v4.seqno = htons(get_msg_seqno());
- 
--    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message));
--    namesize = namesize + sizeof(struct olsrmsg6);
++
 +      namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message), maxsize - sizeof(struct olsrmsg), &cursor);
 +      namesize = namesize + sizeof(struct olsrmsg);
- 
--    message->v6.olsr_msgsize = htons(namesize);
--  }
++
 +      message->v4.olsr_msgsize = htons(namesize);
 +    } else {
 +      /* IPv6 */
@@ -81,14 +67,31 @@ index 9dd6f3a5..e40d1151 100644
 +      cursor++;
 +      continue;
 +    }
- 
--  /* looping trough interfaces */
--  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
--    OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
++
 +    /* looping trough interfaces */
 +    for (ifn = ifnet; ifn; ifn = ifn->int_next) {
 +      OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
  
+-    message->v4.olsr_msgsize = htons(namesize);
+-  } else {
+-    /* IPv6 */
+-    message->v6.olsr_msgtype = MESSAGE_TYPE;
+-    message->v6.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
+-    memcpy(&message->v6.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
+-    message->v6.ttl = MAX_TTL;
+-    message->v6.hopcnt = 0;
+-    message->v6.seqno = htons(get_msg_seqno());
+-
+-    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message));
+-    namesize = namesize + sizeof(struct olsrmsg6);
+-
+-    message->v6.olsr_msgsize = htons(namesize);
+-  }
+-
+-  /* looping trough interfaces */
+-  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
+-    OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
+-
 -    if (net_outbuffer_push(ifn, message, namesize) != namesize) {
 -      /* send data and try again */
 -      net_output(ifn);
@@ -105,7 +108,7 @@ index 9dd6f3a5..e40d1151 100644
    }
  }
  
-@@ -723,41 +756,68 @@
+@@ -737,41 +756,68 @@
   * Returns: the length of the message that was appended
   */
  int
@@ -187,7 +190,7 @@ index 9dd6f3a5..e40d1151 100644
    }
    // latlon
    if ('\0' != latlon_in_file[0]) {
-@@ -778,12 +838,21 @@
+@@ -792,12 +838,21 @@
      e.type = NAME_LATLON;
      e.name = s;
      lookup_defhna_latlon(&e.ip);
