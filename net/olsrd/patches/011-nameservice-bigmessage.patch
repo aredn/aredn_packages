@@ -131,7 +131,7 @@
 -      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
-+      if (npos - pos > maxsize) {
++      if (npos - (char *)msg > maxsize) {
 +        msg->nr_names = htons(i - *cursor);
 +        *cursor = i;
 +        return pos - (char *)msg;     //length
@@ -147,7 +147,7 @@
 -      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
-+      if (npos - pos > maxsize) {
++      if (npos - (char *)msg > maxsize) {
 +        msg->nr_names = htons(i - *cursor);
 +        *cursor = i;
 +        return pos - (char *)msg;     //length
@@ -163,7 +163,7 @@
 -      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
-+      if (npos - pos > maxsize) {
++      if (npos - (char *)msg > maxsize) {
 +        msg->nr_names = htons(i - *cursor);
 +        *cursor = i;
 +        return pos - (char *)msg;     //length
@@ -179,7 +179,7 @@
 -      i++;
 +    if (i >= *cursor) {
 +      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
-+      if (npos - pos > maxsize) {
++      if (npos - (char *)msg > maxsize) {
 +        msg->nr_names = htons(i - *cursor);
 +        *cursor = i;
 +        return pos - (char *)msg;     //length
@@ -196,7 +196,7 @@
      lookup_defhna_latlon(&e.ip);
 -    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), &e);
 +    npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), &e);
-+    if (npos - pos > maxsize) {
++    if (npos - (char *)msg > maxsize) {
 +      msg->nr_names = htons(i - *cursor);
 +      *cursor = i;
 +      return pos - (char *)msg;     //length
@@ -215,11 +215,9 @@
  
    return pos - (char *)msg;     //length
  }
-diff --git a/lib/nameservice/src/nameservice.h b/lib/nameservice/src/nameservice.h
-index b1ea1c90..941349c2 100644
 --- a/lib/nameservice/src/nameservice.h
 +++ b/lib/nameservice/src/nameservice.h
-@@ -139,7 +139,7 @@ bool olsr_parser(union olsr_message *, struct interface_olsr *, union olsr_ip_ad
+@@ -139,7 +139,7 @@
  /* callback for periodic timer */
  void olsr_namesvc_gen(void *);
  
