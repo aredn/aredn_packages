@@ -1,0 +1,228 @@
+--- a/lib/nameservice/src/nameservice.c
++++ b/lib/nameservice/src/nameservice.c
+@@ -624,6 +624,7 @@
+   union olsr_message *message = (union olsr_message *)buffer;
+   struct interface_olsr *ifn;
+   int namesize;
++  int cursor, lastcursor;
+ 
+   if (!nameservice_configured) {
+     name_lazy_init();
+@@ -631,46 +632,64 @@
+       return;
+     }
+   }
+-  /* fill message */
+-  if (olsr_cnf->ip_version == AF_INET) {
+-    /* IPv4 */
+-    message->v4.olsr_msgtype = MESSAGE_TYPE;
+-    message->v4.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
+-    memcpy(&message->v4.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
+-    message->v4.ttl = MAX_TTL;
+-    message->v4.hopcnt = 0;
+-    message->v4.seqno = htons(get_msg_seqno());
+ 
+-    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message));
+-    namesize = namesize + sizeof(struct olsrmsg);
++  /* Limit maxmimum packet size */
++  int maxsize = 1200;
++
++  /* Encapsulate name messages into a set of packets (keeping track of our position with a cursor)
++     While name messages can be large, the mtu limits how many we can send at a time. */
++  for (cursor = 0; cursor != -1; ) {
++    lastcursor = cursor;
++
++    /* fill message */
++    if (olsr_cnf->ip_version == AF_INET) {
++      /* IPv4 */
++      message->v4.olsr_msgtype = MESSAGE_TYPE;
++      message->v4.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
++      memcpy(&message->v4.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
++      message->v4.ttl = MAX_TTL;
++      message->v4.hopcnt = 0;
++      message->v4.seqno = htons(get_msg_seqno());
++
++      namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v4.message), maxsize - sizeof(struct olsrmsg), &cursor);
++      namesize = namesize + sizeof(struct olsrmsg);
++
++      message->v4.olsr_msgsize = htons(namesize);
++    } else {
++      /* IPv6 */
++      message->v6.olsr_msgtype = MESSAGE_TYPE;
++      message->v6.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
++      memcpy(&message->v6.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
++      message->v6.ttl = MAX_TTL;
++      message->v6.hopcnt = 0;
++      message->v6.seqno = htons(get_msg_seqno());
++
++      namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message), maxsize - sizeof(struct olsrmsg6), &cursor);
++      namesize = namesize + sizeof(struct olsrmsg6);
++
++      message->v6.olsr_msgsize = htons(namesize);
++    }
++
++    /* If we fail to make progress it means we've hit a message which is too big for our mtu.
++       Nothing we can do except skip it. */
++    if (cursor == lastcursor) {
++      cursor++;
++      continue;
++    }
++
++    /* looping trough interfaces */
++    for (ifn = ifnet; ifn; ifn = ifn->int_next) {
++      OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
+ 
+-    message->v4.olsr_msgsize = htons(namesize);
+-  } else {
+-    /* IPv6 */
+-    message->v6.olsr_msgtype = MESSAGE_TYPE;
+-    message->v6.olsr_vtime = reltime_to_me(my_timeout * MSEC_PER_SEC);
+-    memcpy(&message->v6.originator, &olsr_cnf->main_addr, olsr_cnf->ipsize);
+-    message->v6.ttl = MAX_TTL;
+-    message->v6.hopcnt = 0;
+-    message->v6.seqno = htons(get_msg_seqno());
+-
+-    namesize = encap_namemsg((struct namemsg *)ARM_NOWARN_ALIGN(&message->v6.message));
+-    namesize = namesize + sizeof(struct olsrmsg6);
+-
+-    message->v6.olsr_msgsize = htons(namesize);
+-  }
+-
+-  /* looping trough interfaces */
+-  for (ifn = ifnet; ifn; ifn = ifn->int_next) {
+-    OLSR_PRINTF(3, "NAME PLUGIN: Generating packet - [%s]\n", ifn->int_name);
+-
+-    if (net_outbuffer_push(ifn, message, namesize) != namesize) {
+-      /* send data and try again */
+-      net_output(ifn);
+       if (net_outbuffer_push(ifn, message, namesize) != namesize) {
+-        OLSR_PRINTF(1, "NAME PLUGIN: could not send on interface: %s\n", ifn->int_name);
++        /* send data and try again */
++        net_output(ifn);
++        if (net_outbuffer_push(ifn, message, namesize) != namesize) {
++          OLSR_PRINTF(1, "NAME PLUGIN: could not send on interface: %s\n", ifn->int_name);
++        }
+       }
+     }
++
+   }
+ }
+ 
+@@ -737,41 +756,68 @@
+  * Returns: the length of the message that was appended
+  */
+ int
+-encap_namemsg(struct namemsg *msg)
++encap_namemsg(struct namemsg *msg, int maxsize, int* cursor)
+ {
+   struct name_entry *my_name;
+ 
+   // add the hostname, service and forwarder entries after the namemsg header
+   char *pos = (char *)msg + sizeof(struct namemsg);
++  char* npos;
+   short i = 0;
+ 
++  msg->version = htons(NAME_PROTOCOL_VERSION);
++
+   // names
+   for (my_name = my_names; my_name != NULL; my_name = my_name->next) {
+-    if (is_nameentry_valid(my_name, NAME_HOST)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
++    if (i >= *cursor) {
++      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      if (npos - (char *)msg > maxsize) {
++        msg->nr_names = htons(i - *cursor);
++        *cursor = i;
++        return pos - (char *)msg;     //length
++      }
++      pos = npos;
+     }
++    i++;
+   }
+   // forwarders
+   for (my_name = my_forwarders; my_name != NULL; my_name = my_name->next) {
+-    if (is_nameentry_valid(my_name, NAME_FORWARDER)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
++    if (i >= *cursor) {
++      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      if (npos - (char *)msg > maxsize) {
++        msg->nr_names = htons(i - *cursor);
++        *cursor = i;
++        return pos - (char *)msg;     //length
++      }
++      pos = npos;
+     }
++    i++;
+   }
+   // services
+   for (my_name = my_services; my_name != NULL; my_name = my_name->next) {
+-    if (is_nameentry_valid(my_name, NAME_SERVICE)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
++    if (i >= *cursor) {
++      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      if (npos - (char *)msg > maxsize) {
++        msg->nr_names = htons(i - *cursor);
++        *cursor = i;
++        return pos - (char *)msg;     //length
++      }
++      pos = npos;
+     }
++    i++;
+   }
+   // macs
+   for (my_name = my_macs; my_name != NULL; my_name = my_name->next) {
+-    if (is_nameentry_valid(my_name, NAME_MACADDR)) {
+-      pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
+-      i++;
++    if (i >= *cursor) {
++      npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), my_name);
++      if (npos - (char *)msg > maxsize) {
++        msg->nr_names = htons(i - *cursor);
++        *cursor = i;
++        return pos - (char *)msg;     //length
++      }
++      pos = npos;
+     }
++    i++;
+   }
+   // latlon
+   if ('\0' != latlon_in_file[0]) {
+@@ -792,12 +838,21 @@
+     e.type = NAME_LATLON;
+     e.name = s;
+     lookup_defhna_latlon(&e.ip);
+-    pos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), &e);
++    npos = create_packet((struct name *)ARM_NOWARN_ALIGN(pos), &e);
++    if (npos - (char *)msg > maxsize) {
++      msg->nr_names = htons(i - *cursor);
++      *cursor = i;
++      return pos - (char *)msg;     //length
++    }
++    pos = npos;
+     i++;
+   }
++
+   // write the namemsg header with the number of announced entries and the protocol version
+-  msg->nr_names = htons(i);
+-  msg->version = htons(NAME_PROTOCOL_VERSION);
++  msg->nr_names = htons(i - *cursor);
++
++  /* Done */
++  *cursor = -1;
+ 
+   return pos - (char *)msg;     //length
+ }
+--- a/lib/nameservice/src/nameservice.h
++++ b/lib/nameservice/src/nameservice.h
+@@ -139,7 +139,7 @@
+ /* callback for periodic timer */
+ void olsr_namesvc_gen(void *);
+ 
+-int encap_namemsg(struct namemsg *);
++int encap_namemsg(struct namemsg *, int maxsize, int* cursor);
+ 
+ struct name_entry *add_name_to_list(struct name_entry *my_list, const char *value, int type, const union olsr_ip_addr *ip);
+ 
