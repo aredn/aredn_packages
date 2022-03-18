@@ -1,0 +1,12 @@
+--- a/tunnel.c
++++ b/tunnel.c
+@@ -127,6 +127,9 @@ int tunnel(struct vtun_host *host)
+ 	   opt=1;
+ 	   setsockopt(host->rmt_fd,IPPROTO_TCP,TCP_NODELAY,&opt,sizeof(opt) );
+ 
++	   opt=60000;
++	   setsockopt(host->rmt_fd,IPPROTO_TCP,TCP_USER_TIMEOUT,&opt,sizeof(opt) );
++
+ 	   proto_write = tcp_write;
+ 	   proto_read  = tcp_read;
+ 
