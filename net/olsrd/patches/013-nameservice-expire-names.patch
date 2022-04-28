@@ -1,0 +1,126 @@
+--- a/lib/nameservice/src/nameservice.c
++++ b/lib/nameservice/src/nameservice.c
+@@ -315,6 +315,7 @@ add_name_to_list(struct name_entry *my_list, const char *value, int type, const
+     memset(&tmp->ip, 0, sizeof(tmp->ip));
+   else
+     tmp->ip = *ip;
++  tmp->expires = 0;
+   tmp->next = my_list;
+   return tmp;
+ }
+@@ -558,6 +559,14 @@ olsr_expire_write_file_timer(void *context __attribute__ ((unused)))
+     }
+   }
+ 
++  /**
++   * Free aged entries from lists before we write anything.
++   */
++  free_old_list_entries(name_list);
++  free_old_list_entries(service_list);
++  free_old_list_entries(mac_list);
++  free_old_list_entries(forwarder_list);
++
+   write_resolv_file();             /* if forwarder_table_changed */
+   write_hosts_file();              /* if name_table_changed */
+   write_services_file(false); /* if service_table_changed */
+@@ -916,6 +925,7 @@ decap_namemsg(struct name *from_packet, struct name_entry **to, bool * this_tabl
+        already_saved_name_entries = already_saved_name_entries->next) {
+     if (type_of_from_packet == NAME_HOST
+         && strncmp(already_saved_name_entries->name, name, len_of_name) == 0) {
++      already_saved_name_entries->expires = olsr_getTimestamp(ENTRY_VALID_TIME);
+       if (ipequal(&already_saved_name_entries->ip, &from_packet->ip)) {
+         OLSR_PRINTF(4, "NAME PLUGIN: received name entry %s (%s) already in hash table\n", name,
+                 olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
+@@ -933,15 +943,18 @@ decap_namemsg(struct name *from_packet, struct name_entry **to, bool * this_tabl
+ 
+     } else if (type_of_from_packet == NAME_SERVICE
+         && strncmp(already_saved_name_entries->name, name, len_of_name) == 0) {
++      already_saved_name_entries->expires = olsr_getTimestamp(ENTRY_VALID_TIME);
+       OLSR_PRINTF(4, "NAME PLUGIN: received name or service entry %s (%s) already in hash table\n", name,
+                   olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
+       return;
+ 
+     } else if (type_of_from_packet == NAME_FORWARDER && ipequal(&already_saved_name_entries->ip, &from_packet->ip)) {
++      already_saved_name_entries->expires = olsr_getTimestamp(ENTRY_VALID_TIME);
+       OLSR_PRINTF(4, "NAME PLUGIN: received forwarder entry %s (%s) already in hash table\n", name,
+                   olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
+       return;
+     } else if (type_of_from_packet == NAME_LATLON) {
++      already_saved_name_entries->expires = olsr_getTimestamp(ENTRY_VALID_TIME);
+       if (0 != strncmp(already_saved_name_entries->name, name, len_of_name)) {
+         OLSR_PRINTF(4, "NAME PLUGIN: updating name %s -> %s (%s)\n", already_saved_name_entries->name, name,
+                     olsr_ip_to_string(&strbuf, &already_saved_name_entries->ip));
+@@ -975,6 +988,7 @@ decap_namemsg(struct name *from_packet, struct name_entry **to, bool * this_tabl
+   tmp->len = ntohs(from_packet->len);
+   tmp->name = olsr_malloc(tmp->len + 1, "new name_entry name");
+   tmp->ip = from_packet->ip;
++  tmp->expires = olsr_getTimestamp(ENTRY_VALID_TIME);
+   strscpy(tmp->name, name, tmp->len + 1);
+ 
+   OLSR_PRINTF(3, "\nNAME PLUGIN: create new name/service/forwarder entry %s (%s) [len=%d] [type=%d] in linked list\n", tmp->name,
+@@ -1487,6 +1501,36 @@ write_resolv_file(void)
+   forwarder_table_changed = false;
+ }
+ 
++/**
++ * free name_entries which have aged out
++ */
++void
++free_old_list_entries(struct list_node *list)
++{
++  int i;
++  struct list_node *list_node, *list_head;
++  struct name_entry *maybe_delete;
++  struct name_entry **tmp;
++
++  for (i = 0; i < HASHSIZE; i++) {
++    list_head = &list[i];
++    for (list_node = list_head->next; list_node != list_head; list_node = list_node->next) {
++      tmp = &list2db(list_node)->names;
++      while (*tmp != NULL) {
++        maybe_delete = *tmp;
++        if (maybe_delete->expires != 0 && olsr_isTimedOut(maybe_delete->expires)) {
++          *tmp = (*tmp)->next;
++          free(maybe_delete->name);
++          free(maybe_delete);
++        }
++        else {
++          tmp = &(*tmp)->next;
++        }
++      }
++    }
++  }
++}
++
+ /**
+  * completely free a list of name_entries
+  */
+diff --git a/lib/nameservice/src/nameservice.h b/lib/nameservice/src/nameservice.h
+index 5e2096e0..9874fbbe 100644
+--- a/lib/nameservice/src/nameservice.h
++++ b/lib/nameservice/src/nameservice.h
+@@ -77,6 +77,7 @@
+ #define EMISSION_JITTER         25      /* percent */
+ #define NAME_VALID_TIME		1800    /* seconds */
+ #define NAMESERVER_COUNT        3
++#define ENTRY_VALID_TIME  (NAME_VALID_TIME * 1000) /* milliseconds */
+ 
+ #define NAME_PROTOCOL_VERSION	1
+ 
+@@ -100,6 +101,7 @@ struct name_entry {
+   uint16_t type;
+   uint16_t len;
+   char *name;
++  uint32_t expires;
+   struct name_entry *next;             /* linked list */
+ };
+ 
+@@ -195,6 +197,8 @@ void name_destructor(void);
+ 
+ int name_init(void);
+ 
++void free_old_list_entries(struct list_node *list);
++
+ #endif /* _NAMESERVICE_PLUGIN */
+ 
+ /*
