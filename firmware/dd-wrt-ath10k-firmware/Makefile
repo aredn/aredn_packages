@@ -33,4 +33,4 @@ define Package/ath10k-firmware-qca4019-ct/install
 	$(INSTALL_DATA) $(call FIRMWARE_FILE_5,QCA4019) $(1)/lib/firmware/ath10k/QCA4019/hw1.0/firmware-5.bin
 endef
 
-$(eval $(call BuildPackage,10k-firmware-qca4019-ct))
+$(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
