@@ -6,8 +6,7 @@ PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
 
-FIRMWARE_FILE_1_5 = ./files/ath10k-firmware-38eeda3ae6f90fde5546bdd48ee4ff3090f238c0/ath10k/$(1)/hw1.0/firmware-5.bin
-FIRMWARE_FILE_2_5 = ./files/ath10k-firmware-38eeda3ae6f90fde5546bdd48ee4ff3090f238c0/ath10k/$(1)/hw2.0/firmware-5.bin
+FIRMWARE_ROOT = ./files/ath10k-firmware-38eeda3ae6f90fde5546bdd48ee4ff3090f238c0/ath10k
 
 define Package/ath10k-firmware-default-ct
   SECTION:=firmware
@@ -27,6 +26,12 @@ define Package/ath10k-firmware-qca9888-ct
   PROVIDES:=ath10k-firmware-qca9888
 endef
 
+define Package/ath10k-firmware-qca988x-ct
+  $(Package/ath10k-firmware-default-ct)
+  TITLE:=DD-WRT Alternate ath10k firmware for QCA988X
+  PROVIDES:=ath10k-firmware-qca988x
+endef
+
 define Package/ath10k-firmware-qca4019-ct/description
   DD-WRT Alternate ath10k firmware
   Provides support for 5MHz and 10MHz channels
@@ -37,18 +42,30 @@ define Package/ath10k-firmware-qca9888-ct/description
   Provides support for 5MHz and 10MHz channels
 endef
 
+define Package/ath10k-firmware-qca988x-ct/description
+  DD-WRT Alternate ath10k firmware
+  Provides support for 5MHz and 10MHz channels
+endef
+
 define Build/Compile
 endef
 
 define Package/ath10k-firmware-qca4019-ct/install
-	$(INSTALL_DIR) $(1)/lib/firmware/ath10k/QCA4019/hw1.0
-	$(INSTALL_DATA) $(call FIRMWARE_FILE_1_5,QCA4019) $(1)/lib/firmware/ath10k/QCA4019/hw1.0/firmware-5.bin
+	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA4019/hw1.0
+  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA4019/hw1.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA4019/hw1.0/firmware-5.bin
 endef
 
 define Package/ath10k-firmware-qca9888-ct/install
-	$(INSTALL_DIR) $(1)/lib/firmware/ath10k/QCA9888/hw2.0
-	$(INSTALL_DATA) $(call FIRMWARE_FILE_2_5,QCA9888) $(1)/lib/firmware/ath10k/QCA9888/hw2.0/firmware-5.bin
+	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA9888/hw2.0
+  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/firmware-5.bin
+endef
+
+define Package/ath10k-firmware-qca988x-ct/install
+	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA988X/hw2.0
+  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/board.bin      $(1)/lib/firmware/ath10k/QCA988X/hw2.0/board.bin
+  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-t.bin
 endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
 $(eval $(call BuildPackage,ath10k-firmware-qca9888-ct))
+$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct))
