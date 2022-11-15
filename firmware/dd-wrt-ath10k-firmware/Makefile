@@ -62,8 +62,7 @@ endef
 
 define Package/ath10k-firmware-qca988x-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA988X/hw2.0
-  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/board.bin      $(1)/lib/firmware/ath10k/QCA988X/hw2.0/board.bin
-  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-t.bin
+  $(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
 endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
