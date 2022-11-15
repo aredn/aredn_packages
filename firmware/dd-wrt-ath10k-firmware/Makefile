@@ -52,17 +52,17 @@ endef
 
 define Package/ath10k-firmware-qca4019-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA4019/hw1.0
-	$(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA4019/hw1.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA4019/hw1.0/firmware-5.bin
+	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA4019/hw1.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA4019/hw1.0/firmware-5.bin
 endef
 
 define Package/ath10k-firmware-qca9888-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA9888/hw2.0
-	$(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/firmware-5.bin
+	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/firmware-5.bin
 endef
 
 define Package/ath10k-firmware-qca988x-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA988X/hw2.0
-	$(INSTALL_DITA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
+	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
 endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
