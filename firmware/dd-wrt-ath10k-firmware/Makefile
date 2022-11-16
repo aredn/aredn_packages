@@ -58,6 +58,7 @@ endef
 define Package/ath10k-firmware-qca9888-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA9888/hw2.0
 	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/firmware-5.bin
+	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/board-2.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/board-2.bin
 endef
 
 define Package/ath10k-firmware-qca988x-ct/install
