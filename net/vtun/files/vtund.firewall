@@ -3,8 +3,8 @@
 vtunduciport=$(uci get vtun.options.port 2>/dev/null)
 vtundport=${vtunduciport:-5525}
 
-iptables -I zone_wan_input -p tcp -m tcp --dport $vtundport -j ACCEPT
+nft insert rule ip fw4 input_wan tcp dport $vtundport counter accept
 if [ "$(/sbin/uci -q get aredn.@tunnel[0].wanonly)" != "0" ]; then
-    iptables -I zone_wifi_output -p tcp -m tcp --dport $vtundport -j REJECT
-    iptables -I zone_dtdlink_output -p tcp -m tcp --dport $vtundport -j REJECT
+    nft insert rule ip fw4 output_wifi tcp dport $vtundport counter reject
+    nft insert rule ip fw4 output_dtdlink tcp dport $vtundport counter reject
 fi
