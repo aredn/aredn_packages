@@ -25,7 +25,7 @@ define Package/prometheus-exporter/install
 	$(CP) ./files/metrics/* $(1)/usr/local/bin/metrics/
 endef
 
-defined Build/Compile
+define Build/Compile
 endef
 
 $(eval $(call BuildPackage,prometheus-exporter))
