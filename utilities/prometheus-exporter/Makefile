@@ -6,11 +6,12 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
 
 define Package/prometheus-exporter
-	SECTION:=utilities
-	CATEGORY:=
+	SECTION:=utils
+	CATEGORY:=Utilities
 	MAINTAINER:=AREDN Dev Team
-	TITLE:=prometheus-exporter
+	TITLE:=Prometheus metrics exporter
 	URL:=http://www.arednmesh.org/
+	PKGARCH:=all
 endef
 
 define Package/prometheus-exporter/description
