@@ -21,13 +21,13 @@ endef
 
 define Package/prometheus-exporter/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin/
-	$(INSTALL_BIN) ./files/main $(1)/www/cgi-bin/metrics
-	$(INSTALL_DIR) $(1)/usr/local/bin/metrics/
-	$(CP) ./files/metrics/* $(1)/usr/local/bin/metrics/
-	$(INSTALL_DIR) $(1)/usr/local/bin/metrics/periodics/
-	$(CP) ./files/metrics/periodics/* $(1)/usr/local/bin/metrics/periodics/
 	$(INSTALL_DIR) $(1)/usr/local/bin/mgr/
+	$(INSTALL_DIR) $(1)/usr/local/bin/metrics/
+	$(INSTALL_DIR) $(1)/usr/local/bin/metrics/periodics/
 	$(INSTALL_BIN) ./files/service/periodic-metrics.lua $(1)/usr/local/bin/mgr/
+	$(INSTALL_BIN) ./files/main $(1)/www/cgi-bin/metrics
+	$(CP) ./files/metrics/* $(1)/usr/local/bin/metrics/
+	$(CP) ./files/periodics/* $(1)/usr/local/bin/metrics/periodics/
 endef
 
 define Build/Compile
