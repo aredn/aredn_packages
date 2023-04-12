@@ -70,7 +70,7 @@ function M.run_iperf3_metric(from, to, protocol)
         if f then
             for line in f:lines()
             do
-                if line:match("iperf is disabled") then
+                if line:match("iperf is disabled") or line:match("iperf server is disabled") then
                     break
                 end
                 if line:match("<title>BUSY</title>") then
