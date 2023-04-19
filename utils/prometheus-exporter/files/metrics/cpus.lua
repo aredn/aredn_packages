@@ -42,7 +42,7 @@ do
         print("# TYPE node_load gauge")
         print('node_load{minutes="1"} ' .. a1)
         print('node_load{minutes="5"} ' .. a5)
-        print('node_load{minutes="15} ' .. a15)
+        print('node_load{minutes="15"} ' .. a15)
         break
     end
 end
