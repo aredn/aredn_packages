@@ -105,8 +105,8 @@ function M.task(conf, metrics, opt)
 
     for _, c in ipairs(conf)
     do
-        if c.name == "iperf3" and (c.frequency == "hourly" or (c.frequency == "daily" and opt.is_daily)) then
-            local hostname, protocol = c.arg:match("^(%S+)%s*(%S*)%s*")
+        if c.name == "iperf3" and (c.period == "hourly" or (c.period == "daily" and opt.is_daily)) then
+            local hostname, protocol = c.args:match("^(%S+)%s*(%S*)%s*")
             if hostname and M.is_peer(hostname) then
                 if protocol ~= "udp" then
                     protocol = "tcp"

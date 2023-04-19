@@ -34,20 +34,32 @@
 
 --]]
 
-local metrics_conf = "/etc/metrics.conf"
 local metrics_data = "/tmp/periodic-metrics"
 local metrics_periodics = "/usr/local/bin/metrics/periodics"
 local M = {}
+local cursor = uci.cursor()
 
 function M.periodic_metrics()
+
+    -- Read the configuration
+    local conf = {}
+    cursor:foreach("metrics", "periodic",
+        function(section)
+            if section.name and section.period then
+                conf[#conf + 1] = { name = section.name, period = section.period, args = section.args or "" }
+            end
+        end
+    )
+
     -- Only run if we have a configuration
-    if not nixio.fs.stat(metrics_conf) then
+    if #conf == 0 then
         exit_app()
         return
     end
 
     wait_for_ticks(30) -- wait to let other things startup
 
+    -- Load the periodic tasks
     local periodics = {}
     for name in nixio.fs.dir(metrics_periodics)
     do
@@ -58,16 +70,6 @@ function M.periodic_metrics()
     end
 
     local metrics = {}
-
-    -- Read the configuration
-    local conf = {}
-    for line in io.lines(metrics_conf)
-    do
-        local freq, name, arg = line:match("^%s*(%a*)%s+(%S+)%s*(.+)%s*$")
-        if freq then
-            conf[#conf + 1] = { frequency = freq, name = name, arg = arg }
-        end
-    end
 
     -- Run once per hour, but signal each 24 hour period
     local count = 0
