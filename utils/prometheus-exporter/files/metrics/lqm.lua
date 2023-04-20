@@ -68,15 +68,17 @@ if f then
         print('# TYPE node_lqm_tracker_' .. key .. (key:match('_total$') and ' counter' or ' gauge'))
         for mac, tracker in pairs(lqm.trackers)
         do
-            local ip = tracker.ip or ""
-            local hostname = tracker.hostname or ip
-            local ltype = tracker.type or "unknown"
-            local val = tracker[key]
-            if val then
-                if type(val) == "boolean" then
-                    val = val and 1 or 0
+            if tracker.lastseen >= lqm.now then
+                local ip = tracker.ip or ""
+                local hostname = tracker.hostname or ip
+                local ltype = tracker.type or "unknown"
+                local val = tracker[key]
+                if val then
+                    if type(val) == "boolean" then
+                        val = val and 1 or 0
+                    end
+                    print('node_lqm_tracker_' .. key .. '{type="' .. ltype .. '",hostname="' .. hostname .. '",ip="' .. ip .. '",mac="' .. mac .. '"} ' .. val)
                 end
-                print('node_lqm_tracker_' .. key .. '{type="' .. ltype .. '",hostname="' .. hostname .. '",ip="' .. ip .. '",mac="' .. mac .. '"} ' .. val)
             end
         end
     end
