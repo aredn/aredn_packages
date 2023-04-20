@@ -103,7 +103,7 @@ function M.periodic_metrics()
                     if prefix:match("_total$") then
                         f:write(" count\n")
                     else
-                        f:write(" guage\n")
+                        f:write(" gauge\n")
                     end
                 end
                 f:write(k .. " " .. metrics[k] .. "\n")
