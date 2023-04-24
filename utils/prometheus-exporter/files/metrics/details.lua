@@ -34,21 +34,24 @@
 
 --]]
 
+require("aredn.utils")
 require("aredn.hardware")
 local info = require("aredn.info")
+
+os.capture = capture
 
 local lat, lon = info.getLatLon()
 
 print('node_details_basics{' ..
 		'board_id="' .. hardware_boardid() .. '"' ..
-		',description="' .. info.getNodeDescription() .. '"' ..
+		',description="' .. (info.getNodeDescription() or "") .. '"' ..
 		',firmware_version="' .. info.getFirmwareVersion() .. '"' ..
-		',gridsquare="' .. info.getGridSquare() .. '"' ..
-		',lat="' .. lat .. '"' ..
-		',lon="' .. lon .. '"' ..
-		',model="' .. info.getModel() .. '"' ..
-        ',node="' .. info.getNodeName() .. '"' ..
-        ',tactical="' .. info.getTacticalName() .. '"' ..
+		',gridsquare="' .. (info.getGridSquare() or "") .. '"' ..
+		',lat="' .. (lat or "") .. '"' ..
+		',lon="' .. (lon or "") .. '"' ..
+		',model="' .. (info.getModel() or "") .. '"' ..
+		',node="' .. (info.getNodeName() or "") .. '"' ..
+		',tactical="' .. (info.getTacticalName() or "") .. '"' ..
     '} 1')
 
 local dev = info.getMeshRadioDevice()
