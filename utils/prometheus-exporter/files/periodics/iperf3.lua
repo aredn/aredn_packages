@@ -66,17 +66,18 @@ function M.run_iperf3_metric(from, to, protocol)
     local retry = 3
     while not bitrate and retry > 0
     do
+        retry = retry - 1
         local f = io.popen("wget -q -O - 'http://" .. from .. ":8080/cgi-bin/iperf?server=" .. to .. "&protocol=" .. protocol .. "'")
         if f then
             for line in f:lines()
             do
                 if line:match("iperf is disabled") or line:match("iperf server is disabled") then
+                    retry = 0
                     break
                 end
                 if line:match("<title>BUSY</title>") then
                     f:close()
                     f = nil
-                    retry = retry - 1
                     wait_for_ticks(math.floor(20 + 20 * math.random()))
                     break
                 end
