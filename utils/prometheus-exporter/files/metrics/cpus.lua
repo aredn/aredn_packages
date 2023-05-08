@@ -38,11 +38,15 @@ for line in io.lines("/proc/loadavg")
 do
     local a1, a5, a15 = line:match("^(%S+) (%S+) (%S+)")
     if a1 then
-        print("# HELP node_load Load average over X minute")
-        print("# TYPE node_load gauge")
-        print('node_load{minutes="1"} ' .. a1)
-        print('node_load{minutes="5"} ' .. a5)
-        print('node_load{minutes="15"} ' .. a15)
+        print("# HELP node_load1 1m load average.")
+        print("# TYPE node_load1 gauge")
+        print('node_load1 ' .. a1)
+        print("# HELP node_load5 5m load average.")
+        print("# TYPE node_load5 gauge")
+        print('node_load5 ' .. a5)
+        print("# HELP node_load15 51m load average.")
+        print("# TYPE node_load15 gauge")
+        print('node_load15 ' .. a15)
         break
     end
 end

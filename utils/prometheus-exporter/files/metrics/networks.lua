@@ -68,7 +68,7 @@ local props = {
         local operstate = read_val(dev .. "/operstate")
         return 'node_network_info{address="' .. address .. '",broadcast="' .. broadcast .. '",device="' .. dev .. '",duplex="' .. duplex .. '",ifalias="' .. ifalias .. '",operstate="' .. operstate .. '"} 1'
     end },
-    { "mtu_bytes_total", "mtu" },
+    { "mtu_bytes", "mtu" },
     { "name_assign_type", "name_assign_type" },
     { "netdev_group", "netdev_group" },
     { "protocol_type", "type" },
