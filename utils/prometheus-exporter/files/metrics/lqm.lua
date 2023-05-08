@@ -47,7 +47,6 @@ if f then
         "distance",
         "exposed",
         "hidden",
-        "last_tx",
         "last_tx_total",
         "lat",
         "lon",
