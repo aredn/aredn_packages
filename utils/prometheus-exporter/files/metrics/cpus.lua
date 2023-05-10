@@ -34,6 +34,17 @@
 
 --]]
 
+function extract_and_print_single_metric_from_string(line, match_pattern, name, type, description)
+    local value = line:match(match_pattern)
+    if value then
+        if description then
+            print("# HELP " .. name  .. " " .. description)
+        end
+        print("# TYPE " .. name  .. " " .. type )
+        print(name .. " " .. value)
+    end
+end
+
 for line in io.lines("/proc/loadavg")
 do
     local a1, a5, a15 = line:match("^(%S+) (%S+) (%S+)")
@@ -51,12 +62,12 @@ do
     end
 end
 
-print("# HELP node_cpu Seconds the cpus spent in each mode")
-print("# TYPE node_cpu counter")
 for line in io.lines("/proc/stat")
 do
     local cpunr, user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice = line:match("^cpu(%d+) (%d+) (%d+) (%d+) (%d+) (%d+) (%d+) (%d+) (%d+) (%d+) (%d+)")
     if cpunr then
+        print("# HELP node_cpu Seconds the cpus spent in each mode.")
+        print("# TYPE node_cpu counter")
         print('node_cpu_seconds_total{cpu="' .. cpunr .. '",mode="guest"} ' .. guest / 100)
         print('node_cpu_seconds_total{cpu="' .. cpunr .. '",mode="guest_nice"} ' .. guest_nice / 100)
         print('node_cpu_seconds_total{cpu="' .. cpunr .. '",mode="idle"} ' .. idle / 100)
@@ -68,4 +79,11 @@ do
         print('node_cpu_seconds_total{cpu="' .. cpunr .. '",mode="system"} ' .. system / 100)
         print('node_cpu_seconds_total{cpu="' .. cpunr .. '",mode="user"} ' .. user / 100)
     end
+
+    extract_and_print_single_metric_from_string(line, "btime (%d+)", "node_boot_time_seconds", "counter", "Node boot time, in unixtime.")
+    extract_and_print_single_metric_from_string(line, "ctxt (%d+)", "node_context_switches_total", "counter", "Total number of context switches.")
+    extract_and_print_single_metric_from_string(line, "intr (%d+)", "node_intr_total", "counter", "Total number of interrupts serviced.")
+    extract_and_print_single_metric_from_string(line, "processes (%d+)", "node_forks_total", "counter")
+    extract_and_print_single_metric_from_string(line, "procs_running  (%d+)", "node_procs_running", "counter")
+    extract_and_print_single_metric_from_string(line, "procs_blocked (%d+)", "node_procs_blocked", "counter")
 end
