@@ -74,6 +74,7 @@ else
     print('node_details_meshrf 0')
 end
 
-print('# HELP node_uname_info MinimalLabeled system information as provided by the uname system call.')
+
+print('# HELP node_uname_info Minimal Labeled system information as provided by the uname system call.')
 print('# TYPE node_uname_info gauge')
 print('node_uname_info{nodename="' .. (info.getNodeName() or "") .. '"} 1')

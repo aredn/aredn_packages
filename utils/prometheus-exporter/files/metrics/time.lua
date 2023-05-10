@@ -34,24 +34,6 @@
 
 --]]
 
-for line in io.lines("/proc/mounts") do
-    local dev, mountpoint, fstype = line:match("^(%S+)%s+(%S+)%s+(%S+)")
-    if dev then
-        if mountpoint:match("^/")
-        and not mountpoint:match("^/proc")
-        and not mountpoint:match("^/sys")
-        and not mountpoint:match("^/dev")
-        and not mountpoint:match("^/run")
-        then
-            local info = nixio.fs.statvfs(mountpoint)
-            print('# HELP node_filesystem_avail_bytes Filesystem space available in bytes.')
-            print('# TYPE node_filesystem_avail_bytes gauge')
-            print('node_filesystem_avail_bytes{device="' .. dev .. '",fstype="' .. fstype .. '",mountpoint="' ..
-                      mountpoint .. '"} ' .. info.bavail * info.frsize)
-            print('# HELP node_filesystem_size_bytes Filesystem size in bytes.')
-            print('# TYPE node_filesystem_size_bytes gauge')
-            print('node_filesystem_size_bytes{device="' .. dev .. '",fstype="' .. fstype .. '",mountpoint="' ..
-                      mountpoint .. '"} ' .. info.blocks * info.frsize)
-        end
-    end
-end
+print("# HELP node_time_seconds System time in seconds since epoch (1970).")
+print("# TYPE node_time_seconds gauge")
+print("node_time_seconds " .. os.time())
