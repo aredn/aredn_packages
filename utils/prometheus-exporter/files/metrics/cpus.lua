@@ -84,6 +84,6 @@ do
     extract_and_print_single_metric_from_string(line, "ctxt (%d+)", "node_context_switches_total", "counter", "Total number of context switches.")
     extract_and_print_single_metric_from_string(line, "intr (%d+)", "node_intr_total", "counter", "Total number of interrupts serviced.")
     extract_and_print_single_metric_from_string(line, "processes (%d+)", "node_forks_total", "counter")
-    extract_and_print_single_metric_from_string(line, "procs_running  (%d+)", "node_procs_running", "counter")
-    extract_and_print_single_metric_from_string(line, "procs_blocked (%d+)", "node_procs_blocked", "counter")
+    extract_and_print_single_metric_from_string(line, "procs_running  (%d+)", "node_procs_running", "gauge")
+    extract_and_print_single_metric_from_string(line, "procs_blocked (%d+)", "node_procs_blocked", "gauge")
 end
