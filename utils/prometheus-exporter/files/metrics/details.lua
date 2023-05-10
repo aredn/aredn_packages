@@ -42,8 +42,8 @@ os.capture = capture
 
 local lat, lon = info.getLatLon()
 
-print('# HELP node_aredn_info Labeled AREDN node information.' ..
-		'# TYPE node_aredn_info gauge')
+print('# HELP node_aredn_info Labeled AREDN node information.')
+print('# TYPE node_aredn_info gauge')
 
 print('node_aredn_info{' ..
 		'board_id="' .. hardware_boardid() .. '"' ..
@@ -59,8 +59,8 @@ print('node_aredn_info{' ..
 
 local dev = info.getMeshRadioDevice()
 if dev ~= "" then
-	print('# HELP node_aredn_meshrf Labeled AREDN node mesh RF information.' ..
-		'# TYPE node_aredn_meshrf gauge')
+	print('# HELP node_aredn_meshrf Labeled AREDN node mesh RF information.')
+    print('# TYPE node_aredn_meshrf gauge')
 
     print('node_aredn_meshrf{' ..
 		'band="' .. info.getBand(dev) .. '"' ..
@@ -74,7 +74,7 @@ else
     print('node_details_meshrf 0')
 end
 
-print(	'# HELP node_uname_info Minimal labeled system information as provided by the uname system call.' ..
-		'# TYPE node_uname_info gauge' ..
-		'node_uname_info{nodename="' .. (info.getNodeName() or "") .. '"} 1'
-	)
+
+print('# HELP node_uname_info Minimal Labeled system information as provided by the uname system call.')
+print('# TYPE node_uname_info gauge')
+print('node_uname_info{nodename="' .. (info.getNodeName() or "") .. '"} 1')
