@@ -1,0 +1,15 @@
+--- a/src/unix/ifnet.c
++++ b/src/unix/ifnet.c
+@@ -664,11 +664,8 @@
+     ifs.int_metric = calculate_if_metric(ifr.ifr_name);
+   OLSR_PRINTF(1, "\tMetric: %d\n", ifs.int_metric);
+ 
+-  /* Get MTU */
+-  if (ioctl(olsr_cnf->ioctl_s, SIOCGIFMTU, &ifr) < 0)
+-    ifs.int_mtu = OLSR_DEFAULT_MTU;
+-  else
+-    ifs.int_mtu = ifr.ifr_mtu;
++  /* Set MTU */
++  ifs.int_mtu = OLSR_DEFAULT_MTU;
+ 
+   ifs.int_mtu -= (olsr_cnf->ip_version == AF_INET6) ? UDP_IPV6_HDRSIZE : UDP_IPV4_HDRSIZE;
