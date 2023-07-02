@@ -58,17 +58,17 @@ print('node_aredn_info{' ..
     '} 1')
 
 local dev = info.getMeshRadioDevice()
-if dev ~= "" then
-	print('# HELP node_aredn_meshrf Labeled AREDN node mesh RF information.')
+if dev and dev ~= "" then
+    print('# HELP node_aredn_meshrf Labeled AREDN node mesh RF information.')
     print('# TYPE node_aredn_meshrf gauge')
 
     print('node_aredn_meshrf{' ..
-		'band="' .. info.getBand(dev) .. '"' ..
+        'band="' .. info.getBand(dev) .. '"' ..
         ',channel="' .. info.getChannel(dev) .. '"' ..
         ',chanbw="' .. info.getChannelBW(dev) .. '"' ..
         ',device="' .. dev .. '"' ..
-        ',frequency="' .. info.getFreq() .. '"' ..
-		',ssid="' .. info.getSSID() .. '"' ..
+        ',frequency="' .. info.getFreq(dev) .. '"' ..
+        ',ssid="' .. info.getSSID() .. '"' ..
     '} 1')
 else
     print('node_details_meshrf 0')
