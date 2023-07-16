@@ -55,7 +55,7 @@ do
         print("# HELP node_load5 5m load average.")
         print("# TYPE node_load5 gauge")
         print('node_load5 ' .. a5)
-        print("# HELP node_load15 51m load average.")
+        print("# HELP node_load15 15m load average.")
         print("# TYPE node_load15 gauge")
         print('node_load15 ' .. a15)
         break
