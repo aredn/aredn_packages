@@ -11,44 +11,32 @@
  
 --- a/src/cfgparser/olsrd_conf.c
 +++ b/src/cfgparser/olsrd_conf.c
-@@ -99,7 +99,8 @@ const char *GW_UPLINK_TXT[] = {
+@@ -99,6 +99,7 @@ const char *GW_UPLINK_TXT[] = {
  const char *OLSR_IF_MODE[] = {
    "mesh",
-   "ether",
--  "silent"
-+  "silent",
+-  "ether"
++  "ether",
 +  "isolated"
  };
  
  int current_line;
-@@ -308,6 +309,8 @@ olsrd_print_interface_cnf(struct if_config_options *cnf, struct if_config_option
+@@ -308,4 +309,6 @@ olsrd_print_interface_cnf(struct if_config_options *cnf, struct if_config_option
      printf("\tMode           : ether%s\n",DEFAULT_STR(mode));
-   } else if (cnf->mode==IF_MODE_SILENT){
-     printf("\tMode           : silent%s\n",DEFAULT_STR(mode));
 +  } else if (cnf->mode==IF_MODE_ISOLATED){
 +    printf("\tMode           : isolated%s\n",DEFAULT_STR(mode));
    } else {
      printf("\tMode           : mesh%s\n",DEFAULT_STR(mode));
    }
-@@ -474,7 +477,7 @@ static int olsrd_sanity_check_rtpolicy(struct olsrd_config *cnf) {
- #endif /* __linux__ */
- 
- 
- static 
- int olsrd_sanity_check_interface_cnf(struct if_config_options * io, struct olsrd_config * cnf, char* name) {
-   struct olsr_lq_mult *mult;
- 
 --- a/src/cfgparser/oparse.y
 +++ b/src/cfgparser/oparse.y
-@@ -582,12 +582,15 @@ isetifmode: TOK_IFMODE TOK_STRING
+@@ -582,12 +582,14 @@ isetifmode: TOK_IFMODE TOK_STRING
  {
    int ifcnt = ifs_in_curr_cfg;
    struct olsr_if *ifs = olsr_cnf->interfaces;
--	int mode = (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:((strcmp($2->string, "silent") == 0)?IF_MODE_SILENT:IF_MODE_MESH);
+-	int mode = (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:IF_MODE_MESH;
 +	int mode = (
 +    (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:
-+    (strcmp($2->string, "isolated") == 0)?IF_MODE_ISOLATED:
-+    (strcmp($2->string, "silent") == 0)?IF_MODE_SILENT:IF_MODE_MESH);
++    (strcmp($2->string, "isolated") == 0)?IF_MODE_ISOLATED:IF_MODE_MESH);
  
    PARSER_DEBUG_PRINTF("\tMode: %s\n", $2->string);
  
