@@ -1,6 +1,6 @@
 #!/bin/sh
 
-vtunduciport=$(uci get vtun.options.port 2>/dev/null)
+vtunduciport=$(uci get vtun.@options[0].port 2>/dev/null)
 vtundport=${vtunduciport:-5525}
 
 nft insert rule ip fw4 input_wan tcp dport $vtundport counter accept
