@@ -1,0 +1,90 @@
+--- a/auth.c
++++ b/auth.c
+@@ -27,6 +27,7 @@
+ 
+ #include "config.h"
+ 
++#include <ctype.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+@@ -343,6 +344,18 @@ struct vtun_host * auth_server(int fd)
+ 	        if( !strcmp(str1,"HOST") ){
+ 		   host = strdup(str2);
+ 
++		   int len = 0;
++		   while (*host) {
++			  *host = tolower(*host);
++			  host++;
++			  len++;
++			  // Safety check to avoid infinite loop
++			  if (len > 255) {
++			  	  free(host);
++				  return NULL;
++			  }
++		   }
++		   host -= len;
+ 		   gen_chal(chal_req);
+ 		   print_p(fd,"OK CHAL: %s\n", cl2cs(chal_req));
+ 
+diff --git a/cfg_file.y b/cfg_file.y
+index 8552e0e..2914168 100644
+--- a/cfg_file.y
++++ b/cfg_file.y
+@@ -27,6 +27,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdarg.h>
++#include <ctype.h>
+ 
+ #include <syslog.h>
+ 
+@@ -106,6 +107,23 @@ statement: '\n'
+ 		   */
+ 	  	  memcpy(parse_host, &default_host, sizeof(struct vtun_host));
+ 		  parse_host->host = strdup($1);
++
++		  // This is later freed in free_host()
++		  char *hostStr = strdup($1);
++		  int len = 0;
++		  while (*hostStr) {
++			  *hostStr = tolower(*hostStr);
++			  hostStr++;
++			  len++;
++			  // Safety check to avoid infinite loop
++			  if (len > 255) {
++			  	  yyerror("Host name too long");
++			  	  YYABORT;
++			  }
++		  }
++		  hostStr -= len;
++
++		  parse_host->host_normalized = hostStr;
+ 		  parse_host->passwd = NULL;
+ 
+ 		  /* Copy local address */
+@@ -568,10 +586,11 @@ int free_host(void *d, void *u)
+ {
+    struct vtun_host *h = d;
+ 
+-   if (u && !strcmp(h->host, u))
++   if (u && (!strcmp(h->host, u) || !strcmp(h->host_normalized, u)))
+       return 1;
+ 
+    free(h->host);   
++   free(h->host_normalized);   
+    free(h->passwd);   
+    
+    llist_free(&h->up, free_cmd, NULL);   
+diff --git a/vtun.h b/vtun.h
+index 6b1efed..60f50cd 100644
+--- a/vtun.h
++++ b/vtun.h
+@@ -83,6 +83,7 @@ struct vtun_addr {
+ 
+ struct vtun_host {
+    char *host;
++   char *host_normalized;
+    char *passwd;
+    char *dev;
+ 
