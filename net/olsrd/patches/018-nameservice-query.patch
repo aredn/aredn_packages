@@ -1,5 +1,16 @@
 --- a/lib/nameservice/src/nameservice.c
 --- b/lib/nameservice/src/nameservice.c
+@@ -364,7 +364,7 @@
+   int ret;
+ 
+   //regex string for validating the hostnames
+-  const char *regex_name = "^[[:alnum:]_.-]+$";
++  const char *regex_name = "^[[:alnum:]_*.-]+$";
+   //regex string for the service line
+   size_t regex_size;
+   char *regex_service;
+--- a/lib/nameservice/src/nameservice.c
+--- b/lib/nameservice/src/nameservice.c
 @@ -402,7 +402,7 @@
    strscpy(regex_service, "^[[:alnum:]]+://(([[:alnum:]_.-]+", regex_size);
    strscat(regex_service, my_suffix, regex_size);
