@@ -5,7 +5,7 @@
  
    //regex string for validating the hostnames
 -  const char *regex_name = "^[[:alnum:]_.-]+$";
-+  const char *regex_name = "^[[:alnum:]_.-*]+$";
++  const char *regex_name = "^[[:alnum:]_.-]+$";
    //regex string for the service line
    size_t regex_size;
    char *regex_service;
