@@ -1,0 +1,198 @@
+--- a/lib/httpinfo/src/olsrd_httpinfo.c
++++ b/lib/httpinfo/src/olsrd_httpinfo.c
+@@ -928,6 +928,8 @@ build_config_body(struct autobuf *abuf)
+     }
+     abuf_appendf(abuf, "<tr>\n" "<td>MTU: %d</td>\n" "<td>WLAN: %s</td>\n" "<td>STATUS: UP</td>\n" "</tr>\n",
+                rifs->int_mtu, rifs->is_wireless ? "Yes" : "No");
++    abuf_appendf(abuf, "<tr>\n" "<td>Isolated: %s</td>\n" "<td></td>\n" "<td></td>\n" "</tr>\n",
++                rifs->mode == IF_MODE_ISOLATED ? "Yes" : "No");
+   }
+   abuf_puts(abuf, "</table>\n");
+ 
+--- a/src/cfgparser/olsrd_conf.c
++++ b/src/cfgparser/olsrd_conf.c
+@@ -99,6 +99,7 @@ const char *GW_UPLINK_TXT[] = {
+ const char *OLSR_IF_MODE[] = {
+   "mesh",
+-  "ether"
++  "ether",
++  "isolated"
+ };
+ 
+ int current_line;
+@@ -308,4 +309,6 @@ olsrd_print_interface_cnf(struct if_config_options *cnf, struct if_config_option
+     printf("\tMode           : ether%s\n",DEFAULT_STR(mode));
++  } else if (cnf->mode==IF_MODE_ISOLATED){
++    printf("\tMode           : isolated%s\n",DEFAULT_STR(mode));
+   } else {
+     printf("\tMode           : mesh%s\n",DEFAULT_STR(mode));
+   }
+--- a/src/cfgparser/oparse.y
++++ b/src/cfgparser/oparse.y
+@@ -582,12 +582,14 @@ isetifmode: TOK_IFMODE TOK_STRING
+ {
+   int ifcnt = ifs_in_curr_cfg;
+   struct olsr_if *ifs = olsr_cnf->interfaces;
+-	int mode = (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:IF_MODE_MESH;
++	int mode = (
++    (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:
++    (strcmp($2->string, "isolated") == 0)?IF_MODE_ISOLATED:IF_MODE_MESH);
+ 
+   PARSER_DEBUG_PRINTF("\tMode: %s\n", $2->string);
+ 
+ 	SET_IFS_CONF(ifs, ifcnt, mode, mode);
+ 	
+   free($2->string);
+   free($2);
+ }
+--- a/src/generate_msg.c
++++ b/src/generate_msg.c
+@@ -88,7 +88,7 @@ generate_tc(void *p)
+   struct tc_message tcpacket;
+   struct interface_olsr *ifn = (struct interface_olsr *)p;
+ 
+-  olsr_build_tc_packet(&tcpacket);
++  olsr_build_tc_packet(&tcpacket, ifn);
+ 
+   if (queue_tc(&tcpacket, ifn) && TIMED_OUT(ifn->fwdtimer)) {
+     set_buffer_timer(ifn);
+@@ -102,6 +102,11 @@ generate_mid(void *p)
+ {
+   struct interface_olsr *ifn = (struct interface_olsr *)p;
+ 
++  /* Dont send any MID messages on isolated interfaces */
++  if (ifn->mode == IF_MODE_ISOLATED) {
++    return;
++  }
++
+   if (queue_mid(ifn) && TIMED_OUT(ifn->fwdtimer)) {
+     set_buffer_timer(ifn);
+   }
+--- a/src/lq_packet.c
++++ b/src/lq_packet.c
+@@ -111,6 +111,11 @@ create_lq_hello(struct lq_hello_message *lq_hello, struct interface_olsr *outif)
+     bool neigh_is_new = false;
+     uint8_t link_type;
+ 
++    /* Exclude neighbors from other interfaces is this is isolated */
++    if (outif->mode == IF_MODE_ISOLATED && !ipequal(&walker->local_iface_addr, &outif->ip_addr)) {
++      continue;
++    }
++
+     // allocate a neighbour entry
+     neigh = neigh_find(lq_hello, walker);
+     if (!neigh) {
+@@ -256,6 +261,11 @@ create_lq_tc(struct lq_tc_message *lq_tc, struct interface_olsr *outif)
+       continue;                 // no link ?
+     }
+ 
++    /* Don't include if this is an isolated interface */
++    if (outif->mode == IF_MODE_ISOLATED && outif != lnk->inter) {
++      continue;
++    }
++
+     if (lnk->linkcost >= LINK_COST_BROKEN) {
+       continue;                 // don't advertise links with very low LQ
+     }
+--- a/src/lq_plugin_default_ffeth.c
++++ b/src/lq_plugin_default_ffeth.c
+@@ -267,7 +267,7 @@ default_lq_ffeth_timer(void __attribute__ ((unused)) * context)
+     }
+ 
+     /* ethernet booster */
+-    if (link->inter->mode == IF_MODE_ETHER) {
++    if (link->inter->mode == IF_MODE_ETHER || link->inter->mode == IF_MODE_ISOLATED) {
+       if (tlq->lq.valueLq > (uint8_t)(0.95 * 255)) {
+         tlq->perfect_eth = true;
+       }
+@@ -279,7 +279,7 @@ default_lq_ffeth_timer(void __attribute__ ((unused)) * context)
+         tlq->lq.valueLq = 255;
+       }
+     }
+-    else if (link->inter->mode != IF_MODE_ETHER && tlq->lq.valueLq > 0) {
++    else if (tlq->lq.valueLq > 0) {
+       tlq->lq.valueLq--;
+     }
+ 
+--- a/src/olsr.c
++++ b/src/olsr.c
+@@ -350,7 +350,7 @@ olsr_forward_message(union olsr_message *m, struct interface_olsr *in_if, union
+     return 0;
+ 
+   /* Check MPR */
+-  if (olsr_lookup_mprs_set(src) == NULL) {
++  if (in_if->mode != IF_MODE_ISOLATED && olsr_lookup_mprs_set(src) == NULL) {
+ #ifdef DEBUG
+     struct ipaddr_str buf;
+     OLSR_PRINTF(5, "Forward - sender %s not MPR selector\n", olsr_ip_to_string(&buf, src));
+@@ -389,6 +389,9 @@ olsr_forward_message(union olsr_message *m, struct interface_olsr *in_if, union
+     /* do not forward TTL 1 messages to non-ether interfaces */
+     if (is_ttl_1 && ifn->mode != IF_MODE_ETHER) continue;
+ 
++    /* do not forward messages to isolated interfaces */
++    if (ifn->mode == IF_MODE_ISOLATED) continue;
++
+     if (net_output_pending(ifn)) {
+       /*
+        * Check if message is to big to be piggybacked
+--- a/src/olsr_cfg.h
++++ b/src/olsr_cfg.h
+@@ -200,5 +200,6 @@ enum olsr_if_mode {
+   IF_MODE_MESH,
+   IF_MODE_ETHER,
++  IF_MODE_ISOLATED,
+   IF_MODE_CNT
+ };
+ 
+--- a/src/packet.c
++++ b/src/packet.c
+@@ -202,6 +202,12 @@ olsr_build_hello_packet(struct hello_message *message, struct interface_olsr *ou
+   OLSR_PRINTF(5, "Not on link:\n");
+ #endif /* DEBUG */
+ 
++  /* If interface is isolated we don't include any other interface neighbors */
++
++  if (outif->mode == IF_MODE_ISOLATED) {
++    return 0;
++  }
++
+   /* Add the rest of the neighbors if running on multiple interfaces */
+ 
+   if (ifnet != NULL && ifnet->int_next != NULL)
+@@ -318,10 +324,11 @@ olsr_free_tc_packet(struct tc_message *message)
+  *@return 0
+  */
+ int
+-olsr_build_tc_packet(struct tc_message *message)
++olsr_build_tc_packet(struct tc_message *message, struct interface_olsr *outif)
+ {
+   struct tc_mpr_addr *message_mpr;
+   struct neighbor_entry *entry;
++  struct link_entry *lnk;
+   bool entry_added = false;
+ 
+   message->multipoint_relay_selector_address = NULL;
+@@ -340,6 +347,12 @@ olsr_build_tc_packet(struct tc_message *message)
+       continue;
+     }
+ 
++    /* Don't include neighbors on other interfaces if this interface is isolated */
++    lnk = get_best_link_to_neighbor(&entry->neighbor_main_addr);
++    if (!lnk || (outif->mode == IF_MODE_ISOLATED && outif != lnk->inter)) {
++      continue;
++    }
++
+     switch (olsr_cnf->tc_redundancy) {
+     case (2):
+       {
+--- a/src/packet.h
++++ b/src/packet.h
+@@ -125,7 +125,7 @@ int olsr_build_hello_packet(struct hello_message *, struct interface_olsr *);
+ 
+ void olsr_free_tc_packet(struct tc_message *);
+ 
+-int olsr_build_tc_packet(struct tc_message *);
++int olsr_build_tc_packet(struct tc_message *, struct interface_olsr *outif);
+ 
+ void olsr_free_mid_packet(struct mid_message *);
+ 
