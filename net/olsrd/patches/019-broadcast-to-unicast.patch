@@ -269,7 +269,7 @@ index 0f0e0d3d..3c09fbdb 100644
    if (olsr_cnf->ip_version == AF_INET) {
      /* IP version 4 */
 -    if (olsr_sendto(ifp->send_socket, ifp->netbuf.buff, ifp->netbuf.pending, MSG_DONTROUTE, (struct sockaddr *)sin, sizeof(*sin)) <
-+    if (sin->sin_addr.s_addr == 1) {
++    if (1) {
 +      /* Address of 1 indicate we should transform a broadcast into a group of unicasts */
 +      if (olsr_sendto_broadcast_to_unicast(ifp->olsr_raw_socket, ifp->netbuf.buff, ifp->netbuf.pending, ifp) < 0) {
 +        perror("olsr_sendto_broadcast_to_unicast(v4)");
