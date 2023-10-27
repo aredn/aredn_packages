@@ -205,9 +205,9 @@ index 22a0fa16..7df9879d 100644
 +  ip_hdr->check = csum(&check, ip_hdr, ip_hdr->ihl << 2, 1);
 +
 +  /* UDP header */
-+  udp_hdr->source = htons(DEF_OLSRPORT);
-+	udp_hdr->dest = htons(DEF_OLSRPORT);
-+	udp_hdr->len = htons(8 + len);
++  udp_hdr->uh_sport = htons(DEF_OLSRPORT);
++  udp_hdr->uh_dport = htons(DEF_OLSRPORT);
++  udp_hdr->uh_ulen = htons(8 + len);
 +
 +  /* Pseudo header for checksum */
 +  pseudo.source_address = iface->int_addr.sin_addr.s_addr;
@@ -219,7 +219,7 @@ index 22a0fa16..7df9879d 100644
 +  check = 0;
 +  csum(&check, &pseudo, sizeof(struct pseudo_header), 0);
 +  csum(&check, udp_hdr, sizeof(struct udphdr), 0);
-+  udp_hdr->check = csum(&check, data, len, 1);
++  udp_hdr->uh_sum = csum(&check, data, len, 1);
 +
 +  /* Get destinations */
 +  if (iface->peers[0] == 0 || (f = fopen(iface->peers, "r")) == NULL) {
