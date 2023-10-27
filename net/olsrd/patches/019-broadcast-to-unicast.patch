@@ -33,7 +33,7 @@ index f853bf64..f0e5c662 100644
    /* Periodic message generation timers */
    struct timer_entry *hello_gen_timer;
 diff --git a/src/linux/net.c b/src/linux/net.c
-index 22a0fa16..ae1f175a 100644
+index 22a0fa16..689db076 100644
 --- a/src/linux/net.c
 +++ b/src/linux/net.c
 @@ -57,7 +57,13 @@
@@ -123,7 +123,7 @@ index 22a0fa16..ae1f175a 100644
  /**
   *Creates a nonblocking IPv6 socket
   *@param bufspace the number of bytes in the buffer
-@@ -671,6 +729,142 @@ olsr_sendto(int s, const void *buf, size_t len, int flags, const struct sockaddr
+@@ -671,6 +729,144 @@ olsr_sendto(int s, const void *buf, size_t len, int flags, const struct sockaddr
    return sendto(s, buf, len, flags, to, tolen);
  }
  
@@ -249,14 +249,16 @@ index 22a0fa16..ae1f175a 100644
 +    return sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
 +  }
 +  /* Send the packet to each peer individually */
-+  while ((d = readdir(f)) != NULL && sscanf(d->d_name, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]) == 6) {
-+    socket_address.sll_addr[0] = ether_hdr->ether_dhost[0] = dst_mac[0];
-+    socket_address.sll_addr[1] = ether_hdr->ether_dhost[1] = dst_mac[1];
-+    socket_address.sll_addr[2] = ether_hdr->ether_dhost[2] = dst_mac[2];
-+    socket_address.sll_addr[3] = ether_hdr->ether_dhost[3] = dst_mac[3];
-+    socket_address.sll_addr[4] = ether_hdr->ether_dhost[4] = dst_mac[4];
-+    socket_address.sll_addr[5] = ether_hdr->ether_dhost[5] = dst_mac[5];
-+    r = sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
++  while ((d = readdir(f)) != NULL) {
++    if (sscanf(d->d_name, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]) == 6) {
++      socket_address.sll_addr[0] = ether_hdr->ether_dhost[0] = dst_mac[0];
++      socket_address.sll_addr[1] = ether_hdr->ether_dhost[1] = dst_mac[1];
++      socket_address.sll_addr[2] = ether_hdr->ether_dhost[2] = dst_mac[2];
++      socket_address.sll_addr[3] = ether_hdr->ether_dhost[3] = dst_mac[3];
++      socket_address.sll_addr[4] = ether_hdr->ether_dhost[4] = dst_mac[4];
++      socket_address.sll_addr[5] = ether_hdr->ether_dhost[5] = dst_mac[5];
++      r = sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
++    }
 +  }
 +  closedir(f);
 +
