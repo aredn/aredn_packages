@@ -33,12 +33,14 @@ index f853bf64..f5c91d09 100644
    /* Periodic message generation timers */
    struct timer_entry *hello_gen_timer;
 diff --git a/src/linux/net.c b/src/linux/net.c
-index 22a0fa16..7df9879d 100644
+index 22a0fa16..d6d49e5f 100644
 --- a/src/linux/net.c
 +++ b/src/linux/net.c
-@@ -58,6 +58,11 @@
+@@ -57,7 +57,13 @@
+ #include "kernel_tunnel.h"
  #include "ifnet.h"
  
++#include <features.h>
  #include <net/if.h>
 +#include <arpa/inet.h>
 +#include <linux/if_packet.h>
@@ -48,7 +50,7 @@ index 22a0fa16..7df9879d 100644
  
  #include <sys/ioctl.h>
  #include <sys/utsname.h>
-@@ -113,6 +118,18 @@ static char orig_global_redirect_state;
+@@ -113,6 +119,18 @@ static char orig_global_redirect_state;
  static char orig_global_rp_filter;
  static char orig_tunnel_rp_filter;
  
@@ -57,17 +59,17 @@ index 22a0fa16..7df9879d 100644
 + */
 +struct pseudo_header
 +{
-+	u_int32_t source_address;
-+	u_int32_t dest_address;
-+	u_int8_t placeholder;
-+	u_int8_t protocol;
-+	u_int16_t udp_length;
++  u_int32_t source_address;
++  u_int32_t dest_address;
++  u_int8_t placeholder;
++  u_int8_t protocol;
++  u_int16_t udp_length;
 +};
 +
  /**
   *Bind a socket to a device
   *
-@@ -484,6 +501,45 @@ getsocket(int bufspace, struct interface_olsr *ifp)
+@@ -484,6 +502,45 @@ getsocket(int bufspace, struct interface_olsr *ifp)
    return sock;
  }
  
@@ -113,37 +115,37 @@ index 22a0fa16..7df9879d 100644
  /**
   *Creates a nonblocking IPv6 socket
   *@param bufspace the number of bytes in the buffer
-@@ -671,6 +727,134 @@ olsr_sendto(int s, const void *buf, size_t len, int flags, const struct sockaddr
+@@ -671,6 +728,144 @@ olsr_sendto(int s, const void *buf, size_t len, int flags, const struct sockaddr
    return sendto(s, buf, len, flags, to, tolen);
  }
  
 +/*
-+	Generic checksum calculation function
++  Generic checksum calculation function
 +*/
 +static uint16_t
 +csum(uint32_t *sum, void *data, int nbytes, int end)
 +{
-+	uint16_t oddbyte = 0;
++  uint16_t oddbyte = 0;
 +  uint16_t *ptr = (uint16_t*)data;
 +  uint32_t tsum = *sum;
 +
-+	while (nbytes > 1) {
-+		tsum += *ptr++;
-+		nbytes -= 2;
-+	}
++  while (nbytes > 1) {
++    tsum += *ptr++;
++    nbytes -= 2;
++  }
 +
 +  if (!end) {
 +    *sum = tsum;
 +    return 0;
 +  }
 +
-+	if (nbytes == 1) {
-+		*((uint8_t*)&oddbyte) = *(uint8_t*)ptr;
-+		tsum += oddbyte;
-+	}
++  if (nbytes == 1) {
++    *((uint8_t*)&oddbyte) = *(uint8_t*)ptr;
++    tsum += oddbyte;
++  }
 +
-+	tsum = (tsum >> 16) + (tsum & 0xffff);
-+	tsum = tsum + (tsum >> 16);
++  tsum = (tsum >> 16) + (tsum & 0xffff);
++  tsum = tsum + (tsum >> 16);
 +
 +  *sum = (uint32_t)(uint16_t)~tsum;
 +  return (uint16_t)*sum;
@@ -186,28 +188,34 @@ index 22a0fa16..7df9879d 100644
 +
 +  /* Ethernet header */
 +  ether_hdr->ether_type = htons(ETH_P_IP);
-+	memcpy(ether_hdr->ether_shost, iface->mac, sizeof (iface->mac));
++  memcpy(ether_hdr->ether_shost, iface->mac, sizeof (iface->mac));
 +
 +  /* IP header */
 +  ip_hdr->ihl = 5;
-+	ip_hdr->version = 4;
-+	ip_hdr->tos = 0;
-+	ip_hdr->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + len);
-+	ip_hdr->id = htons(id++);
-+	ip_hdr->frag_off = 0;
-+	ip_hdr->ttl = 1;
-+	ip_hdr->protocol = IPPROTO_UDP;
-+	ip_hdr->check = 0;
-+	ip_hdr->saddr = iface->int_addr.sin_addr.s_addr;
-+	ip_hdr->daddr = 0xFFFFFFFF;
++  ip_hdr->version = 4;
++  ip_hdr->tos = 0;
++  ip_hdr->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + len);
++  ip_hdr->id = htons(id++);
++  ip_hdr->frag_off = 0;
++  ip_hdr->ttl = 1;
++  ip_hdr->protocol = IPPROTO_UDP;
++  ip_hdr->check = 0;
++  ip_hdr->saddr = iface->int_addr.sin_addr.s_addr;
++  ip_hdr->daddr = 0xFFFFFFFF;
 +
 +  check = 0;
 +  ip_hdr->check = csum(&check, ip_hdr, ip_hdr->ihl << 2, 1);
 +
 +  /* UDP header */
++#ifdef __GLIBC__
++  udp_hdr->source = htons(DEF_OLSRPORT);
++  udp_hdr->dest = htons(DEF_OLSRPORT);
++  udp_hdr->len = htons(8 + len);
++#else
 +  udp_hdr->uh_sport = htons(DEF_OLSRPORT);
 +  udp_hdr->uh_dport = htons(DEF_OLSRPORT);
 +  udp_hdr->uh_ulen = htons(8 + len);
++#endif
 +
 +  /* Pseudo header for checksum */
 +  pseudo.source_address = iface->int_addr.sin_addr.s_addr;
@@ -219,7 +227,11 @@ index 22a0fa16..7df9879d 100644
 +  check = 0;
 +  csum(&check, &pseudo, sizeof(struct pseudo_header), 0);
 +  csum(&check, udp_hdr, sizeof(struct udphdr), 0);
++#ifdef __GLIBC__
++  udp_hdr->check = csum(&check, data, len, 1);
++#else
 +  udp_hdr->uh_sum = csum(&check, data, len, 1);
++#endif
 +
 +  /* Get destinations */
 +  if (iface->peers[0] == 0 || (f = fopen(iface->peers, "r")) == NULL) {
@@ -261,7 +273,7 @@ index 6e663595..ce528901 100644
  
  #ifdef __linux__
 diff --git a/src/net_olsr.c b/src/net_olsr.c
-index 0f0e0d3d..3c09fbdb 100644
+index 0f0e0d3d..407a2f9f 100644
 --- a/src/net_olsr.c
 +++ b/src/net_olsr.c
 @@ -384,7 +384,14 @@ net_output(struct interface_olsr *ifp)
@@ -269,8 +281,8 @@ index 0f0e0d3d..3c09fbdb 100644
    if (olsr_cnf->ip_version == AF_INET) {
      /* IP version 4 */
 -    if (olsr_sendto(ifp->send_socket, ifp->netbuf.buff, ifp->netbuf.pending, MSG_DONTROUTE, (struct sockaddr *)sin, sizeof(*sin)) <
-+    if (1) {
-+      /* Address of 1 indicate we should transform a broadcast into a group of unicasts */
++    if (ifp->peers[0] != 0) {
++      /* If we might have multiple peers (in wifi) we transform this broadcast into a group of unicasts */
 +      if (olsr_sendto_broadcast_to_unicast(ifp->olsr_raw_socket, ifp->netbuf.buff, ifp->netbuf.pending, ifp) < 0) {
 +        perror("olsr_sendto_broadcast_to_unicast(v4)");
 +        retval = -1;
