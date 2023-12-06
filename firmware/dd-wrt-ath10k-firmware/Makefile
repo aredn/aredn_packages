@@ -64,8 +64,9 @@ endef
 define Package/ath10k-firmware-qca988x-ct/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA988X/hw2.0
 	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
+	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/board.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/board.bin
 endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
 $(eval $(call BuildPackage,ath10k-firmware-qca9888-ct))
-#$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct)) - No IBSS support
+$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct))
