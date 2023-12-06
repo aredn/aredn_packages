@@ -36,6 +36,10 @@ if [ $rules_exist -eq 0  ] ; then
 	iptables -I mesh_block_known_encryption -p tcp --dport 995 -o wlan0 -j REJECT
 	iptables -I mesh_block_known_encryption -p tcp --dport 995 -i wlan0 -j REJECT
 
+       # MQTT with TLS
+	iptables -I mesh_block_known_encryption -p tcp --dport 8883 -o wlan0 -j REJECT
+	iptables -I mesh_block_known_encryption -p tcp --dport 8883 -i wlan0 -j REJECT
+
 	# NODE SSH
 	iptables -I mesh_block_known_encryption -p tcp --dport 2222 -o wlan0 -j REJECT
 	iptables -I mesh_block_known_encryption -p tcp --dport 2222 -i wlan0 -j REJECT

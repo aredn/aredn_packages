@@ -1,0 +1,58 @@
+--- a/cfg_file.y
++++ b/cfg_file.y
+@@ -27,6 +27,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdarg.h>
++#include <ctype.h>
+ 
+ #include <syslog.h>
+ 
+@@ -105,7 +106,22 @@ statement: '\n'
+ 		   * MUST dup strings to be able to reread config.
+ 		   */
+ 	  	  memcpy(parse_host, &default_host, sizeof(struct vtun_host));
+-		  parse_host->host = strdup($1);
++
++		  unsigned char *hostStr = (unsigned char *) strdup($1);
++		  int len = 0;
++		  while (*hostStr) {
++			*hostStr = tolower(*hostStr);
++			hostStr++;
++			len++;
++			// Safety check to avoid infinite loop
++			if (len > 255) {
++				yyerror("Host name too long");
++				YYABORT;
++			}
++		  }
++		  hostStr -= len;
++
++		  parse_host->host = (char *) hostStr;
+ 		  parse_host->passwd = NULL;
+ 
+ 		  /* Copy local address */
+@@ -593,7 +609,22 @@ int free_host(void *d, void *u)
+  */ 
+ inline struct vtun_host* find_host(char *host)
+ {
+-   return (struct vtun_host *)llist_free(&host_list, free_host, host);
++   unsigned char *hostStr = (unsigned char *) strdup(host);
++   int len = 0;
++   while (*hostStr) {
++      *hostStr = tolower(*hostStr);
++      hostStr++;
++      len++;
++      // Safety check to avoid infinite loop
++      if (len > 255) {
++        free(hostStr);
++        return NULL;
++      }
++   }
++   hostStr -= len;
++   struct vtun_host *ret = (struct vtun_host *)llist_free(&host_list, free_host, hostStr);
++   free(hostStr);
++   return ret;
+ }
+ 
+ int clear_nat_hack_server(void *d, void *u)
