@@ -1,0 +1,44 @@
+--- a/auth.c
++++ b/auth.c
+@@ -355,8 +355,10 @@ struct vtun_host * auth_server(int fd)
+ 		   if( !cs2cl(str2,chal_res) )
+ 		      break; 
+ 		   
+-		   if( !(h = find_host(host)) )
++		   if( !(h = find_host(host)) ) {
++			  vtun_syslog(LOG_ERR,"Auth failed, unknown host %s", host);
+ 		      break;
++		   }
+ 
+ 		   decrypt_chal(chal_res, h->passwd);   		
+ 	
+@@ -370,8 +372,10 @@ struct vtun_host * auth_server(int fd)
+ 		         break;
+ 		      }	
+ 		      print_p(fd,"OK FLAGS: %s\n", bf2cf(h)); 
+- 		   } else
++ 		   } else {
++			  vtun_syslog(LOG_ERR,"Auth failed, wrong hostname or password for host %s", host);
+ 		      h = NULL;
++		   }
+ 	        }
+ 		break;
+  	   }
+@@ -414,12 +418,16 @@ int auth_client(int fd, struct vtun_host *host)
+ 		      print_p(fd,"CHAL: %s\n", cl2cs(chal));
+ 
+ 		      continue;
+-	   	   }
++	   	   } else {
++			vtun_syslog(LOG_ERR,"Auth failed, server denied hostname of host %s", host->host);
++		   }
+ 		   break;	
+ 	
+ 	        case ST_CHAL:
+ 		   if( !strncmp(buf,"OK",2) && cf2bf(buf,host) )
+ 		      success = 1;
++			else
++				vtun_syslog(LOG_ERR,"Auth failed, server denied password for host %s", host->host);
+ 		   break;
+ 	   }
+ 	   break;
