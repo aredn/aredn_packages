@@ -171,6 +171,8 @@ olsrd_write_plparam() {
 		[ -z "$ifname" ] || value=$ifname
 	fi
 
+	option=$(echo $option | sed -r "s/^(\d+)-(\d+)-(\d+)-(\d+)$/\1.\2.\3.\4/")
+
 	echo -n "${N}${param}PlParam \"$option\" \"$value\""
 
 	return 0
@@ -636,8 +638,6 @@ olsrd_write_config() {
 	INTERFACES_COUNT=0
 	config_foreach olsrd_write_interface_defaults InterfaceDefaults
 	config_foreach olsrd_write_interface Interface
-	echo
-	/usr/local/bin/olsrd-config $UCI_CONF_NAME
 	echo
 
 	return 0
