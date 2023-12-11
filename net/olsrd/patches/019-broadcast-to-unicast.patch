@@ -1,0 +1,397 @@
+diff --git a/src/interfaces.c b/src/interfaces.c
+index beec4f15..7ac78e50 100644
+--- a/src/interfaces.c
++++ b/src/interfaces.c
+@@ -430,6 +430,8 @@ olsr_remove_interface(struct olsr_if * iface)
+   remove_olsr_socket(ifp->send_socket, &olsr_input, NULL);
+   close(ifp->send_socket);
+ 
++  close(ifp->olsr_raw_socket);
++
+   /* Free memory */
+   free(ifp->int_name);
+   free(ifp);
+diff --git a/src/interfaces.h b/src/interfaces.h
+index f853bf64..f0e5c662 100644
+--- a/src/interfaces.h
++++ b/src/interfaces.h
+@@ -135,6 +135,7 @@ struct interface_olsr {
+   int is_hcif;                         /* Is this a emulated host-client if? */
+ 
+   int olsr_socket;                     /* The broadcast socket for this interface */
++  int olsr_raw_socket;                 /* The raw socket for the interface */
+   int send_socket;                     /* The send socket for this interface */
+ 
+   int int_metric;                      /* metric of interface */
+@@ -144,6 +145,8 @@ struct interface_olsr {
+   int is_wireless;                     /* wireless interface or not */
+   char *int_name;                      /* from kernel if structure */
+   uint16_t olsr_seqnum;                /* Olsr message seqno */
++  uint8_t mac[6];                      /* Mac address of interface */
++  char stations[60];                   /* Path to peer file > strlen("/sys/kernel/debug/ieee80211/phy0/netdev:wlan0/stations") */
+ 
+   /* Periodic message generation timers */
+   struct timer_entry *hello_gen_timer;
+diff --git a/src/linux/net.c b/src/linux/net.c
+index 22a0fa16..689db076 100644
+--- a/src/linux/net.c
++++ b/src/linux/net.c
+@@ -57,7 +57,13 @@
+ #include "kernel_tunnel.h"
+ #include "ifnet.h"
+ 
++#include <features.h>
+ #include <net/if.h>
++#include <arpa/inet.h>
++#include <linux/if_packet.h>
++#include <netinet/ether.h>
++#include <netinet/ip.h>
++#include <netinet/udp.h>
+ 
+ #include <sys/ioctl.h>
+ #include <sys/utsname.h>
+@@ -67,6 +73,7 @@
+ #include <stdio.h>
+ #include <syslog.h>
+ #include <unistd.h>
++#include <dirent.h>
+ 
+ /**
+  * Fix bug in GLIBC, see https://bugzilla.redhat.com/show_bug.cgi?id=635260
+@@ -113,6 +120,18 @@ static char orig_global_redirect_state;
+ static char orig_global_rp_filter;
+ static char orig_tunnel_rp_filter;
+ 
++/*
++ * udp checksum header
++ */
++struct pseudo_header
++{
++  u_int32_t source_address;
++  u_int32_t dest_address;
++  u_int8_t placeholder;
++  u_int8_t protocol;
++  u_int16_t udp_length;
++};
++
+ /**
+  *Bind a socket to a device
+  *
+@@ -484,6 +503,45 @@ getsocket(int bufspace, struct interface_olsr *ifp)
+   return sock;
+ }
+ 
++/**
++ *Creates a nonblocking raw socket.
++ *@param bufspace the number of bytes in the buffer
++ *@param ifp interface struct. Used for bind(2).
++ *@return the FD of the socket or -1 on error.
++ */
++int
++getrawsocket(struct interface_olsr *ifp)
++{
++  int on;
++  int sock;
++
++  sock = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
++  if (sock < 0) {
++    perror("socket");
++    syslog(LOG_ERR, "socket: %m");
++    return -1;
++  }
++
++  /* Bind to device */
++  if (bind_socket_to_device(sock, ifp->int_name) < 0) {
++    fprintf(stderr, "Could not bind socket to device... exiting!\n\n");
++    syslog(LOG_ERR, "Could not bind socket to device... exiting!\n\n");
++    close(sock);
++    return -1;
++  }
++
++  on = fcntl(sock, F_GETFL);
++  if (on == -1) {
++    syslog(LOG_ERR, "fcntl (F_GETFL): %m\n");
++  } else {
++    if (fcntl(sock, F_SETFL, on | O_NONBLOCK) == -1) {
++      syslog(LOG_ERR, "fcntl O_NONBLOCK: %m\n");
++    }
++  }
++
++  return sock;
++}
++
+ /**
+  *Creates a nonblocking IPv6 socket
+  *@param bufspace the number of bytes in the buffer
+@@ -671,6 +729,144 @@ olsr_sendto(int s, const void *buf, size_t len, int flags, const struct sockaddr
+   return sendto(s, buf, len, flags, to, tolen);
+ }
+ 
++/*
++  Generic checksum calculation function
++*/
++static uint16_t
++csum(uint32_t *sum, void *data, int nbytes, int end)
++{
++  uint16_t oddbyte = 0;
++  uint16_t *ptr = (uint16_t*)data;
++  uint32_t tsum = *sum;
++
++  while (nbytes > 1) {
++    tsum += *ptr++;
++    nbytes -= 2;
++  }
++
++  if (!end) {
++    *sum = tsum;
++    return 0;
++  }
++
++  if (nbytes == 1) {
++    *((uint8_t*)&oddbyte) = *(uint8_t*)ptr;
++    tsum += oddbyte;
++  }
++
++  tsum = (tsum >> 16) + (tsum & 0xffff);
++  tsum = tsum + (tsum >> 16);
++
++  *sum = (uint32_t)(uint16_t)~tsum;
++  return (uint16_t)*sum;
++}
++
++/**
++ * Send using broadcast to unicast fanout
++ */
++ssize_t
++olsr_sendto_broadcast_to_unicast(int s, const void *buf, size_t len, struct interface_olsr * iface)
++{
++  static uint16_t id = 1;
++  uint8_t dst_mac[6];
++  uint8_t pkt[sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + OLSR_DEFAULT_MTU];
++  ssize_t r = 0;
++  uint32_t check = 0;
++  struct sockaddr_ll socket_address;
++  struct pseudo_header pseudo;
++  DIR *f;
++  struct dirent* d;
++
++  struct ether_header *ether_hdr = (struct ether_header *)pkt;
++  struct iphdr *ip_hdr = (struct iphdr *)(pkt + sizeof(struct ether_header));
++  struct udphdr *udp_hdr = (struct udphdr *)(pkt + sizeof(struct ether_header) + sizeof(struct iphdr));
++  uint8_t *data = pkt + sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr);
++
++  memset(pkt, 0, sizeof(pkt));
++
++  /* Copy in data */
++  if (data + len > pkt + sizeof(pkt)) {
++    return -1;
++  }
++  memcpy(data, buf, len);
++
++  /* Socket */
++  socket_address.sll_family = AF_PACKET;
++  socket_address.sll_protocol = 0;
++  socket_address.sll_halen = ETH_ALEN;
++  socket_address.sll_ifindex = iface->if_index;
++
++  /* Ethernet header */
++  ether_hdr->ether_type = htons(ETH_P_IP);
++  memcpy(ether_hdr->ether_shost, iface->mac, sizeof (iface->mac));
++
++  /* IP header */
++  ip_hdr->ihl = 5;
++  ip_hdr->version = 4;
++  ip_hdr->tos = 0;
++  ip_hdr->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + len);
++  ip_hdr->id = htons(id++);
++  ip_hdr->frag_off = 0;
++  ip_hdr->ttl = 1;
++  ip_hdr->protocol = IPPROTO_UDP;
++  ip_hdr->check = 0;
++  ip_hdr->saddr = iface->int_addr.sin_addr.s_addr;
++  ip_hdr->daddr = 0xFFFFFFFF;
++
++  check = 0;
++  ip_hdr->check = csum(&check, ip_hdr, ip_hdr->ihl << 2, 1);
++
++  /* UDP header */
++#ifdef __GLIBC__
++  udp_hdr->source = htons(DEF_OLSRPORT);
++  udp_hdr->dest = htons(DEF_OLSRPORT);
++  udp_hdr->len = htons(8 + len);
++#else
++  udp_hdr->uh_sport = htons(DEF_OLSRPORT);
++  udp_hdr->uh_dport = htons(DEF_OLSRPORT);
++  udp_hdr->uh_ulen = htons(8 + len);
++#endif
++
++  /* Pseudo header for checksum */
++  pseudo.source_address = iface->int_addr.sin_addr.s_addr;
++  pseudo.dest_address = 0xFFFFFFFF;
++  pseudo.placeholder = 0;
++  pseudo.protocol = IPPROTO_UDP;
++  pseudo.udp_length = htons(sizeof(struct udphdr) + len);
++
++  check = 0;
++  csum(&check, &pseudo, sizeof(struct pseudo_header), 0);
++  csum(&check, udp_hdr, sizeof(struct udphdr), 0);
++#ifdef __GLIBC__
++  udp_hdr->check = csum(&check, data, len, 1);
++#else
++  udp_hdr->uh_sum = csum(&check, data, len, 1);
++#endif
++
++  /* Get destinations */
++  if (iface->stations[0] == 0 || (f = opendir(iface->stations)) == NULL) {
++    /* No stations - use broadcast */
++    memset(socket_address.sll_addr, 255, sizeof(dst_mac));
++    memset(ether_hdr->ether_dhost, 255, sizeof(dst_mac));
++    return sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
++  }
++  /* Send the packet to each peer individually */
++  while ((d = readdir(f)) != NULL) {
++    if (sscanf(d->d_name, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]) == 6) {
++      socket_address.sll_addr[0] = ether_hdr->ether_dhost[0] = dst_mac[0];
++      socket_address.sll_addr[1] = ether_hdr->ether_dhost[1] = dst_mac[1];
++      socket_address.sll_addr[2] = ether_hdr->ether_dhost[2] = dst_mac[2];
++      socket_address.sll_addr[3] = ether_hdr->ether_dhost[3] = dst_mac[3];
++      socket_address.sll_addr[4] = ether_hdr->ether_dhost[4] = dst_mac[4];
++      socket_address.sll_addr[5] = ether_hdr->ether_dhost[5] = dst_mac[5];
++      r = sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
++    }
++  }
++  closedir(f);
++
++  return r;
++}
++
+ /**
+  * Wrapper for recvfrom(2)
+  */
+diff --git a/src/main.c b/src/main.c
+index 6e663595..ce528901 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -284,6 +284,7 @@ static void olsr_shutdown(int signo __attribute__ ((unused)))
+   /* OLSR sockets */
+   for (ifn = ifnet; ifn; ifn = ifn->int_next) {
+     close(ifn->olsr_socket);
++    close(ifn->olsr_raw_socket);
+     close(ifn->send_socket);
+ 
+ #ifdef __linux__
+diff --git a/src/net_olsr.c b/src/net_olsr.c
+index 0f0e0d3d..7aeb123c 100644
+--- a/src/net_olsr.c
++++ b/src/net_olsr.c
+@@ -384,7 +384,14 @@ net_output(struct interface_olsr *ifp)
+ 
+   if (olsr_cnf->ip_version == AF_INET) {
+     /* IP version 4 */
+-    if (olsr_sendto(ifp->send_socket, ifp->netbuf.buff, ifp->netbuf.pending, MSG_DONTROUTE, (struct sockaddr *)sin, sizeof(*sin)) <
++    if (ifp->stations[0] != 0) {
++      /* If we might have multiple stations (in wifi) we transform this broadcast into a group of unicasts */
++      if (olsr_sendto_broadcast_to_unicast(ifp->olsr_raw_socket, ifp->netbuf.buff, ifp->netbuf.pending, ifp) < 0) {
++        perror("olsr_sendto_broadcast_to_unicast(v4)");
++        retval = -1;
++      }
++    }
++    else if (olsr_sendto(ifp->send_socket, ifp->netbuf.buff, ifp->netbuf.pending, MSG_DONTROUTE, (struct sockaddr *)sin, sizeof(*sin)) <
+         0) {
+       perror("sendto(v4)");
+ #ifndef _WIN32
+diff --git a/src/net_os.h b/src/net_os.h
+index 33e9c3eb..77e37ecb 100644
+--- a/src/net_os.h
++++ b/src/net_os.h
+@@ -59,6 +59,8 @@
+ /* OS dependent functions */
+ ssize_t olsr_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+ 
++ssize_t olsr_sendto_broadcast_to_unicast(int, const void *, size_t, struct interface_olsr *);
++
+ ssize_t olsr_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+ 
+ int olsr_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+@@ -75,6 +77,8 @@ int gethemusocket(struct sockaddr_in *pin);
+ 
+ int getsocket(int, struct interface_olsr *);
+ 
++int getrawsocket(struct interface_olsr *);
++
+ int getsocket6(int, struct interface_olsr *);
+ 
+ int get_ipv6_address(char *, struct sockaddr_in6 *, struct olsr_ip_prefix *);
+diff --git a/src/unix/ifnet.c b/src/unix/ifnet.c
+index c286289b..a39653a4 100644
+--- a/src/unix/ifnet.c
++++ b/src/unix/ifnet.c
+@@ -66,6 +66,7 @@
+ #include <assert.h>
+ #include <signal.h>
+ #include <sys/types.h>
++#include <sys/stat.h>
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ #include <netinet/in_systm.h>
+@@ -90,6 +91,8 @@
+ 
+ static const uint8_t  zero_v6[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+ 
++static const char PATH_STATIONS_PATTERN[] = "/sys/kernel/debug/ieee80211/phy%d/netdev:wlan%d/stations";
++
+ void
+ check_interface_updates(void *foo __attribute__ ((unused)))
+ {
+@@ -222,6 +225,24 @@ chk_if_changed(struct olsr_if *iface)
+   /* Get interface index */
+   ifp->if_index = if_nametoindex(ifr.ifr_name);
+ 
++  /* Get mac address */
++  if (ioctl(olsr_cnf->ioctl_s, SIOCGIFHWADDR, &ifr) < 0) {
++    OLSR_PRINTF(3, "No such interface: %s\n", iface->name);
++    goto remove_interface;
++  }
++  memcpy(ifp->mac, ifr.ifr_hwaddr.sa_data, sizeof(ifp->mac));
++
++  /* Find path to stations */
++  ifp->stations[0] = 0;
++  if (strcmp(ifr.ifr_name, "wlan0") == 0 || strcmp(ifr.ifr_name, "wlan1") == 0) {
++    struct stat stat_buf;
++    int phyid = ifr.ifr_name[4] - '0';
++    sprintf(ifp->stations, PATH_STATIONS_PATTERN, phyid, phyid);
++    if (stat(ifp->stations, &stat_buf) != 0) {
++      ifp->stations[0] = 0;
++    }
++  }
++
+   /*
+    * Now check if the IP has changed
+    */
+@@ -706,6 +727,7 @@ chk_if_up(struct olsr_if *iface, int debuglvl __attribute__ ((unused)))
+      */
+ 
+     ifs.olsr_socket = getsocket(BUFSPACE, &ifs);
++    ifs.olsr_raw_socket = getrawsocket(&ifs);
+     ifs.send_socket = getsocket(0, &ifs);
+ 
+     if (ifs.olsr_socket < 0) {
+@@ -716,9 +738,18 @@ chk_if_up(struct olsr_if *iface, int debuglvl __attribute__ ((unused)))
+       kill(getpid(), SIGINT);
+       return 0;
+     }
++    if (ifs.olsr_raw_socket < 0) {
++      fprintf(stderr, "Could not initialize raw socket... exiting!\n\n");
++      olsr_syslog(OLSR_LOG_ERR, "Could not initialize socket... exiting!\n\n");
++      olsr_cnf->exit_value = EXIT_FAILURE;
++      free(ifs.int_name);
++      kill(getpid(), SIGINT);
++      return 0;
++    }
+     if (ifs.send_socket < 0) {
+       OLSR_PRINTF(1, "Warning, transmission socket could not be initialized. Abort if-up.\n");
+       close (ifs.olsr_socket);
++      close (ifs.olsr_raw_socket);
+       free(ifs.int_name);
+       return 0;
+     }
