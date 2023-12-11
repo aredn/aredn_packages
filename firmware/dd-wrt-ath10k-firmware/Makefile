@@ -69,4 +69,4 @@ endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
 $(eval $(call BuildPackage,ath10k-firmware-qca9888-ct))
-$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct))
+#$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct))
