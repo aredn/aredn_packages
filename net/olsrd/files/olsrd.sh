@@ -3,7 +3,7 @@
 
 OLSRD_OLSRD_SCHEMA='ignore:internal config_file:internal DebugLevel=0 AllowNoInt=yes'
 OLSRD_IPCCONNECT_SCHEMA='ignore:internal Host:list Net:list2'
-OLSRD_LOADPLUGIN_SCHEMA='ignore:internal library:internal Host4:list Net4:list2 Host:list Net:list2 Host6:list Net6:list2 Ping:list redistribute:list NonOlsrIf:list name:list lat lon latlon_infile HNA:list2 hosts:list2'
+OLSRD_LOADPLUGIN_SCHEMA='ignore:internal library:internal Host4:list Net4:list2 Host:list Net:list2 Host6:list Net6:list2 Ping:list redistribute:list NonOlsrIf:list name:list lat lon latlon_infile HNA:list2 hosts:list2 service:list'
 OLSRD_INTERFACE_SCHEMA='ignore:internal interface:internal AutoDetectChanges:bool LinkQualityMult:list2'
 OLSRD_INTERFACE_DEFAULTS_SCHEMA='AutoDetectChanges:bool'
 
@@ -139,11 +139,6 @@ olsrd_write_plparam() {
 		esac
 	fi
 
-	if ! validate_olsrd_option "$value"; then
-		warning_invalid_value olsrd "$cfg" "$option"
-		return 1
-	fi
-
 	oldIFS="$IFS"
 	IFS='-_'
 	set -- $option
@@ -170,8 +165,6 @@ olsrd_write_plparam() {
 		fi
 		[ -z "$ifname" ] || value=$ifname
 	fi
-
-	option=$(echo $option | sed -r "s/^(\d+)-(\d+)-(\d+)-(\d+)$/\1.\2.\3.\4/")
 
 	echo -n "${N}${param}PlParam \"$option\" \"$value\""
 
