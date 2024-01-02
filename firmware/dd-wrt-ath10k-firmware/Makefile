@@ -26,7 +26,7 @@ define Package/ath10k-firmware-qca9888-ct
   PROVIDES:=ath10k-firmware-qca9888
 endef
 
-define Package/ath10k-firmware-qca988x-ct
+define Package/ath10k-firmware-qca988x-ddwrt
   $(Package/ath10k-firmware-default-ct)
   TITLE:=DD-WRT Alternate ath10k firmware for QCA988X
   PROVIDES:=ath10k-firmware-qca988x
@@ -42,7 +42,7 @@ define Package/ath10k-firmware-qca9888-ct/description
   Provides support for 5MHz and 10MHz channels
 endef
 
-define Package/ath10k-firmware-qca988x-ct/description
+define Package/ath10k-firmware-qca988x-ddwrt/description
   DD-WRT Alternate ath10k firmware
   Provides support for 5MHz and 10MHz channels
 endef
@@ -61,7 +61,7 @@ define Package/ath10k-firmware-qca9888-ct/install
 	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA9888/hw2.0/board-2.bin $(1)/lib/firmware/ath10k/QCA9888/hw2.0/board-2.bin
 endef
 
-define Package/ath10k-firmware-qca988x-ct/install
+define Package/ath10k-firmware-qca988x-ddwrt/install
 	$(INSTALL_DIR)  $(1)/lib/firmware/ath10k/QCA988X/hw2.0
 	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/firmware-5.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
 	$(INSTALL_DATA) $(FIRMWARE_ROOT)/QCA988X/hw2.0/board.bin $(1)/lib/firmware/ath10k/QCA988X/hw2.0/board.bin
@@ -69,4 +69,4 @@ endef
 
 $(eval $(call BuildPackage,ath10k-firmware-qca4019-ct))
 $(eval $(call BuildPackage,ath10k-firmware-qca9888-ct))
-#$(eval $(call BuildPackage,ath10k-firmware-qca988x-ct))
+$(eval $(call BuildPackage,ath10k-firmware-qca988x-ddwrt))
