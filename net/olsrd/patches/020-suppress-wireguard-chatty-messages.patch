@@ -1,0 +1,13 @@
+--- a/src/net_olsr.c
++++ b/src/net_olsr.c
+@@ -395,7 +395,9 @@
+         0) {
+       perror("sendto(v4)");
+ #ifndef _WIN32
+-      olsr_syslog(OLSR_LOG_ERR, "OLSR: sendto IPv4 '%s' on interface %s", strerror(errno), ifp->int_name);
++      if (strcmp(ifp->int_name, "wgc") != 0) {
++        olsr_syslog(OLSR_LOG_ERR, "OLSR: sendto IPv4 '%s' on interface %s", strerror(errno), ifp->int_name);
++      }
+ #endif /* _WIN32 */
+       retval = -1;
+     }
