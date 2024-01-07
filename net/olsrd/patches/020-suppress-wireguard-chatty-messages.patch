@@ -5,7 +5,7 @@
        perror("sendto(v4)");
  #ifndef _WIN32
 -      olsr_syslog(OLSR_LOG_ERR, "OLSR: sendto IPv4 '%s' on interface %s", strerror(errno), ifp->int_name);
-+      if (strcmp(ifp->int_name, "wgc") != 0) {
++      if (strncmp(ifp->int_name, "wg", 2) != 0) {
 +        olsr_syslog(OLSR_LOG_ERR, "OLSR: sendto IPv4 '%s' on interface %s", strerror(errno), ifp->int_name);
 +      }
  #endif /* _WIN32 */
