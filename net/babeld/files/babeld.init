@@ -13,17 +13,17 @@ build_active() {
         if [ "$(ip link show ${i} | grep UP)" != "" ]; then # cannot use /sys/class/net/*/operstate
             case $i in
             br-nomesh|br-dtdlink)
-                echo "interface ${i} wired" >> ${C}
+                echo "interface ${i} type wired" >> ${C}
                 echo "interface ${i} split-horizon true" >> ${C}
                 ;;
             wifi*)
-                echo "interface ${i} wireless" >> ${C}
+                echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} link-quality yes" >> ${C}
                 echo "interface ${i} rxcost 256" >> ${C}
                 echo "interface ${i} unicast true" >> ${C}
                 ;;
             wg*|tun[0-9]*)
-                echo "interface ${i} tunnel" >> ${C}
+                echo "interface ${i} type tunnel" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty 96" >> ${C}
                 ;;
@@ -41,7 +41,6 @@ start_service() {
     procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
     procd_set_param stdout 1
     procd_set_param stderr 1
-    procd_set_param pidfile /var/run/babeld.pid
     procd_set_param user root
     procd_close_instance
 }
