@@ -7,12 +7,15 @@ C=/var/etc/babeld-active.conf
 
 build_active() {
     cp /dev/null ${C}
+    # Alway DtD so Babel is happy to have one interface
+    echo "interface br-dtdlink type wired" >> ${C}
+    echo "interface br-dtdlink split-horizon true" >> ${C}
     for p in /sys/class/net/*
     do
         i=$(basename $p)
         if [ "$(ip link show ${i} | grep UP)" != "" ]; then # cannot use /sys/class/net/*/operstate
             case $i in
-            br-nomesh|br-dtdlink)
+            br-nomesh)
                 echo "interface ${i} type wired" >> ${C}
                 echo "interface ${i} split-horizon true" >> ${C}
                 ;;
