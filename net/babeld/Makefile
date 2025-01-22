@@ -8,6 +8,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/babeld
 	SECTION:=net
 	CATEGORY:=Network
+	DEPENDS:=+libc
 	MAINTAINER:=AREDN Dev Team (AREDN edition of Babel)
 	TITLE:=Babel mesh routing
 	URL:=https://www.irif.fr/~jch/software/babel/
