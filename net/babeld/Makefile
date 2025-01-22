@@ -29,6 +29,12 @@ define Package/babeld/install
 	$(INSTALL_BIN) ./files/babeld.init $(1)/etc/init.d/babeld
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	cp -r ./files/* $(PKG_BUILD_DIR)
+	$(Build/Patch)	
+endef
+
 define Build/Compile
 	+$(MAKE) -C $(PKG_BUILD_DIR) babeld
 endef
