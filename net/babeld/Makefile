@@ -5,7 +5,7 @@ PKG_RELEASE:=1
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Package/babel
+define Package/babeld
 	SECTION:=net
 	CATEGORY:=Network
 	MAINTAINER:=AREDN Dev Team (AREDN edition of Babel)
@@ -14,12 +14,12 @@ define Package/babel
 	PKGARCH:=all
 endef
 
-define Package/babel/description
+define Package/babeld/description
 	Babel is a loop-avoiding distance-vector routing protocol
 	for IPv6 and IPv4 with fast convergence properties.
 endef
 
-define Package/babel/install
+define Package/babeld/install
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc/
 	$(INSTALL_DIR) $(1)/etc/init.d/
@@ -33,4 +33,4 @@ define Build/Compile
 	+$(MAKE) -C $(PKG_BUILD_DIR) babeld
 endef
 
-$(eval $(call BuildPackage,babel))
+$(eval $(call BuildPackage,babeld))
