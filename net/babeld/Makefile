@@ -8,7 +8,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/babeld
 	SECTION:=net
 	CATEGORY:=Network
-	DEPENDS:=+libc
+	DEPENDS:=+librt
 	MAINTAINER:=AREDN Dev Team (AREDN edition of Babel)
 	TITLE:=Babel mesh routing
 	URL:=https://www.irif.fr/~jch/software/babel/
@@ -37,7 +37,7 @@ define Build/Prepare
 endef
 
 define Build/Compile
-	+$(MAKE) -C $(PKG_BUILD_DIR) babeld
+	+$(MAKE) -C $(PKG_BUILD_DIR) $(TARGET_CONFIGURE_OPTS)
 endef
 
 $(eval $(call BuildPackage,babeld))
