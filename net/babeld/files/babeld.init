@@ -6,7 +6,7 @@ START=97
 C=/var/etc/babeld-active.conf
 
 build_active() {
-    echo "router-id $(uci get -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
+    echo "router-id $(uci -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
     # Alway DtD so Babel is happy to have one interface
     echo "interface br-dtdlink type wired" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
@@ -17,20 +17,20 @@ build_active() {
             case $i in
             br-nomesh)
                 echo "interface ${i} type wired" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.babel.wired_rxcost)" >> ${C}
-                echo "interface ${i} split-horizon $(uci get aredn.babel.wired_split_horizon)" >> ${C}
+                echo "interface ${i} rxcost $(uci get aredn.@babel[0].wired_rxcost)" >> ${C}
+                echo "interface ${i} split-horizon $(uci get aredn.@babel[0].wired_split_horizon)" >> ${C}
                 ;;
             wifi*)
                 echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} link-quality yes" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.babel.wireless_rxcost)" >> ${C}
-                echo "interface ${i} unicast $(uci get aredn.babel.wireless_unicast)" >> ${C}
+                echo "interface ${i} rxcost $(uci get aredn.@babel[0].wireless_rxcost)" >> ${C}
+                echo "interface ${i} unicast $(uci get aredn.@babel[0].wireless_unicast)" >> ${C}
                 ;;
             wg*|tun[0-9]*)
                 echo "interface ${i} type tunnel" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.babel.tunnel_rxcost)" >> ${C}
+                echo "interface ${i} rxcost $(uci get aredn.@babel[0].tunnel_rxcost)" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
-                echo "interface ${i} max-rtt-penalty $(uci get aredn.babel.tunnel_max_rtt_penalty)" >> ${C}
+                echo "interface ${i} max-rtt-penalty $(uci get aredn.@babel[0].tunnel_max_rtt_penalty)" >> ${C}
                 ;;
             *)
                 xlink=$(uci -q show network | grep "xlink.*ifname='${i}'")
