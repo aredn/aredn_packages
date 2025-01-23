@@ -12,8 +12,8 @@ build_active() {
     echo "interface br-dtdlink split-horizon true" >> ${C}
     for p in /sys/class/net/*
     do
-        i=$(basename $p)
-        if [ "$(ip link show ${i} | grep UP)" != "" ]; then # cannot use /sys/class/net/*/operstate
+        if [ "$(cat ${p}/operstate)" != "down" ]; then
+            i=$(basename $p)
             case $i in
             br-nomesh)
                 echo "interface ${i} type wired" >> ${C}
