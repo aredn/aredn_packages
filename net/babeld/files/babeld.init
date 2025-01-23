@@ -9,6 +9,7 @@ build_active() {
     echo "router-id $(uci -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
     # Alway DtD so Babel is happy to have one interface
     echo "interface br-dtdlink type wired" >> ${C}
+    echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
     for p in /sys/class/net/*
     do
