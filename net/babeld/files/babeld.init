@@ -17,20 +17,20 @@ build_active() {
             case $i in
             br-nomesh)
                 echo "interface ${i} type wired" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.@babel[0].wired_rxcost)" >> ${C}
-                echo "interface ${i} split-horizon $(uci get aredn.@babel[0].wired_split_horizon)" >> ${C}
+                echo "interface ${i} rxcost $(uci get babel.wired.rxcost)" >> ${C}
+                echo "interface ${i} split-horizon $(uci get babel.wired.split_horizon)" >> ${C}
                 ;;
             wifi*)
                 echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} link-quality yes" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.@babel[0].wireless_rxcost)" >> ${C}
-                echo "interface ${i} unicast $(uci get aredn.@babel[0].wireless_unicast)" >> ${C}
+                echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
+                echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
                 ;;
             wg*|tun[0-9]*)
                 echo "interface ${i} type tunnel" >> ${C}
-                echo "interface ${i} rxcost $(uci get aredn.@babel[0].tunnel_rxcost)" >> ${C}
+                echo "interface ${i} rxcost $(uci get babel.tunnel.rxcost)" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
-                echo "interface ${i} max-rtt-penalty $(uci get aredn.@babel[0].tunnel_max_rtt_penalty)" >> ${C}
+                echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
                 ;;
             *)
                 xlink=$(uci -q show network | grep "xlink.*ifname='${i}'")
