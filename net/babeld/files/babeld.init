@@ -42,6 +42,16 @@ build_active() {
             esac
         fi
     done
+    # Limit what we redistribute
+    echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
+    echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
+    echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+    gw=$(uci get aredn.@wan[0].olsrd_gw)
+    if [ "${gw}" = "1" ]; then
+        echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
+    fi
+    echo "redistribute ip 172.31.0.0/16 deny" >> ${C}
+    echo "redistribute local if br-wan deny" >> ${C}
 }
 
 start_service() {
