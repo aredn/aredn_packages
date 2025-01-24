@@ -322,6 +322,7 @@ local_read(struct local_socket *s)
     char *eol;
     char reply[100] = "ok\n";
     const char *message = NULL;
+    struct neighbour *neigh;
 
     if(s->buf == NULL)
         s->buf = malloc(LOCAL_BUFSIZE);
@@ -354,6 +355,11 @@ local_read(struct local_socket *s)
             break;
         case CONFIG_ACTION_DUMP:
             local_notify_all_1(s);
+            break;
+        case CONFIG_ACTION_DUMP_NEIGHBORS:
+            FOR_ALL_NEIGHBOURS(neigh) {
+                local_notify_neighbour_1(s, neigh, LOCAL_ADD);
+            }
             break;
         case CONFIG_ACTION_MONITOR:
             local_notify_all_1(s);
