@@ -27,8 +27,6 @@ struct hello_history {
     struct timeval time;
 };
 
-#define NONCE_LEN 8
-
 struct neighbour {
     struct neighbour *next;
     /* This is -1 when unknown, so don't make it unsigned */
@@ -50,7 +48,6 @@ struct neighbour {
     unsigned char pc_u[4], pc_m[4];
     int index_len; /* This is -1 when index is undefined */
     unsigned char index[32];
-    unsigned char nonce[NONCE_LEN];
     struct timeval challenge_deadline;
     struct timeval challenge_request_limitation;
     struct timeval challenge_reply_limitation;

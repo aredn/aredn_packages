@@ -1107,51 +1107,6 @@ send_ack(struct neighbour *neigh, unsigned short nonce, unsigned short interval)
     schedule_flush_ms(&neigh->buf, roughly(interval * 6));
 }
 
-int
-send_challenge_request(struct neighbour *neigh)
-{
-    int rc;
-
-    gettime(&now);
-    if(timeval_compare(&now, &neigh->challenge_request_limitation) <= 0)
-        return -1;
-
-    debugf("Sending challenge request to %s on %s.\n",
-           format_address(neigh->address), neigh->ifp->name);
-    rc = read_random_bytes(neigh->nonce, NONCE_LEN);
-    if(rc < NONCE_LEN) {
-        perror("read_random_bytes");
-        return -2;
-    }
-    start_message(&neigh->buf, neigh->ifp, MESSAGE_CHALLENGE_REQUEST, NONCE_LEN);
-    accumulate_bytes(&neigh->buf, neigh->nonce, NONCE_LEN);
-    end_message(&neigh->buf, MESSAGE_CHALLENGE_REQUEST, NONCE_LEN);
-    gettime(&now);
-    timeval_add_msec(&neigh->challenge_deadline, &now, 30000);
-    timeval_add_msec(&neigh->challenge_request_limitation, &now, 300);
-    schedule_flush_now(&neigh->buf);
-    return 0;
-}
-
-int
-send_challenge_reply(struct neighbour *neigh, const unsigned char *crypto_nonce,
-                     int len)
-{
-    gettime(&now);
-    if(timeval_compare(&now, &neigh->challenge_reply_limitation) <= 0)
-        return -1;
-
-    debugf("Sending challenge reply to %s on %s.\n",
-           format_address(neigh->address), neigh->ifp->name);
-    start_message(&neigh->buf, neigh->ifp, MESSAGE_CHALLENGE_REPLY, len);
-    accumulate_bytes(&neigh->buf, crypto_nonce, len);
-    end_message(&neigh->buf, MESSAGE_CHALLENGE_REPLY, len);
-    gettime(&now);
-    timeval_add_msec(&neigh->challenge_reply_limitation, &now, 300);
-    schedule_flush_now(&neigh->buf);
-    return 0;
-}
-
 static void
 buffer_hello(struct buffered *buf, struct interface *ifp,
              unsigned short seqno, unsigned interval, int unicast)
