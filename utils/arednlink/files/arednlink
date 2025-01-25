@@ -1,0 +1,288 @@
+#!/usr/bin/ucode
+/*
+ * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
+ * Copyright (C) 2025 Tim Wilkinson
+ * See Contributors file for additional contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Additional Terms:
+ *
+ * Additional use restrictions exist on the AREDN® trademark and logo.
+ * See AREDNLicense.txt for more info.
+ *
+ * Attributions to the AREDN® Project must be retained in the source code.
+ * If importing this code into a new or existing project attribution
+ * to the AREDN® project must be added to the source code.
+ *
+ * You must not misrepresent the origin of the material contained within.
+ *
+ * Modified versions must be modified to attribute to the original source
+ * and be marked in reasonable ways as differentiate it from the original
+ * version
+ */
+
+const DEBUG = true;
+
+import * as fs from "fs";
+import * as socket from "socket";
+import * as babel from "aredn.babel";
+
+const POLLIN = socket.POLLIN;
+const POLLOUT = socket.POLLOUT;
+const POLLHUP = socket.POLLHUP;
+const POLLTIMER = 0x10000;
+
+const AREDNLINK_PORT = 9623;
+const AREDNLINK_MGR = "/var/run/arednlink.sock";
+
+//
+// Set of all connected channels.
+//
+const channels = {};
+
+//
+// Internal state of this node.
+//
+const state = {
+    channelId: 1,
+    exiting: false,
+    poller: { fn: null, len: -1 },
+};
+
+//
+// Setup our main socket for incoming connections, and the management socket.
+//
+const main = socket.create(socket.AF_INET6, socket.SOCK_STREAM);
+main.setopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+main.bind({ address: "::", port: AREDNLINK_PORT });                             
+main.listen();
+fs.unlink(AREDNLINK_MGR);
+const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM });
+
+//
+// Create a new channel to manage the socket. The channel may be for an incoming
+// comnnection, or for one we're initiating.
+//
+function createChannel(initialstate, connection, polling, timer, process) {
+    DEBUG && print("createChannel\n");
+    const channel = {
+        id: state.channelId++,
+        state: initialstate,
+        connection: connection,
+        polling: polling,
+        timer: timer
+    };
+    if (!process) {
+        process = channelProcess;
+    }
+    channel.process = (event) => call(process, channel, null, event),
+    channels[channel.id] = channel;
+    return channel;
+}
+
+//
+// Process the current channel, potentially consuming or sending traffic on the socket
+// if the event says we can.
+// this: channel
+//
+function channelProcess(event) {
+    DEBUG && print("channelProcess: event ${event} channel ${this}\n");
+    switch (this.state) {
+        case "STARTUP":
+        {
+            // Setup the initially known interfaces
+            const ifaces = babel.getInterfaces();
+            for (let i = 0; i < length(ifaces); i++) {
+                const channel = createChannel("RECONNECT", null, 0, 0);
+                channel.address = "";
+                channel.interface = ifaces[i];
+            }
+            this.state = "EXIT";
+            this.timer = 0;
+            break;
+        }
+        case "RECONNECT":
+        {
+            const neighbors = babel.getNeighbors();
+            for (let i = 0; i < length(neighbors); i++) {
+                const n = neighbors[i];
+                if (n.interface == this.interface && n.address > this.address) {
+                    this.address = n.address;
+                }
+                if (this.address === "") {
+                    this.timer = clock(true) + 60; // 1 minute
+                }
+                else {
+                    this.state = "CONNECT";
+                    this.timer = 0;
+                }
+            }
+            break;
+        }
+        case "CONNECT":
+
+        case "CONNECTING":
+        case "INCOMING":
+        case "EXIT":
+        default:
+            this.state = "CLOSED";
+            if (this.connection) {
+                this.connection.close();
+            }
+            delete channels[this.id];
+            break;
+    }
+}
+
+//
+// Process manager commands.
+// this: channel
+//
+function managerProcess(event) {
+    switch (this.state) {
+        case "INCOMING":
+            this.buffer = "";
+            // Fallthrough
+        case "READING":
+        {
+            const d = this.connection.recv();
+            if (!d || d === "") {
+                this.state = "CLOSING";
+                this.polling = POLLIN;
+            }
+            else {
+                this.buffer += d;
+                // Do stuff with buffer ...
+                this.buffer = "";
+                this.state = "READING";
+                this.polling = POLLIN;
+            }
+            break;
+        }
+        case "CLOSING":
+        default:
+            this.state = "CLOSED";
+            this.polling = 0;
+            this.connection.close();
+            delete channels[this.id];
+            break;
+    }
+}
+
+//
+// Our main socket process handles incoming requests, accepts them
+// then creates a channel to manage them.
+//
+function mainProcess(event) {
+    if (event & POLLIN) {
+        const channel = createChannel("INCOMING", main.accept(), POLLIN, null);
+        channel.incoming = true;
+    }
+}
+
+//
+// Our mgr socket profcess handles incoming manage requests, accepts them
+// then creates a channel to handle the incoming manager calls.
+//
+function mgrProcess(event) {
+    if (event & POLLIN) {
+        const channel = createChannel("INCOMING", mgr.accept(), POLLIN, null, managerProcess);
+    }
+}
+
+//
+// Work out what to poll and poll it.
+// NOTE: Because socket.poll takes a list of arguments and not an array, and because there
+// is no fn.apply(...) method, we use 'loadstring' to build our own. We keep it around and
+// only rebuild it when the argument count changes. Maybe I'm missing an easier way to do this?
+//
+function pollWorkers() {
+    const workers = [
+        [ main, POLLIN, mainProcess ],
+        [ mgr, POLLIN, mgrProcess ]
+    ];
+    let timeout = 24 * 60 * 60; // 1 day
+    const now = clock(true);
+    for (let id in channels) {
+        const channel = channels[id];
+        if (channel.connection && channel.polling) {
+            push(workers, [ channel.connection, channel.polling, channel.process ]);
+        }
+        if (channel.timer) {
+            timeout = min(timeout, channel.timer - now);
+        }
+    }
+    if (length(workers) !== state.poller.len) {
+        state.poller.len = length(workers);
+        let p = "import * as socket from 'socket';return function(t,w){ return socket.poll(t";
+        for (let count = 0; count < state.poller.len; count++) {
+            p += `,w[${count}]`;
+        }
+        p += ");}";
+        state.poller.fn = loadstring(p, { raw_mode: true })();
+    }
+    return state.poller.fn(1000 * max(0, timeout), workers) || [];
+}
+
+//
+// Signals
+//
+signal("SIGINT", _ => {
+    state.exiting = true;
+});
+signal("SIGTERM", _ => {
+    state.exiting = true;
+});
+
+//
+// Start connecting
+//
+const startup = createChannel("STARTUP", null, 0, 0);
+
+//
+// Run until exit
+//
+while (!state.exiting) {
+    // Poll for any sockets which we can dispatch
+    DEBUG && printf("Polling\n");
+    const events = pollWorkers();
+    DEBUG && printf("Dispatching %s\n", events);
+    for (let i = 0; i < length(events); i++) {
+        const event = events[i];
+        if (event[1]) {
+            event[2](event[1]);
+        }
+    }
+    // Check for expired timers
+    const now = clock(true);
+    for (let id in channels) {
+        const channel = channels[id];
+        if (channel.timer <= now) {
+            channel.timer = null;
+            channel.process(POLLTIMER);
+        }
+    }
+}
+
+DEBUG && print("Exiting\n");
+//
+// Tidy up connections on the way out
+//
+main.close();
+for (let id in channels) {
+    if (channels[id].connection) {
+        channels[id].connection.close();
+    }
+}
+mgr.close();
