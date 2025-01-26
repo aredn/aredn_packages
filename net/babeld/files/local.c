@@ -322,6 +322,7 @@ local_read(struct local_socket *s)
     char *eol;
     char reply[100] = "ok\n";
     const char *message = NULL;
+    struct interface *ifp;
     struct neighbour *neigh;
 
     if(s->buf == NULL)
@@ -355,6 +356,11 @@ local_read(struct local_socket *s)
             break;
         case CONFIG_ACTION_DUMP:
             local_notify_all_1(s);
+            break;
+        case CONFIG_ACTION_DUMP_INTERFACES:
+            FOR_ALL_INTERFACES(ifp) {
+                local_notify_interface_1(s, ifp, LOCAL_ADD);
+            }
             break;
         case CONFIG_ACTION_DUMP_NEIGHBORS:
             FOR_ALL_NEIGHBOURS(neigh) {
