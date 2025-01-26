@@ -165,33 +165,12 @@ fs.unlink(AREDNLINK_MGR);
 const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM });
 
 //
-// Create a new channel to manage the socket. The channel may be for an incoming
-// comnnection, or for one we're initiating.
-//
-function createChannel(initialstate, connection, polling, timer, process) {
-    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${polling} timer ${timer}\n`);
-    const channel = {
-        id: channelId++,
-        state: initialstate,
-        connection: connection,
-        polling: polling,
-        timer: timer
-    };
-    if (!process) {
-        process = channelProcess;
-    }
-    channel.process = (event) => call(process, channel, null, event),
-    channels[channel.id] = channel;
-    return channel;
-}
-
-//
 // Process the current channel, potentially consuming or sending traffic on the socket
 // if the event says we can.
 // this: channel
 //
 function channelProcess(event) {
-    DEBUG && print("channelProcess: event ${event} state ${this.state} address ${this.address ?? '<none>'}\n");
+    DEBUG && print(`channelProcess: event ${sprintf("%x", event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
     switch (this.state) {
         case "IDLE":
         {
@@ -360,6 +339,27 @@ function channelProcess(event) {
 }
 
 //
+// Create a new channel to manage the socket. The channel may be for an incoming
+// comnnection, or for one we're initiating.
+//
+function createChannel(initialstate, connection, polling, timer, process) {
+    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${polling} timer ${timer}\n`);
+    const channel = {
+        id: channelId++,
+        state: initialstate,
+        connection: connection,
+        polling: polling,
+        timer: timer
+    };
+    if (!process) {
+        process = channelProcess;
+    }
+    channel.process = (event) => call(process, channel, null, event),
+    channels[channel.id] = channel;
+    return channel;
+}
+
+//
 // Process manager commands.
 // this: channel
 //
@@ -405,7 +405,10 @@ function neighborhoodProcess(event) {
     for (let i = 0; i < length(ifaces); i++) {
         const iface = ifaces[i];
         const name = iface.interface;
-        if (oldinterfaces[name]) {
+        if (name === "br-nomesh") {
+            // Ignore interfaces which cannot have neighbors
+        }
+        else if (oldinterfaces[name]) {
             interfaces[name] = oldinterfaces[name];
             delete oldinterfaces[name];
         }
@@ -426,12 +429,12 @@ function neighborhoodProcess(event) {
     const ifacea = {};
     for (let i = 0; i < length(neighbors); i++) {
         const n = neighbors[i];
-        ifacea[n] = bestAddress(ifacea[n], n.ipv6address);
+        ifacea[n.interface] = bestAddress(ifacea[n.interface], n.ipv6address);
     }
     for (let id in channels) {
         const channel = channels[id];
         const address = ifacea[channel.interface];
-        if (channel.address != address) {
+        if (address && channel.address != address) {
             channel.address = address;
             channel.timer = null;
             channel.process(NEWADDRESS);

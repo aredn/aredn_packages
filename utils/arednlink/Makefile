@@ -19,8 +19,8 @@ define Package/arednlink/description
 endef
 
 define Package/arednlink/install
-	$(INSTALL_DIR) $(1)/usr/local/bin/arednlink/
-	$(INSTALL_BIN) ./files/arednlink $(1)/usr/local/bin/arednlink/
+	$(INSTALL_DIR) $(1)/usr/local/bin/
+	$(INSTALL_BIN) ./files/arednlink $(1)/usr/local/bin/
 endef
 
 define Build/Compile
