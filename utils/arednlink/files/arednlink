@@ -36,6 +36,7 @@ const DEBUG = true;
 
 import * as fs from "fs";
 import * as socket from "socket";
+import * as uci from "uci";
 import * as babel from "aredn.babel";
 
 //
@@ -52,15 +53,16 @@ const CLOSECONN     = 0x80000;
 //
 // Commands
 //
-const CMD_UPDATE_NAMES  = ord('N');
-const CMD_UPDATE_SRVS   = ord('U')
-const CMD_SYNC          = ord('S');
+const CMD_UPDATE_NAMES      = ord('N');
+const CMD_UPDATE_SERVICES   = ord('U');
+const CMD_SYNC              = ord('S');
 
 //
 // Poll timers
 //
-const NEIGHBORHOOD_POLL = 60;
-const IDLE_POLL = 60 * 60;
+const NEIGHBORHOOD_POLL     = 60;
+const IDLE_POLL             = 60 * 60;
+const CONNECT_RETRY_POLL    = 30;
 
 //
 // Communications
@@ -71,9 +73,12 @@ const AREDNLINK_MGR = "/var/run/arednlink.sock";
 //
 // DNS and services file locations.
 //
-const ROOT_DIR_DNS  = "/tmp/arednlink/dns/";
-const ROOT_DIR_SRV  = "/tmp/arednlink/srv/";
-
+const ROOT_DIR_NAMES    = "/tmp/arednlink/dns/";
+const ROOT_DIR_SERVICES = "/tmp/arednlink/srv/";
+//
+// Default hop count for messages.
+//
+const HOP_DEFAULT = 64;
 //
 // Set of all connected channels.
 //
@@ -81,15 +86,15 @@ const channels = {};
 //
 // Set of known interfaces
 //
-const interfaces = {};
+let interfaces = {};
 //
 // Neighborhood monitor
 //
 let neighborhood = null;
 //
-// Data hashes to streamline data syncing.
+// Our IPv4 address, used for all messages we generate
 //
-const datatracker = {};
+const myipv4address = iptoarr(uci.cursor("/etc/config.mesh").get("setup", "globals", "wifi_ip"));
 
 let channelId = 1;
 let exiting = false;
@@ -134,32 +139,19 @@ function validNextHop(channel, ipv4address) {
 }
 
 //
-// Build a message
+// Calculate time for timer
 //
-function buildMessage(cmd, hop, srcipv4, payload)
-{
-    payload = payload ?? "";
-    const len =  8 + length(payload); // Length is the entire message including the length itself.
-    return chr(len >> 8, len & 255, cmd, hop , srcipv4[0], srcipv4[1], srcipv4[2],srcipv4[3]) + payload;
+function when(timeout) {
+    return clock(true)[0] + timeout;
 }
 
 //
-// Hash data and store the result in data tracker.
+// Build a message
 //
-function trackData(ipv4address, type, data)
-{
-    const tracker = datatracker[ipv4address] ?? (datatracker[ipv4address] = {});
-    let hash = 0;
-    const len = length(data);
-    for (let i = 0; i < len; i++) {
-        hash += ord(data, i);
-        hash += hash << 10;
-        hash ^= hash >> 6;
-    }
-    hash += hash << 3;
-    hash ^= hash >> 11;
-    hash += hash << 15;
-    tracker[type] = hash;
+function buildMessage(cmd, ipv4addr, hop, payload) {
+    payload = payload ?? "";
+    const len =  8 + length(payload); // Length is the entire message including the length itself.
+    return chr(len >> 8, len & 255, cmd, hop , ipv4addr[0], ipv4addr[1], ipv4addr[2], ipv4addr[3]) + payload;
 }
 
 //
@@ -177,7 +169,7 @@ const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK
 // comnnection, or for one we're initiating.
 //
 function createChannel(initialstate, connection, polling, timer, process) {
-    DEBUG && print("createChannel\n");
+    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${polling} timer ${timer}\n`);
     const channel = {
         id: channelId++,
         state: initialstate,
@@ -215,7 +207,7 @@ function channelProcess(event) {
                     break;
                 case POLLTIMER:
                 default:
-                    this.timer = IDLE_POLL;
+                    this.timer = when(IDLE_POLL);
                     break;
             }
             break;
@@ -227,23 +219,30 @@ function channelProcess(event) {
                 case POLLTIMER:
                     if (bestAddress(this.myaddress, this.address) === this.myaddress) {
                         this.state = "IDLE";
+                        this.timer = 0;
                     }
                     else {
                         this.connection = socket.connect({ address: this.address, port: AREDNLINK_PORT });
-                        this.state = "CONNECTED";
-                        this.polling = POLLIN|POLLHUP;
-                        this.incoming = "";
-                        this.outgoing = "";
-                        // If we are initiating a connection, then we should terminate any incoming connections
-                        // on the same interface, as they are no longer connected to the best node.
-                        for (let id in channels) {
-                            const channel = channels[id];
-                            if (channel.interface === this.interface && channel !== this) {
-                                channel.process(CLOSECONN);
+                        if (!this.connection) {
+                            // Failed to connect
+                            this.timer = when(CONNECT_RETRY_POLL);
+                        }
+                        else {
+                            this.state = "CONNECTED";
+                            this.polling = POLLIN|POLLOUT|POLLHUP;
+                            this.timer = null;
+                            this.incoming = "";
+                            this.outgoing = buildMessage(CMD_SYNC, myipv4address, 1);
+                            // If we are initiating a connection, then we should terminate any incoming connections
+                            // on the same interface, as they are no longer connected to the best node.
+                            for (let id in channels) {
+                                const channel = channels[id];
+                                if (channel.interface === this.interface && channel !== this) {
+                                    channel.process(CLOSECONN);
+                                }
                             }
                         }
                     }
-                    this.timer = 0;
                     break;
                 case NOINTERFACE:
                 case CLOSECONN:
@@ -399,6 +398,7 @@ function managerProcess(event) {
 // Monitor the neighborhood
 //
 function neighborhoodProcess(event) {
+    DEBUG && print("neighborhoodProcess\n");
     const ifaces = babel.getInterfaces();
     const oldinterfaces = interfaces;
     interfaces = {};
@@ -438,7 +438,7 @@ function neighborhoodProcess(event) {
         }
     }
 
-    this.timer = NEIGHBORHOOD_POLL;
+    this.timer = when(NEIGHBORHOOD_POLL);
 }
 
 //
@@ -473,7 +473,7 @@ function pollWorkers() {
         [ mgr, POLLIN, mgrProcess ]
     ];
     let timeout = 24 * 60 * 60; // 1 day
-    const now = clock(true);
+    const now = clock(true)[0];
     for (let id in channels) {
         const channel = channels[id];
         if (channel.timer !== null) {
@@ -495,7 +495,9 @@ function pollWorkers() {
         p += ");}";
         poller.fn = loadstring(p, { raw_mode: true })();
     }
-    return poller.fn(1000 * max(0, timeout), workers) || [];
+    timeout = max(0, timeout);
+    DEBUG && printf(`Polling: timeout ${timeout} workers: ${workers}\n`);
+    return poller.fn(1000 * timeout, workers) || [];
 }
 
 //
@@ -509,35 +511,50 @@ function processMessage(cmd, hop, srcipv4, payload)
         case CMD_SYNC:
             // A sync request from a neighbor.
             // Return false so the request is not forwarded (it should have a hop of 1);
+            let dir = fs.opendir(ROOT_DIR_NAMES);
+            for (let name; name = dir.read(); ) {
+                const ip = iptoarr(name);
+                if (ip) {
+                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_NAMES}${name}`));
+                }
+            }
+            dir.close();
+            dir = fs.opendir(ROOT_DIR_SERVICES);
+            for (let name; name = dir.read(); ) {
+                const ip = iptoarr(name);
+                if (ip) {
+                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_SERVICES}${name}`));
+                }
+            }
+            dir.close();
             return false;
         case CMD_UPDATE_NAMES:
         {
             // Updates the dns entries published by the srvipv4 node. We read and compare so we
             // dont write to the file unless it has changed.
-            const path = `${ROOT_DIR_DNS}${srcipv4}`;
+            const path = `${ROOT_DIR_NAMES}${srcipv4}`;
             const old = fs.readfile(path);
             if (old != payload) {
                 fs.writefile(path, payload);
-                trackData(srcipv4, "D", payload);
             }
-            return true;
+            break;
         }
-        case CMD_UPDATE_SRVS:
+        case CMD_UPDATE_SERVICES:
         {
             // Updates the service entries published by the srvipv4 node. We read and compare so
             // we dont write to tjhe file unless it has changed.
-            const path = `${ROOT_DIR_SRV}${srcipv4}`;
+            const path = `${ROOT_DIR_SERVICES}${srcipv4}`;
             const old = fs.readfile(path);
             if (old != payload) {
                 fs.writefile(path, payload);
-                trackData(srcipv4, "S", payload);
             }
-            return true;
+            break;
         }
         default:
-            // Pass on messages we dont understand.
-            return true;
+            break;
     }
+    // Pass on messages so long as they're from a validhop
+    return validhop;
 }
 
 //
@@ -565,10 +582,10 @@ function processRequest() {
         const cmd = ord(this.incoming, i + 2);
         const hop = ord(this.incoming, i + 3);
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
-        // Only process payloads if they come from a the correct direction
-        if (validNextHop(this, srcipv4)) {
+        const validhop = validNextHop(this, srcipv4);
+        if (validhop) {
             const payload = substr(this.incoming, i + 8, len - 8);
-            const status = processMessage(cmd, hop, srcipv4, payload);
+            const status = call(processMessage, this, null, cmd, hop, srcipv4, payload);
             if (status && hop > 1) {
                 // Build the message to forward
                 const msg = chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2],srcipv4[3]) + payload;
@@ -604,32 +621,23 @@ signal("SIGTERM", _ => {
 });
 
 //
-// Create data directores and hash anything stored there.
+// Create data directores and empty them.
 //
-system(`mkdir -p ${ROOT_DIR_DNS}`);
-system(`mkdir -p ${ROOT_DIR_SRV}`);
-let dir = fs.opendir(ROOT_DIR_DNS);
-for (let ipv4addr; ipv4addr = dir.read(); ) {
-   trackData(ipv4addr, "D", fs.readfile(`${ROOT_DIR_DNS}${ipv4addr}`));
-}
-dir.close();
-dir = fs.opendir(ROOT_DIR_SRV);
-for (let ipv4addr; ipv4addr = dir.read(); ) {
-   trackData(ipv4addr, "S", fs.readfile(`${ROOT_DIR_SRV}${ipv4addr}`));
-}
-dir.close();
+system(`mkdir -p ${ROOT_DIR_NAMES}`);
+system(`rm -f ${ROOT_DIR_NAMES}*`);
+system(`mkdir -p ${ROOT_DIR_SERVICES}`);
+system(`rm -f ${ROOT_DIR_SERVICES}*`);
 
 //
 // Start connecting
 //
-neighborhood = createChannel("NEIGHBORHOOD", null, 0, NEIGHBORHOOD_POLL, neighborhoodProcess);
+neighborhood = createChannel("NEIGHBORHOOD", null, 0, 0, neighborhoodProcess);
 
 //
 // Run until exit
 //
 while (!exiting) {
     // Poll for any sockets which we can dispatch
-    DEBUG && printf("Polling\n");
     const events = pollWorkers();
     DEBUG && printf("Dispatching %s\n", events);
     for (let i = 0; i < length(events); i++) {
@@ -639,7 +647,7 @@ while (!exiting) {
         }
     }
     // Check for expired timers
-    const now = clock(true);
+    const now = clock(true)[0];
     for (let id in channels) {
         const channel = channels[id];
         if (channel.timer <= now) {
