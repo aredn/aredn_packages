@@ -44,14 +44,13 @@ import * as babel from "aredn.babel";
 //
 // Events
 //
-const POLLIN        = socket.POLLIN;
-const POLLOUT       = socket.POLLOUT;
-const POLLRDHUP     = socket.POLLRDHUP;
-const POLLTIMER     = 0x10000;
-const NOINTERFACE   = 0x20000;
-const NEWADDRESS    = 0x40000;
-const CLOSECONN     = 0x80000;
-
+const POLLIN                = socket.POLLIN;
+const POLLOUT               = socket.POLLOUT;
+const POLLRDHUP             = socket.POLLRDHUP;
+const POLLTIMER             = 0x10000;
+const NOINTERFACE           = 0x20000;
+const NEWADDRESS            = 0x40000;
+const CLOSECONN             = 0x80000;
 //
 // Commands
 //
@@ -59,36 +58,40 @@ const CMD_VERSION           = ord('V');
 const CMD_UPDATE_NAMES      = ord('N');
 const CMD_UPDATE_SERVICES   = ord('U');
 const CMD_SYNC              = ord('S');
-
 //
-// Poll timers and timeout
+// Poll timers
 //
 const NEIGHBORHOOD_POLL     = 60;
 const IDLE_POLL             = 60 * 60;
 const ROUTE_POLL            = 30;
-const CONNECT_TIMEOUT       = 10 * 1000;
-
 //
 // Gray list timers
 //
 const GRAY_TIMEOUT          = 45;
 const GRAY_MAX_SCALE        = 15;
-
+//
+// TCP configuration
+//
+const CHANNEL_KEEPCNT       = 3;
+const CHANNEL_KEEPIDLE      = 30;
+const CHANNEL_KEEPALIVE     = 30;
+const CHANNEL_SYNCNT        = 3;
+const CHANNEL_USER_TIMEOUT  = 60;
+const CHANNEL_CONN_TIMEOUT  = 10;
 //
 // Communications
 //
-const AREDNLINK_PORT = 9623;
-const AREDNLINK_MGR = "/var/run/arednlink.sock";
-
+const AREDNLINK_PORT        = 9623;
+const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 //
 // DNS and services file locations.
 //
-const ROOT_DIR_NAMES    = "/tmp/arednlink/names/";
-const ROOT_DIR_SERVICES = "/tmp/arednlink/services/";
+const ROOT_DIR_NAMES        = "/tmp/arednlink/names/";
+const ROOT_DIR_SERVICES     = "/tmp/arednlink/services/";
 //
 // Default hop count for messages.
 //
-const HOP_DEFAULT = 64;
+const HOP_DEFAULT           = 64;
 //
 // Set of all connected channels.
 //
@@ -165,6 +168,18 @@ function validNextHop(channel, ipv4address) {
 //
 function when(timeout) {
     return clock(true)[0] + timeout;
+}
+
+//
+// Setup the socket just the way we want it.
+//
+function setupConnection(sock) {
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, CHANNEL_KEEPCNT);
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, CHANNEL_KEEPIDLE);
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, CHANNEL_KEEPALIVE);
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1);
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_SYNCNT, CHANNEL_SYNCNT);
+    sock.setopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, CHANNEL_USER_TIMEOUT * 1000);
 }
 
 //
@@ -370,7 +385,7 @@ function channelProcess(event) {
                     }
                     else {
                         DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
-                        this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CONNECT_TIMEOUT);
+                        this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CHANNEL_CONN_TIMEOUT * 1000);
                         DEBUG && print(`Connection: ${this.connection}\n`);
                         if (!this.connection) {
                             // Failed to connect
@@ -387,6 +402,8 @@ function channelProcess(event) {
                             this.timer = 0;
                         }
                         else {
+                            // Setup the connection just the way we like it
+                            setupConnection(this.connection);
                             // If the we successfully opened the primary, close any secondary
                             const iface = interfaces[this.interface];
                             if (iface.primary === this && iface.secondary) {
@@ -786,6 +803,7 @@ function mainProcess(event) {
         const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null);
         channel.interface = address.interface;
         channel.address = address.address;
+        setupConnection(channel.connection);
     }
 }
 
