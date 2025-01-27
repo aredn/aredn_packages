@@ -45,6 +45,7 @@ import * as babel from "aredn.babel";
 const POLLIN        = socket.POLLIN;
 const POLLOUT       = socket.POLLOUT;
 const POLLHUP       = socket.POLLHUP;
+const POLLRDHUP     = socket.POLLRDHUP;
 const POLLTIMER     = 0x10000;
 const NOINTERFACE   = 0x20000;
 const NEWADDRESS    = 0x40000;
@@ -165,12 +166,131 @@ fs.unlink(AREDNLINK_MGR);
 const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM });
 
 //
+// Process incoming message locally.
+//
+function processMessage(cmd, hop, srcipv4, payload)
+{
+    srcipv4 = arrtoip(srcipv4);
+    DEBUG && print(`processMessage: cmd ${cmd} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
+    switch (cmd) {
+        case CMD_SYNC:
+            // A sync request from a neighbor.
+            // Return false so the request is not forwarded (it should have a hop of 1);
+            let dir = fs.opendir(ROOT_DIR_NAMES);
+            for (let name; name = dir.read(); ) {
+                const ip = iptoarr(name);
+                if (ip) {
+                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_NAMES}${name}`));
+                }
+            }
+            dir.close();
+            dir = fs.opendir(ROOT_DIR_SERVICES);
+            for (let name; name = dir.read(); ) {
+                const ip = iptoarr(name);
+                if (ip) {
+                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_SERVICES}${name}`));
+                }
+            }
+            dir.close();
+            if (length(this.outgoing)) {
+                this.polling |= POLLOUT;
+            }
+            return false;
+        case CMD_UPDATE_NAMES:
+        {
+            // Updates the dns entries published by the srvipv4 node. We read and compare so we
+            // dont write to the file unless it has changed.
+            const path = `${ROOT_DIR_NAMES}${srcipv4}`;
+            const old = fs.readfile(path);
+            if (old != payload) {
+                fs.writefile(path, payload);
+            }
+            break;
+        }
+        case CMD_UPDATE_SERVICES:
+        {
+            // Updates the service entries published by the srvipv4 node. We read and compare so
+            // we dont write to tjhe file unless it has changed.
+            const path = `${ROOT_DIR_SERVICES}${srcipv4}`;
+            const old = fs.readfile(path);
+            if (old != payload) {
+                fs.writefile(path, payload);
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    // Pass on messages so long as they're from a validhop
+    return validhop;
+}
+
+//
+// Process incoming data from another node.
+//
+function processRequest() {
+    DEBUG && print(`processRequest channel ${this}\n`);
+    const data = this.connection.recv();
+    DEBUG && print(`--- data length ${length(data)}\n`);
+    if (!data || !length(data)) {
+        return;
+    }
+    this.incoming += data;
+    const ilen = length(this.incoming);
+    DEBUG && print(`--- incoming length ${ilen}\n`);
+    // Process the incoming data
+    let i = 0;
+    while (i < ilen) {
+        // Make sure we have enough to read the length
+        if (i + 2 > ilen) {
+            break;
+        }
+        DEBUG && print(`--- header [ ${ord(this.incoming, i+0)}, ${ord(this.incoming, i+1)}, ${ord(this.incoming, i+2)}, ${ord(this.incoming, i+3)}, ${ord(this.incoming, i+4)}, ${ord(this.incoming, i+5)}, ${ord(this.incoming, i+6)}, ${ord(this.incoming, i+7)} ]\n`);
+        const len = 256 * ord(this.incoming, i) + ord(this.incoming, i + 1);
+        DEBUG && print(`--- msg length ${len}\n`);
+        // Then make sure we have enough to read the packet.
+        if (i + len > ilen) {
+            break;
+        }
+        const cmd = ord(this.incoming, i + 2);
+        const hop = ord(this.incoming, i + 3);
+        const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
+        const validhop = validNextHop(this, srcipv4);
+        DEBUG && print(`--- msg ${cmd} hop ${hop} validhop ${validhop} ${srcipv4}\n`);
+        if (validhop) {
+            const payload = substr(this.incoming, i + 8, len - 8);
+            const status = call(processMessage, this, null, cmd, hop, srcipv4, payload);
+            if (status && hop > 1) {
+                // Build the message to forward
+                const msg = chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2],srcipv4[3]) + payload;
+                for (let id in channels) {
+                    const channel = channels[id];
+                    if (channel !== this) {
+                        if (this.state === "CONNECTED" || this.state === "CONNECTED_INCOMING") {
+                            this.outgoing += msg;
+                            this.polling |= POLLOUT;
+                        }
+                    }
+                }
+            }
+        }
+        i += len;
+    }
+    if (i >= ilen) {
+        this.incoming = "";
+    }
+    else {
+        this.incoming = substr(this.incoming, i);
+    }
+}
+
+//
 // Process the current channel, potentially consuming or sending traffic on the socket
 // if the event says we can.
 // this: channel
 //
 function channelProcess(event) {
-    DEBUG && print(`channelProcess: event ${sprintf("%x", event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
+    DEBUG && print(`channelProcess: id ${this.id} event ${sprintf("%x", event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
     switch (this.state) {
         case "IDLE":
         {
@@ -201,14 +321,16 @@ function channelProcess(event) {
                         this.timer = 0;
                     }
                     else {
-                        this.connection = socket.connect({ address: this.address, port: AREDNLINK_PORT });
+                        DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
+                        this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT });
+                        DEBUG && print(`Connection: ${this.connection}\n`);
                         if (!this.connection) {
                             // Failed to connect
                             this.timer = when(CONNECT_RETRY_POLL);
                         }
                         else {
                             this.state = "CONNECTED";
-                            this.polling = POLLIN|POLLOUT|POLLHUP;
+                            this.polling = POLLIN|POLLOUT|POLLRDHUP;
                             this.timer = null;
                             this.incoming = "";
                             this.outgoing = buildMessage(CMD_SYNC, myipv4address, 1);
@@ -249,10 +371,10 @@ function channelProcess(event) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
                     break;
-                case POLLHUP:
-                case POLLHUP|POLLIN:
-                case POLLHUP|POLLOUT:
-                case POLLHUP|POLLIN|POLLOUT:
+                case POLLRDHUP:
+                case POLLRDHUP|POLLIN:
+                case POLLRDHUP|POLLOUT:
+                case POLLRDHUP|POLLIN|POLLOUT:
                 case NEWADDRESS:
                     if (this.connection) {
                         this.connection.close();
@@ -285,8 +407,9 @@ function channelProcess(event) {
         case "INCOMING":
         {
             this.incoming = "";
-            this.outgoing = "";
+            this.outgoing = buildMessage(CMD_SYNC, myipv4address, 1);
             this.state = "CONNECTED_INCOMING";
+            this.polling = POLLIN|POLLOUT|POLLRDHUP;
             // Fall through
         }
         case "CONNECTED_INCOMING":
@@ -308,10 +431,10 @@ function channelProcess(event) {
                     break;
                 case NEWADDRESS:
                     break;
-                case POLLHUP:
-                case POLLHUP|POLLIN:
-                case POLLHUP|POLLOUT:
-                case POLLHUP|POLLIN|POLLOUT:
+                case POLLRDHUP:
+                case POLLRDHUP|POLLIN:
+                case POLLRDHUP|POLLOUT:
+                case POLLRDHUP|POLLIN|POLLOUT:
                     // Force neighbor update
                     neighborhood.timer = 0;
                     // Fall through
@@ -434,7 +557,7 @@ function neighborhoodProcess(event) {
     for (let id in channels) {
         const channel = channels[id];
         const address = ifacea[channel.interface];
-        if (address && channel.address != address) {
+        if (address && channel.address != address && channel.state !== "INCOMING" && channel.state !== "CONNECTED_INCOMING") {
             channel.address = address;
             channel.timer = null;
             channel.process(NEWADDRESS);
@@ -450,7 +573,10 @@ function neighborhoodProcess(event) {
 //
 function mainProcess(event) {
     if (event & POLLIN) {
-        createChannel("INCOMING", main.accept(null, socket.SOCK_NONBLOCK), POLLIN|POLLHUP, null);
+        const address = {};
+        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null);
+        channel.interface = address.interface;
+        channel.address = address.address;
     }
 }
 
@@ -460,7 +586,7 @@ function mainProcess(event) {
 //
 function mgrProcess(event) {
     if (event & POLLIN) {
-        createChannel("INCOMING", mgr.accept(), POLLIN|POLLHUP, null, managerProcess);
+        createChannel("INCOMING", mgr.accept(), POLLIN|POLLRDHUP, null, managerProcess);
     }
 }
 
@@ -472,8 +598,8 @@ function mgrProcess(event) {
 //
 function pollWorkers() {
     const workers = [
-        [ main, POLLIN, mainProcess ],
-        [ mgr, POLLIN, mgrProcess ]
+        [ main, POLLIN, { process: mainProcess } ],
+        [ mgr, POLLIN, { process: mgrProcess } ]
     ];
     let timeout = 24 * 60 * 60; // 1 day
     const now = clock(true)[0];
@@ -483,7 +609,7 @@ function pollWorkers() {
             timeout = min(timeout, channel.timer - now);
         }
         if (channel.connection && channel.polling) {
-            push(workers, [ channel.connection, channel.polling, channel.process ]);
+            push(workers, [ channel.connection, channel.polling, channel ]);
         }
         else if (channel.timer === null) {
             print(`ERROR: Worker blocked without timer or active socket: ${channel}\n`);
@@ -504,121 +630,11 @@ function pollWorkers() {
 }
 
 //
-// Process incoming message locally.
-//
-function processMessage(cmd, hop, srcipv4, payload)
-{
-    srcipv4 = arrtoip(srcipv4);
-    DEBUG && print(`processMessage: cmd ${cmd} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
-    switch (cmd) {
-        case CMD_SYNC:
-            // A sync request from a neighbor.
-            // Return false so the request is not forwarded (it should have a hop of 1);
-            let dir = fs.opendir(ROOT_DIR_NAMES);
-            for (let name; name = dir.read(); ) {
-                const ip = iptoarr(name);
-                if (ip) {
-                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_NAMES}${name}`));
-                }
-            }
-            dir.close();
-            dir = fs.opendir(ROOT_DIR_SERVICES);
-            for (let name; name = dir.read(); ) {
-                const ip = iptoarr(name);
-                if (ip) {
-                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_SERVICES}${name}`));
-                }
-            }
-            dir.close();
-            return false;
-        case CMD_UPDATE_NAMES:
-        {
-            // Updates the dns entries published by the srvipv4 node. We read and compare so we
-            // dont write to the file unless it has changed.
-            const path = `${ROOT_DIR_NAMES}${srcipv4}`;
-            const old = fs.readfile(path);
-            if (old != payload) {
-                fs.writefile(path, payload);
-            }
-            break;
-        }
-        case CMD_UPDATE_SERVICES:
-        {
-            // Updates the service entries published by the srvipv4 node. We read and compare so
-            // we dont write to tjhe file unless it has changed.
-            const path = `${ROOT_DIR_SERVICES}${srcipv4}`;
-            const old = fs.readfile(path);
-            if (old != payload) {
-                fs.writefile(path, payload);
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    // Pass on messages so long as they're from a validhop
-    return validhop;
-}
-
-//
-// Process incoming data from another node.
-//
-function processRequest() {
-    const data = this.connection.recv();
-    if (!data || !length(data)) {
-        return;
-    }
-    this.incoming += data;
-    const ilen = length(this.incoming);
-    // Process the incoming data
-    let i = 0;
-    while (i < ilen) {
-        // Make sure we have enough to read the length
-        if (i + 2 > ilen) {
-            break;
-        }
-        const len = ord(this.incoming, i) << 8 + ord(this.incoming, i + 1);
-        // Then make sure we have enough to read the packet.
-        if (i + len > ilen) {
-            break;
-        }
-        const cmd = ord(this.incoming, i + 2);
-        const hop = ord(this.incoming, i + 3);
-        const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
-        const validhop = validNextHop(this, srcipv4);
-        if (validhop) {
-            const payload = substr(this.incoming, i + 8, len - 8);
-            const status = call(processMessage, this, null, cmd, hop, srcipv4, payload);
-            if (status && hop > 1) {
-                // Build the message to forward
-                const msg = chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2],srcipv4[3]) + payload;
-                for (let id in channels) {
-                    const channel = channels[id];
-                    if (channel !== this) {
-                        if (this.state === "CONNECTED" || this.state === "CONNECTED_INCOMING") {
-                            this.outgoing += msg;
-                            this.polling |= POLLOUT;
-                        }
-                    }
-                }
-            }
-        }
-        i += len;
-    }
-    if (i >= ilen) {
-        this.incoming = "";
-    }
-    else {
-        this.incoming = substr(this.incoming, i);
-    }
-}
-
-//
 // Signals
 //
-signal("SIGINT", _ => {
-    exiting = true;
-});
+//signal("SIGINT", _ => {
+//    exiting = true;
+//});
 signal("SIGTERM", _ => {
     exiting = true;
 });
@@ -627,9 +643,9 @@ signal("SIGTERM", _ => {
 // Create data directores and empty them.
 //
 system(`mkdir -p ${ROOT_DIR_NAMES}`);
-system(`rm -f ${ROOT_DIR_NAMES}*`);
+//system(`rm -f ${ROOT_DIR_NAMES}*`);
 system(`mkdir -p ${ROOT_DIR_SERVICES}`);
-system(`rm -f ${ROOT_DIR_SERVICES}*`);
+//system(`rm -f ${ROOT_DIR_SERVICES}*`);
 
 //
 // Start connecting
@@ -646,14 +662,15 @@ while (!exiting) {
     for (let i = 0; i < length(events); i++) {
         const event = events[i];
         if (event[1]) {
-            event[2](event[1]);
+            event[2].timer = null;
+            event[2].process(event[1]);
         }
     }
     // Check for expired timers
     const now = clock(true)[0];
     for (let id in channels) {
         const channel = channels[id];
-        if (channel.timer <= now) {
+        if (channel.timer !== null && channel.timer <= now) {
             channel.timer = null;
             channel.process(POLLTIMER);
         }
