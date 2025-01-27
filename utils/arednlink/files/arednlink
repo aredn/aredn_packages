@@ -55,7 +55,7 @@ const CLOSECONN             = 0x80000;
 // Commands
 //
 const CMD_VERSION           = ord('V');
-const CMD_UPDATE_NAMES      = ord('N');
+const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
 const CMD_SYNC              = ord('S');
 //
@@ -86,7 +86,7 @@ const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 //
 // DNS and services file locations.
 //
-const ROOT_DIR_NAMES        = "/tmp/arednlink/names/";
+const ROOT_DIR_HOSTS        = "/tmp/arednlink/hosts/";
 const ROOT_DIR_SERVICES     = "/tmp/arednlink/services/";
 //
 // Default hop count for messages.
@@ -204,7 +204,7 @@ function buildTargettedSyncMessage(target) {
     let sync = "";
     for (let ip in hostroutes) {
         if (hostroutes[ip] === target) {
-            if (!(fs.access(`${ROOT_DIR_NAMES}${ip}`) && fs.access(`${ROOT_DIR_SERVICES}${ip}`))) {
+            if (!(fs.access(`${ROOT_DIR_HOSTS}${ip}`) && fs.access(`${ROOT_DIR_SERVICES}${ip}`))) {
                 const addr = iptoarr(ip);
                 sync += chr(addr[0], addr[1], addr[2], addr[3]);
             }
@@ -255,9 +255,9 @@ function processMessage(cmd, hop, srcipv4, payload)
             const len = length(payload);
             for (let i = 0; i < len; i += 4) {
                 const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
-                const name = fs.readfile(`${ROOT_DIR_NAMES}${ip}`);
+                const name = fs.readfile(`${ROOT_DIR_HOSTS}${ip}`);
                 if (name) {
-                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, ip, HOP_DEFAULT, name);
+                    this.outgoing += buildMessage(CMD_UPDATE_HOSTS, ip, HOP_DEFAULT, name);
                 }
                 const service = fs.readfile(`${ROOT_DIR_SERVICES}${ip}`);
                 if (service) {
@@ -268,11 +268,11 @@ function processMessage(cmd, hop, srcipv4, payload)
                 this.polling |= POLLOUT;
             }
             return false;
-        case CMD_UPDATE_NAMES:
+        case CMD_UPDATE_HOSTS:
         {
             // Updates the name entries published by the srvipv4 node. We read and compare so we
             // dont write to the file unless it has changed nor do we forward the update.
-            const path = `${ROOT_DIR_NAMES}${srcipv4}`;
+            const path = `${ROOT_DIR_HOSTS}${srcipv4}`;
             const old = fs.readfile(path);
             if (old == payload) {
                 return false;
@@ -580,18 +580,18 @@ function commandProcess(cmd) {
     const cv = split(trim(cmd), " ", 2);
     cv[1] = trim(cv[1]);
     switch (cv[0]) {
-        case "upload-names":
+        case "upload-hosts":
         {
             const data = fs.readfile(cv[1]);
             if (!data) {
                 return "bad file";
             }
             else {
-                const path = `${ROOT_DIR_NAMES}${myipv4address}`;
+                const path = `${ROOT_DIR_HOSTS}${myipv4address}`;
                 const old = fs.readfile(path);
                 if (old != data) {
                     fs.writefile(path, data);
-                    sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, data));
+                    sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, data));
                     return old ? "ok updated" : "ok new";
                 }
                 else {
@@ -620,9 +620,9 @@ function commandProcess(cmd) {
         }
         case "force-update":
         {
-            const n = fs.readfile(`${ROOT_DIR_NAMES}${myipv4address}`);
+            const n = fs.readfile(`${ROOT_DIR_HOSTS}${myipv4address}`);
             if (n) {
-                sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, n));
+                sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, n));
             }
             const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
             if (s) {
@@ -788,7 +788,7 @@ function routeProcess(event) {
 
     // Remove any data we no longer need
     for (let ip in oldr) {
-        fs.unlink(`${ROOT_DIR_NAMES}${ip}`);
+        fs.unlink(`${ROOT_DIR_HOSTS}${ip}`);
         fs.unlink(`${ROOT_DIR_SERVICES}${ip}`);
     }
 
@@ -878,8 +878,8 @@ signal("SIGTERM", _ => {
 //
 // Create data directores and empty them.
 //
-system(`mkdir -p ${ROOT_DIR_NAMES}`);
-system(`rm -f ${ROOT_DIR_NAMES}*`);
+system(`mkdir -p ${ROOT_DIR_HOSTS}`);
+system(`rm -f ${ROOT_DIR_HOSTS}*`);
 system(`mkdir -p ${ROOT_DIR_SERVICES}`);
 system(`rm -f ${ROOT_DIR_SERVICES}*`);
 
