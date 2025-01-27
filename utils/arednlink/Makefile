@@ -21,6 +21,7 @@ endef
 define Package/arednlink/install
 	$(INSTALL_DIR) $(1)/usr/local/bin/
 	$(INSTALL_BIN) ./files/arednlink $(1)/usr/local/bin/
+	$(INSTALL_BIN) ./files/arednlink-ctl $(1)/usr/local/bin/
 endef
 
 define Build/Compile
