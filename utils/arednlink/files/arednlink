@@ -65,6 +65,7 @@ const CMD_SYNC              = ord('S');
 //
 const NEIGHBORHOOD_POLL     = 60;
 const IDLE_POLL             = 60 * 60;
+const ROUTE_POLL            = 30;
 const CONNECT_TIMEOUT       = 10 * 1000;
 
 //
@@ -100,6 +101,10 @@ let interfaces = {};
 // Neighborhood monitor
 //
 let neighborhood = null;
+//
+// Current babel host routes
+//
+let hostroutes = {};
 //
 // Greylist of addresses in timeout
 //
@@ -178,19 +183,30 @@ function buildMessage(cmd, ipv4addr, hop, payload) {
 }
 
 //
-// Send message to all our connected channels.
+// Build a targetted sync message.
 //
-function sendMsgToAll(msg) {
+function buildTargettedSyncMessage(target) {
+    let sync = "";
+    for (let ip in hostroutes) {
+        if (hostroutes[ip] === target) {
+            if (!(fs.access(`${ROOT_DIR_NAMES}${ip}`) && fs.access(`${ROOT_DIR_SERVICES}${ip}`))) {
+                const addr = iptoarr(ip);
+                sync += chr(addr[0], addr[1], addr[2], addr[3]);
+            }
+        }
+    }
+    return buildMessage(CMD_SYNC, myipv4address, 1, sync);
+}
+
+//
+// Send message to all (most) of our connected channels.
+//
+function sendMsgToAll(msg, except) {
     for (let id in channels) {
         const channel = channels[id];
-        switch (channel.state) {
-            case "CONNECTED":
-            case "CONNECTED_INCOMING":
-                channel.outgoing += msg;
-                channel.polling |= POLLOUT;
-                break;
-            default:
-                break;
+        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== except) {
+            channel.outgoing += msg;
+            channel.polling |= POLLOUT;
         }
     }
 }
@@ -219,22 +235,20 @@ function processMessage(cmd, hop, srcipv4, payload)
             }
             return false;
         case CMD_SYNC:
-            // A sync request from a neighbor.
+            // A sync request from a neighbor. Payload contains a list of addresses the neighbor is soliciting data for.
             // Return false so the request is not forwarded (it should have a hop of 1);
-            let dir = fs.opendir(ROOT_DIR_NAMES);
-            for (let name; name = dir.read(); ) {
-                if (name !== "." && name !== "..") {
-                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, name, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_NAMES}${name}`));
+            const len = length(payload);
+            for (let i = 0; i < len; i += 4) {
+                const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
+                const name = fs.readfile(`${ROOT_DIR_NAMES}${ip}`);
+                if (name) {
+                    this.outgoing += buildMessage(CMD_UPDATE_NAMES, ip, HOP_DEFAULT, name);
+                }
+                const service = fs.readfile(`${ROOT_DIR_SERVICES}${ip}`);
+                if (service) {
+                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, service);
                 }
             }
-            dir.close();
-            dir = fs.opendir(ROOT_DIR_SERVICES);
-            for (let name; name = dir.read(); ) {
-                if (name !== "." && name !== "..") {
-                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, name, HOP_DEFAULT, fs.readfile(`${ROOT_DIR_SERVICES}${name}`));
-                }
-            }
-            dir.close();
             if (length(this.outgoing)) {
                 this.polling |= POLLOUT;
             }
@@ -305,17 +319,8 @@ function processRequest() {
             const payload = substr(this.incoming, i + 8, len - 8);
             const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
             if (forward && hop > 1) {
-                // Build the message to forward
-                const msg = chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload;
-                for (let id in channels) {
-                    const channel = channels[id];
-                    if (channel !== this) {
-                        if (this.state === "CONNECTED" || this.state === "CONNECTED_INCOMING") {
-                            this.outgoing += msg;
-                            this.polling |= POLLOUT;
-                        }
-                    }
-                }
+                // Build and forward message
+                sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
             }
         }
         i += len;
@@ -393,7 +398,7 @@ function channelProcess(event) {
                             this.polling = POLLIN|POLLOUT|POLLRDHUP;
                             this.timer = null;
                             this.incoming = "";
-                            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildMessage(CMD_SYNC, myipv4address, 1);
+                            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
                             // If we are initiating a connection, then we should terminate any incoming connections
                             // on the same interface, as they are no longer connected to the best node.
                             for (let id in channels) {
@@ -463,7 +468,7 @@ function channelProcess(event) {
         case "INCOMING":
         {
             this.incoming = "";
-            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildMessage(CMD_SYNC, myipv4address, 1);
+            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
             this.state = "CONNECTED_INCOMING";
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
             // Fall through
@@ -721,6 +726,57 @@ function neighborhoodProcess(event) {
 }
 
 //
+// Monitor Babel route changes.
+//
+function routeProcess(event) {
+    DEBUG && print("routeProcess\n");
+    const broutes = babel.getHostRoutes();
+
+    const oldr = hostroutes;
+    const newr = {};
+    hostroutes = {};
+    for (let i = length(broutes) - 1; i >= 0; i--) {
+        const route = broutes[i];
+        const dst = route.dst;
+        const iface = route.iface;
+        hostroutes[dst] = iface;
+        if (oldr[dst]) {
+            delete oldr[dst];
+        }
+        else {
+            // Build the sync message payloads as we go
+            const addr = iptoarr(dst);
+            if (!newr[iface]) {
+                newr[iface] = chr(addr[0], addr[1], addr[2], addr[3]);
+            }
+            else {
+                newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
+            }
+        }
+    }
+
+    DEBUG && printf(`--- current ${hostroutes}\n--- old ${oldr}\n--- new ${newr}\n`);
+
+    // Remove any data we no longer need
+    for (let ip in oldr) {
+        fs.unlink(`${ROOT_DIR_NAMES}${ip}`);
+        fs.unlink(`${ROOT_DIR_SERVICES}${ip}`);
+    }
+
+    // Sync our neighbors for information about the new routes
+    for (let id in channels) {
+        const channel = channels[id];
+        const sync = newr[channel.interface];
+        if (sync && (channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING")) {
+            channel.outgoing += buildMessage(CMD_SYNC, myipv4address, 1, sync);
+            channel.polling |= POLLOUT;
+        }
+    }
+
+    this.timer = when(ROUTE_POLL);
+}
+
+//
 // Our main socket process handles incoming requests, accepts them
 // then creates a channel to manage them.
 //
@@ -750,10 +806,7 @@ function mgrProcess(event) {
 // only rebuild it when the argument count changes. Maybe I'm missing an easier way to do this?
 //
 function pollWorkers() {
-    const workers = [
-        [ main, POLLIN, { process: mainProcess } ],
-        [ mgr, POLLIN, { process: mgrProcess } ]
-    ];
+    const workers = [];
     let timeout = 24 * 60 * 60; // 1 day
     const now = clock(true)[0];
     for (let id in channels) {
@@ -803,6 +856,9 @@ system(`rm -f ${ROOT_DIR_SERVICES}*`);
 //
 // Start connecting
 //
+createChannel("MAIN", main, POLLIN, null, mainProcess);
+createChannel("MGR", mgr, POLLIN, null, mgrProcess);
+createChannel("ROUTES", null, 0, 0, routeProcess);
 neighborhood = createChannel("NEIGHBORHOOD", null, 0, 0, neighborhoodProcess);
 
 //
