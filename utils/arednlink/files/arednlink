@@ -296,6 +296,8 @@ function channelProcess(event) {
         {
             switch (event) {
                 case NEWADDRESS:
+                    this.address = this.newaddress;
+                    delete this.newaddress;
                     this.state = "NEW";
                     this.timer = 0;
                     break;
@@ -315,6 +317,9 @@ function channelProcess(event) {
         {
             switch (event) {
                 case NEWADDRESS:
+                    this.address = this.newaddress;
+                    delete this.newaddress;
+                    // Fall throught
                 case POLLTIMER:
                     if (bestAddress(this.myaddress, this.address) === this.myaddress) {
                         this.state = "IDLE";
@@ -384,6 +389,8 @@ function channelProcess(event) {
                     this.incoming = "";
                     this.outgoing = "";
                     if (event === NEWADDRESS) {
+                        this.address = this.newaddress;
+                        delete this.newaddress;
                         this.state = "NEW";
                     }
                     else {
@@ -430,6 +437,7 @@ function channelProcess(event) {
                     }
                     break;
                 case NEWADDRESS:
+                    delete this.newaddress;
                     break;
                 case POLLRDHUP:
                 case POLLRDHUP|POLLIN:
@@ -557,8 +565,8 @@ function neighborhoodProcess(event) {
     for (let id in channels) {
         const channel = channels[id];
         const address = ifacea[channel.interface];
-        if (address && channel.address != address && channel.state !== "INCOMING" && channel.state !== "CONNECTED_INCOMING") {
-            channel.address = address;
+        if (address && channel.address != address) {
+            channel.newaddress = address;
             channel.timer = null;
             channel.process(NEWADDRESS);
         }
