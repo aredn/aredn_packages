@@ -20,8 +20,10 @@ endef
 
 define Package/arednlink/install
 	$(INSTALL_DIR) $(1)/usr/local/bin/
+	$(INSTALL_DIR) $(1)/etc/init.d/
 	$(INSTALL_BIN) ./files/arednlink $(1)/usr/local/bin/
 	$(INSTALL_BIN) ./files/arednlink-ctl $(1)/usr/local/bin/
+	$(INSTALL_BIN) ./files/arednlink.init $(1)/etc/init.d/babeld
 endef
 
 define Build/Compile

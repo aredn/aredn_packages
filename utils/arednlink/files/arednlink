@@ -32,7 +32,7 @@
  * version
  */
 
-const DEBUG = true;
+const DEBUG = false;
 
 const VERSION = "0.0.1";
 
