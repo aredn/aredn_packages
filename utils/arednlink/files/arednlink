@@ -34,6 +34,8 @@
 
 const DEBUG = true;
 
+const VERSION = "0.0.1";
+
 import * as fs from "fs";
 import * as socket from "socket";
 import * as uci from "uci";
@@ -74,8 +76,8 @@ const AREDNLINK_MGR = "/var/run/arednlink.sock";
 //
 // DNS and services file locations.
 //
-const ROOT_DIR_NAMES    = "/tmp/arednlink/dns/";
-const ROOT_DIR_SERVICES = "/tmp/arednlink/srv/";
+const ROOT_DIR_NAMES    = "/tmp/arednlink/names/";
+const ROOT_DIR_SERVICES = "/tmp/arednlink/services/";
 //
 // Default hop count for messages.
 //
@@ -153,6 +155,24 @@ function buildMessage(cmd, ipv4addr, hop, payload) {
     payload = payload ?? "";
     const len =  8 + length(payload); // Length is the entire message including the length itself.
     return chr(len >> 8, len & 255, cmd, hop , ipv4addr[0], ipv4addr[1], ipv4addr[2], ipv4addr[3]) + payload;
+}
+
+//
+// Send message to all our connected channels.
+//
+function sendMsgToAll(msg) {
+    for (let id in channels) {
+        const channel = channels[id];
+        switch (channel.state) {
+            case "CONNECTED":
+            case "CONNECTED_INCOMING":
+                channel.outgoing += msg;
+                channel.polling |= POLLOUT;
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 //
@@ -462,8 +482,12 @@ function channelProcess(event) {
             this.state = "CLOSED";
             if (this.connection) {
                 this.connection.close();
+                this.connection = null;
             }
             delete channels[this.id];
+            if (interfaces[this.interface] === this) {
+                delete interfaces[this.interface];
+            }
             break;
         }
     }
@@ -497,31 +521,75 @@ function createChannel(initialstate, connection, polling, timer, process) {
 function managerProcess(event) {
     switch (this.state) {
         case "INCOMING":
-            this.buffer = "";
-            // Fallthrough
+            this.connection.send(`AREDNLink ${VERSION}\n`);
+            this.state = "READING";
+            this.polling &= ~POLLOUT;
+            // Fall through
         case "READING":
+        default:
         {
-            const d = this.connection.recv();
-            if (!d || d === "") {
-                this.state = "CLOSING";
-                this.polling = POLLIN;
+            if (event & POLLRDHUP) {
+                this.state = "CLOSED";
+                this.polling = 0;
+                this.connection.close();
+                delete channels[this.id];
             }
-            else {
-                this.buffer += d;
-                // Do stuff with buffer ...
-                this.buffer = "";
-                this.state = "READING";
-                this.polling = POLLIN;
+            else if (event & POLLIN) {
+                const cmds = split(this.connection.recv(), "\n");
+                for (let i = 0; i < length(cmds); i++) {
+                    const cv = split(trim(cmds[i]), " ", 2);
+                    switch (cv[0]) {
+                        case "upload-names":
+                        {
+                            const data = fs.readfile(cv[1]);
+                            if (!data) {
+                                this.connection.send("bad file\n");
+                            }
+                            else {
+                                const path = `${ROOT_DIR_NAMES}${arrtoip(myipv4address)}`;
+                                const old = fs.readfile(path);
+                                if (old != data) {
+                                    fs.writefile(path, data);
+                                    const msg = buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, data);
+                                    sendMsgToAll(msg);
+                                    this.connection.send(old ? "ok updated\n" : "ok new\n");
+                                }
+                                else {
+                                    this.connection.send("ok nochange\n");
+                                }
+                            }
+                            break;
+                        }
+                        case "upload-services":
+                        const data = fs.readfile(cv[1]);
+                        if (!data) {
+                            this.connection.send("bad file\n");
+                        }
+                        else {
+                            const path = `${ROOT_DIR_SERVICES}${arrtoip(myipv4address)}`;
+                            const old = fs.readfile(path);
+                            if (old != data) {
+                                fs.writefile(path, data);
+                                const msg = buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data);
+                                sendMsgToAll(msg);
+                                this.connection.send(old ? "ok updated\n" : "ok new\n");
+                            }
+                            else {
+                                this.connection.send("ok nochange\n");
+                            }
+                        }
+                        break;
+                            break;
+                        case "":
+                            break;
+                        default:
+                            this.connection.send("bad command\n");
+                            break;
+                    }
+                }
             }
             break;
         }
-        case "CLOSING":
-        default:
-            this.state = "CLOSED";
-            this.polling = 0;
-            this.connection.close();
-            delete channels[this.id];
-            break;
     }
 }
 
@@ -594,7 +662,7 @@ function mainProcess(event) {
 //
 function mgrProcess(event) {
     if (event & POLLIN) {
-        createChannel("INCOMING", mgr.accept(), POLLIN|POLLRDHUP, null, managerProcess);
+        createChannel("INCOMING", mgr.accept(), POLLIN|POLLOUT|POLLRDHUP, null, managerProcess);
     }
 }
 
