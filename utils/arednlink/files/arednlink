@@ -32,7 +32,7 @@
  * version
  */
 
-const DEBUG = false;
+let DEBUG = false;
 
 const VERSION = "0.0.1";
 
@@ -574,6 +574,75 @@ function createChannel(initialstate, connection, polling, timer, process) {
 }
 
 //
+// Commands
+//
+function commandProcess(cmd) {
+    const cv = split(trim(cmd), " ", 2);
+    cv[1] = trim(cv[1]);
+    switch (cv[0]) {
+        case "upload-names":
+        {
+            const data = fs.readfile(cv[1]);
+            if (!data) {
+                return "bad file";
+            }
+            else {
+                const path = `${ROOT_DIR_NAMES}${myipv4address}`;
+                const old = fs.readfile(path);
+                if (old != data) {
+                    fs.writefile(path, data);
+                    sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, data));
+                    return old ? "ok updated" : "ok new";
+                }
+                else {
+                    return "ok nochange";
+                }
+            }
+        }
+        case "upload-services":
+        {
+            const data = fs.readfile(cv[1]);
+            if (!data) {
+                return "bad file";
+            }
+            else {
+                const path = `${ROOT_DIR_SERVICES}${myipv4address}`;
+                const old = fs.readfile(path);
+                if (old != data) {
+                    fs.writefile(path, data);
+                    sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data));
+                    return old ? "ok updated" : "ok new";
+                }
+                else {
+                    return "ok nochange";
+                }
+            }
+        }
+        case "force-update":
+        {
+            const n = fs.readfile(`${ROOT_DIR_NAMES}${myipv4address}`);
+            if (n) {
+                sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, n));
+            }
+            const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
+            if (s) {
+                sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
+            }
+            return "ok";
+        }
+        case "quit":
+            return "ok quitting";
+        case "debug":
+            DEBUG = cv[1] === "on" ? true : false;
+            return "ok";
+        case "":
+            return null;
+        default:
+            return "bad command";
+    }
+}
+
+//
 // Process manager commands.
 // this: channel
 //
@@ -596,72 +665,15 @@ function managerProcess(event) {
             else if (event & POLLIN) {
                 const cmds = split(this.connection.recv(), "\n");
                 for (let i = 0; i < length(cmds) && this.state != "CLOSED"; i++) {
-                    const cv = split(trim(cmds[i]), " ", 2);
-                    switch (cv[0]) {
-                        case "upload-names":
-                        {
-                            const data = fs.readfile(trim(cv[1]));
-                            if (!data) {
-                                this.connection.send("bad file\n");
-                            }
-                            else {
-                                const path = `${ROOT_DIR_NAMES}${myipv4address}`;
-                                const old = fs.readfile(path);
-                                if (old != data) {
-                                    fs.writefile(path, data);
-                                    sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, data));
-                                    this.connection.send(old ? "ok updated\n" : "ok new\n");
-                                }
-                                else {
-                                    this.connection.send("ok nochange\n");
-                                }
-                            }
-                            break;
-                        }
-                        case "upload-services":
-                        {
-                            const data = fs.readfile(trim(cv[1]));
-                            if (!data) {
-                                this.connection.send("bad file\n");
-                            }
-                            else {
-                                const path = `${ROOT_DIR_SERVICES}${myipv4address}`;
-                                const old = fs.readfile(path);
-                                if (old != data) {
-                                    fs.writefile(path, data);
-                                    sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data));
-                                    this.connection.send(old ? "ok updated\n" : "ok new\n");
-                                }
-                                else {
-                                    this.connection.send("ok nochange\n");
-                                }
-                            }
-                            break;
-                        }
-                        case "force-update":
-                        {
-                            const n = fs.readfile(`${ROOT_DIR_NAMES}${myipv4address}`);
-                            if (n) {
-                                sendMsgToAll(buildMessage(CMD_UPDATE_NAMES, myipv4address, HOP_DEFAULT, n));
-                            }
-                            const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
-                            if (s) {
-                                sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
-                            }
-                            this.connection.send("ok\n");
-                            break;
-                        }
-                        case "quit":
+                    const r = commandProcess(cmds[i]);
+                    if (r) {
+                        this.connection.send(`${r}\n`);
+                        if (r === "ok quitting") {
                             this.state = "CLOSED";
                             this.polling = 0;
                             this.connection.close();
                             delete channels[this.id];
-                            break;
-                        case "":
-                            break;
-                        default:
-                            this.connection.send("bad command\n");
-                            break;
+                        }
                     }
                 }
             }
@@ -878,6 +890,19 @@ createChannel("MAIN", main, POLLIN, null, mainProcess);
 createChannel("MGR", mgr, POLLIN, null, mgrProcess);
 createChannel("ROUTES", null, 0, 0, routeProcess);
 neighborhood = createChannel("NEIGHBORHOOD", null, 0, 0, neighborhoodProcess);
+
+//
+// Command line
+//
+for (let i = 0; i < length(ARGV); i++) {
+    if (ARGV[i] === "-C") {
+        commandProcess(ARGV[i + 1]);
+        i++;
+    }
+    else {
+        print("Bad command line argument: " + ARGV[i]);
+    }
+}
 
 //
 // Run until exit
