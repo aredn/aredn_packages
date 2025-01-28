@@ -762,11 +762,7 @@ function neighborhoodProcess(event) {
         }
         else {
             // Found new interface
-            const channel = createChannel("IDLE", null, 0, 0);
-            channel.interface = name;
-            channel.myaddress = iface.address;
-            channel.timer = 0;
-            interfaces[name] = { address: iface.ipv6address, channel: channel };
+            interfaces[name] = { address: iface.ipv6address, channel: null };
         }
     }
     for (let name in oldinterfaces) {
@@ -790,6 +786,12 @@ function neighborhoodProcess(event) {
     for (let name in ifacea) {
         const address = ifacea[name];
         const iface = interfaces[name];
+        if (!iface.channel) {
+            const channel = createChannel("IDLE", null, 0, 0);
+            channel.interface = name;
+            channel.myaddress = iface.address;
+            iface.channel = channel;
+        }
         if (iface.channel.state === "IDLE") {
             iface.channel.address = address;
             iface.channel.process(NEWADDRESS);
