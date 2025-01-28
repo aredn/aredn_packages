@@ -169,7 +169,7 @@ function eventString(polling) {
         s += "|NOIF";
     }
     if (polling & NEWADDRESS) {
-        s += "|NOADDR";
+        s += "|NEWADDR";
     }
     if (polling & CLOSECONN) {
         s += "|CLOSE";
@@ -229,10 +229,8 @@ function buildTargettedSyncMessage(target) {
     let sync = "";
     for (let ip in hostroutes) {
         if (hostroutes[ip] === target) {
-            if (!(fs.access(`${ROOT_DIR_HOSTS}${ip}`) && fs.access(`${ROOT_DIR_SERVICES}${ip}`))) {
-                const addr = iptoarr(ip);
-                sync += chr(addr[0], addr[1], addr[2], addr[3]);
-            }
+            const addr = iptoarr(ip);
+            sync += chr(addr[0], addr[1], addr[2], addr[3]);
         }
     }
     return buildMessage(CMD_SYNC, myipv4address, 1, sync);
@@ -430,11 +428,6 @@ function channelProcess(event) {
                             this.timer = 0;
                         }
                         else {
-                            // If the we successfully opened the primary, close any secondary
-                            const iface = interfaces[this.interface];
-                            if (iface.primary === this && iface.secondary) {
-                                iface.secondary.process(CLOSECONN);
-                            }
                             // No longer gray (in case were were)
                             delete graylist[this.address];
                             this.state = "CONNECTED";
@@ -597,17 +590,8 @@ function channelProcess(event) {
             }
             delete channels[this.id];
             const iface = interfaces[this.interface];
-            if (iface.primary === this) {
-                if (iface.secondary) {
-                    iface.primary = this.secondary;
-                    iface.secondary = null;
-                }
-                else {
-                    iface.primary = null;
-                }
-            }
-            if (iface.secondary === this) {
-                iface.secondary = null;
+            if (iface.channel === this) {
+                iface.channel = null;
             }
             break;
         }
@@ -698,7 +682,7 @@ function commandProcess(cmd) {
             let r = "";
             for (let id in channels) {
                 const c = channels[id];
-                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"} role ${c === interfaces[c.interface]?.primary ? "primary" : c === interfaces[c.interface]?.secondary ? "secondary" : "-"}\n`;
+                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
             }
             return r + "ok";
         }
@@ -778,24 +762,25 @@ function neighborhoodProcess(event) {
             delete oldinterfaces[name];
         }
         else {
-            interfaces[name] = { address: iface.ipv6address, primary: null, secondary: null };
+            // Found new interface
+            const channel = createChannel("IDLE", null, 0, 0);
+            channel.interface = name;
+            channel.myaddress = iface.address;
+            channel.timer = 0;
+            interfaces[name] = { address: iface.ipv6address, channel: channel };
         }
     }
     for (let name in oldinterfaces) {
         const iface = oldinterfaces[name];
-        if (iface.primary) {
-            iface.primary.timer = null;
-            iface.primary.process(NOINTERFACE);
-        }
-        if (iface.secondary) {
-            iface.secondary.timer = null;
-            iface.secondary.process(NOINTERFACE);
+        if (iface.channel) {
+            iface.channel.timer = null;
+            iface.channel.process(NOINTERFACE);
         }
     }
 
     const neighbors = babel.getNeighbors();
     const ifacea = {};
-    const now = clock(true)[0];
+    const now = when(0);
     for (let i = 0; i < length(neighbors); i++) {
         const n = neighbors[i];
         const gray = graylist[n.ipv6address];
@@ -806,25 +791,9 @@ function neighborhoodProcess(event) {
     for (let name in ifacea) {
         const address = ifacea[name];
         const iface = interfaces[name];
-        if (!(iface.primary && iface.secondary)) {
-            if (iface.primary && iface.primary.address !== address) {
-                if (iface.primary.state === "IDLE") {
-                    iface.primary.address = address;
-                    iface.primary.process(NEWADDRESS);
-                }
-                else {
-                    iface.secondary = iface.primary;
-                    iface.primary = null;
-                }
-            }
-            if (!iface.primary) {
-                const channel = createChannel("IDLE", null, 0, 0);
-                channel.interface = name;
-                channel.myaddress = iface.address;
-                channel.address = address;
-                iface.primary = channel;
-                channel.process(NEWADDRESS);
-            }
+        if (iface.channel.state === "IDLE") {
+            iface.channel.address = address;
+            iface.channel.process(NEWADDRESS);
         }
     }
 
