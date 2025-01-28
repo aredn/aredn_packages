@@ -8,6 +8,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/arednlink
 	SECTION:=utils
 	CATEGORY:=Utilities
+	DEPENDS:=+ucode +ucode-mod-fs +ucode-mod-socket ucode-mod-uci +socat
 	MAINTAINER:=AREDN Dev Team
 	TITLE:=AREDN Link
 	URL:=http://www.arednmesh.org/
