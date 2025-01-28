@@ -68,7 +68,7 @@ const ROUTE_POLL            = 30;
 //
 // Connection keepalive
 const KEEPALIVE_POLL        = 20;
-const KEEPALIVE_LIMIT       = 4;
+const KEEPALIVE_LIMIT       = 3;
 //
 // Gray list timers
 //
@@ -143,6 +143,38 @@ function bestAddress(a, b) {
         }
     }
     return a;
+}
+
+//
+// Make events human readable
+//
+function eventString(polling) {
+    if (!polling) {
+        return "-";
+    }
+    let s = "";
+    if (polling & POLLIN) {
+        s += "|IN";
+    }
+    if (polling & POLLOUT) {
+        s += "|OUT";
+    }
+    if (polling & POLLRDHUP) {
+        s += "|HUP";
+    }
+    if (polling & POLLTIMER) {
+        s += "|TIMER";
+    }
+    if (polling & NOINTERFACE) {
+        s += "|NOIF";
+    }
+    if (polling & NEWADDRESS) {
+        s += "|NOADDR";
+    }
+    if (polling & CLOSECONN) {
+        s += "|CLOSE";
+    }
+    return substr(s, 1);
 }
 
 //
@@ -350,7 +382,7 @@ function processRequest() {
 // this: channel
 //
 function channelProcess(event) {
-    DEBUG && print(`channelProcess: id ${this.id} event ${sprintf("%x", event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
+    DEBUG && print(`channelProcess: id ${this.id} event ${eventString(event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
     switch (this.state) {
         case "IDLE":
         {
@@ -407,8 +439,9 @@ function channelProcess(event) {
                             delete graylist[this.address];
                             this.state = "CONNECTED";
                             this.polling = POLLIN|POLLOUT|POLLRDHUP;
-                            this.timer = null;
                             this.keepalive = 0;
+                            this.keepalivetime = when(KEEPALIVE_POLL);
+                            this.timer = this.keepalivetime;
                             this.incoming = "";
                             this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
                             // If we are initiating a connection, then we should terminate any incoming connections
@@ -441,7 +474,7 @@ function channelProcess(event) {
                         this.polling &= ~POLLIN;
                     }
                     this.keepalive = 0;
-                    this.timer = when(KEEPALIVE_POLL);
+                    this.timer = max(when(0), this.keepalivetime);
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -453,7 +486,8 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
-                    this.timer = when(KEEPALIVE_POLL);
+                    this.keepalivetime = when(KEEPALIVE_POLL);
+                    this.timer = this.keepalivetime;
                     break;
                 case POLLRDHUP:
                 case POLLRDHUP|POLLOUT:
@@ -476,7 +510,8 @@ function channelProcess(event) {
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         this.outgoing += keepaliveMsg;
                         this.polling |= POLLOUT;
-                        this.timer = when(KEEPALIVE_POLL);
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
                         break;
                     }
                     // Fall through
@@ -497,6 +532,7 @@ function channelProcess(event) {
             this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
             this.state = "CONNECTED_INCOMING";
             this.keepalive = 0;
+            this.keepalivetime = when(KEEPALIVE_POLL);
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
             // Fall through
         }
@@ -509,7 +545,7 @@ function channelProcess(event) {
                         this.polling &= ~POLLIN;
                     }
                     this.keepalive = 0;
-                    this.timer = when(KEEPALIVE_POLL);
+                    this.timer = max(when(0), this.keepalivetime);
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -521,14 +557,16 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
-                    this.timer = when(KEEPALIVE_POLL);
+                    this.keepalivetime = when(KEEPALIVE_POLL);
+                    this.timer = this.keepalivetime;
                     break;
                 case POLLTIMER:
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         this.outgoing += keepaliveMsg;
                         this.polling |= POLLOUT;
-                        this.timer = when(KEEPALIVE_POLL);
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
                         break;
                     }
                     // Fall through
@@ -581,7 +619,7 @@ function channelProcess(event) {
 // comnnection, or for one we're initiating.
 //
 function createChannel(initialstate, connection, polling, timer, process) {
-    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${polling} timer ${timer}\n`);
+    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${eventString(polling)} timer ${timer}\n`);
     const channel = {
         id: channelId++,
         state: initialstate,
@@ -653,6 +691,16 @@ function commandProcess(cmd) {
                 sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
             }
             return "ok";
+        }
+        case "dump":
+        {
+            const now = clock(true)[0];
+            let r = "";
+            for (let id in channels) {
+                const c = channels[id];
+                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"} role ${c === interfaces[c.interface]?.primary ? "primary" : c === interfaces[c.interface]?.secondary ? "secondary" : "-"}\n`;
+            }
+            return r + "ok";
         }
         case "quit":
             return "ok quitting";
