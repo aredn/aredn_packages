@@ -58,12 +58,17 @@ const CMD_VERSION           = ord('V');
 const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
 const CMD_SYNC              = ord('S');
+const CMD_KEEPALIVE         = ord('K');
 //
 // Poll timers
 //
 const NEIGHBORHOOD_POLL     = 60;
 const IDLE_POLL             = 60 * 60;
 const ROUTE_POLL            = 30;
+//
+// Connection keepalive
+const KEEPALIVE_POLL        = 20;
+const KEEPALIVE_LIMIT       = 4;
 //
 // Gray list timers
 //
@@ -72,11 +77,6 @@ const GRAY_MAX_SCALE        = 15;
 //
 // TCP configuration
 //
-const CHANNEL_KEEPCNT       = 3;
-const CHANNEL_KEEPIDLE      = 30;
-const CHANNEL_KEEPALIVE     = 30;
-const CHANNEL_SYNCNT        = 3;
-const CHANNEL_USER_TIMEOUT  = 60;
 const CHANNEL_CONN_TIMEOUT  = 10;
 //
 // Communications
@@ -171,18 +171,6 @@ function when(timeout) {
 }
 
 //
-// Setup the socket just the way we want it.
-//
-function setupConnection(sock) {
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, CHANNEL_KEEPCNT);
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, CHANNEL_KEEPIDLE);
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, CHANNEL_KEEPALIVE);
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1);
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_SYNCNT, CHANNEL_SYNCNT);
-    sock.setopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, CHANNEL_USER_TIMEOUT * 1000);
-}
-
-//
 // Build a message
 //
 function buildMessage(cmd, ipv4addr, hop, payload) {
@@ -196,6 +184,11 @@ function buildMessage(cmd, ipv4addr, hop, payload) {
     }
     return chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
 }
+
+//
+// Cache useful messages
+//
+const keepaliveMsg = buildMessage(CMD_KEEPALIVE, myipv4address, 1);
 
 //
 // Build a targetted sync message.
@@ -249,6 +242,8 @@ function processMessage(cmd, hop, srcipv4, payload)
                 this.process(CLOSECONN);
             }
             return false;
+        case CMD_KEEALIVE:
+            break;
         case CMD_SYNC:
             // A sync request from a neighbor. Payload contains a list of addresses the neighbor is soliciting data for.
             // Return false so the request is not forwarded (it should have a hop of 1);
@@ -305,7 +300,7 @@ function processRequest() {
     const data = this.connection.recv();
     DEBUG && print(`--- data length ${length(data)}\n`);
     if (!data || !length(data)) {
-        return;
+        return false;
     }
     this.incoming += data;
     const ilen = length(this.incoming);
@@ -346,6 +341,7 @@ function processRequest() {
     else {
         this.incoming = substr(this.incoming, i);
     }
+    return true;
 }
 
 //
@@ -402,8 +398,6 @@ function channelProcess(event) {
                             this.timer = 0;
                         }
                         else {
-                            // Setup the connection just the way we like it
-                            setupConnection(this.connection);
                             // If the we successfully opened the primary, close any secondary
                             const iface = interfaces[this.interface];
                             if (iface.primary === this && iface.secondary) {
@@ -414,6 +408,7 @@ function channelProcess(event) {
                             this.state = "CONNECTED";
                             this.polling = POLLIN|POLLOUT|POLLRDHUP;
                             this.timer = null;
+                            this.keepalive = 0;
                             this.incoming = "";
                             this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
                             // If we are initiating a connection, then we should terminate any incoming connections
@@ -442,7 +437,11 @@ function channelProcess(event) {
             switch (event) {
                 case POLLIN:
                 case POLLRDHUP|POLLIN:
-                    call(processRequest, this);
+                    if (!call(processRequest, this) && (event & POLLRDHUP)) {
+                        this.polling &= ~POLLIN;
+                    }
+                    this.keepalive = 0;
+                    this.timer = when(KEEPALIVE_POLL);
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -454,6 +453,7 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
+                    this.timer = when(KEEPALIVE_POLL);
                     break;
                 case POLLRDHUP:
                 case POLLRDHUP|POLLOUT:
@@ -471,6 +471,15 @@ function channelProcess(event) {
                     neighborhood.timer = 0;
                     this.timer = 0;
                     break;
+                case POLLTIMER:
+                    this.keepalive++;
+                    if (this.keepalive < KEEPALIVE_LIMIT) {
+                        this.outgoing += keepaliveMsg;
+                        this.polling |= POLLOUT;
+                        this.timer = when(KEEPALIVE_POLL);
+                        break;
+                    }
+                    // Fall through
                 case NEWADDRESS:
                 case NOINTERFACE:
                 case CLOSECONN:
@@ -487,6 +496,7 @@ function channelProcess(event) {
             this.incoming = "";
             this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
             this.state = "CONNECTED_INCOMING";
+            this.keepalive = 0;
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
             // Fall through
         }
@@ -495,7 +505,11 @@ function channelProcess(event) {
             switch (event) {
                 case POLLIN:
                 case POLLRDHUP|POLLIN:
-                    call(processRequest, this);
+                    if (!call(processRequest, this) && (event & POLLRDHUP)) {
+                        this.polling &= ~POLLIN;
+                    }
+                    this.keepalive = 0;
+                    this.timer = when(KEEPALIVE_POLL);
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -507,7 +521,17 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
+                    this.timer = when(KEEPALIVE_POLL);
                     break;
+                case POLLTIMER:
+                    this.keepalive++;
+                    if (this.keepalive < KEEPALIVE_LIMIT) {
+                        this.outgoing += keepaliveMsg;
+                        this.polling |= POLLOUT;
+                        this.timer = when(KEEPALIVE_POLL);
+                        break;
+                    }
+                    // Fall through
                 case POLLRDHUP:
                 case POLLRDHUP|POLLOUT:
                 case POLLRDHUP|POLLIN|POLLOUT:
@@ -537,8 +561,8 @@ function channelProcess(event) {
             const iface = interfaces[this.interface];
             if (iface.primary === this) {
                 if (iface.secondary) {
-                    this.primary = this.secondary;
-                    this.secondary = null;
+                    iface.primary = this.secondary;
+                    iface.secondary = null;
                 }
                 else {
                     iface.primary = null;
@@ -656,22 +680,27 @@ function managerProcess(event) {
         case "READING":
         default:
         {
+            let close = false;
             if (event & POLLIN) {
-                const cmds = split(this.connection.recv(), "\n");
+                const d = this.connection.recv();
+                if (d === "" && (event & POLLRDHUP)) {
+                    close = true;
+                }
+                const cmds = split(d, "\n");
                 for (let i = 0; i < length(cmds) && this.state != "CLOSED"; i++) {
                     const r = commandProcess(cmds[i]);
                     if (r) {
                         this.connection.send(`${r}\n`);
                         if (r === "ok quitting") {
-                            this.state = "CLOSED";
-                            this.polling = 0;
-                            this.connection.close();
-                            delete channels[this.id];
+                            close = true;
                         }
                     }
                 }
             }
             else if (event & POLLRDHUP) {
+                close = true;
+            }
+            if (close) {
                 this.state = "CLOSED";
                 this.polling = 0;
                 this.connection.close();
@@ -815,7 +844,6 @@ function mainProcess(event) {
         const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null);
         channel.interface = address.interface;
         channel.address = address.address;
-        setupConnection(channel.connection);
     }
 }
 
