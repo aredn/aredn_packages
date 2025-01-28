@@ -386,8 +386,13 @@ function channelProcess(event) {
         {
             switch (event) {
                 case NEWADDRESS:
-                    this.state = "NEW";
-                    this.timer = 0;
+                    if (bestAddress(this.myaddress, this.address) === this.myaddress) {
+                        this.timer = when(IDLE_POLL);
+                    }
+                    else {
+                        this.state = "NEW";
+                        this.timer = 0;
+                    }
                     break;
                 case NOINTERFACE:
                 case CLOSECONN:
@@ -405,45 +410,39 @@ function channelProcess(event) {
         {
             switch (event) {
                 case POLLTIMER:
-                    if (bestAddress(this.myaddress, this.address) === this.myaddress) {
-                        this.state = "IDLE";
+                    DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
+                    this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CHANNEL_CONN_TIMEOUT * 1000);
+                    DEBUG && print(`Connection: ${this.connection}\n`);
+                    if (!this.connection) {
+                        // Failed to connect
+                        // Timeout address to graylist
+                        const gray = graylist[this.address];
+                        if (gray) {
+                            gray.scale = min(gray.scale * 1.5, GRAY_MAX_SCALE);
+                            gray.timer = when(GRAY_TIMEOUT * gray.scale);
+                        }
+                        else {
+                            graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+                        }
+                        this.state = "EXIT";
                         this.timer = 0;
                     }
                     else {
-                        DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
-                        this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CHANNEL_CONN_TIMEOUT * 1000);
-                        DEBUG && print(`Connection: ${this.connection}\n`);
-                        if (!this.connection) {
-                            // Failed to connect
-                            // Timeout address to graylist
-                            const gray = graylist[this.address];
-                            if (gray) {
-                                gray.scale = min(gray.scale * 1.5, GRAY_MAX_SCALE);
-                                gray.timer = when(GRAY_TIMEOUT * gray.scale);
-                            }
-                            else {
-                                graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
-                            }
-                            this.state = "EXIT";
-                            this.timer = 0;
-                        }
-                        else {
-                            // No longer gray (in case were were)
-                            delete graylist[this.address];
-                            this.state = "CONNECTED";
-                            this.polling = POLLIN|POLLOUT|POLLRDHUP;
-                            this.keepalive = 0;
-                            this.keepalivetime = when(KEEPALIVE_POLL);
-                            this.timer = this.keepalivetime;
-                            this.incoming = "";
-                            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
-                            // If we are initiating a connection, then we should terminate any incoming connections
-                            // on the same interface, as they are no longer connected to the best node.
-                            for (let id in channels) {
-                                const channel = channels[id];
-                                if (channel.interface === this.interface && channel !== this) {
-                                    channel.process(CLOSECONN);
-                                }
+                        // No longer gray (in case were were)
+                        delete graylist[this.address];
+                        this.state = "CONNECTED";
+                        this.polling = POLLIN|POLLOUT|POLLRDHUP;
+                        this.keepalive = 0;
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
+                        this.incoming = "";
+                        this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+                        // If we are initiating a connection, then we should terminate any incoming connections
+                        // on the same interface, as they are no longer connected to the best node.
+                        for (let id in channels) {
+                            const channel = channels[id];
+                            if (channel.interface === this.interface && channel !== this) {
+                                channel.process(CLOSECONN);
                             }
                         }
                     }
