@@ -49,7 +49,7 @@ build_active() {
     if [ "$(uci get aredn.@wan[0].olsrd_gw)" = "1" ]; then
         echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
     fi
-    if [ "$(uci -c /etc/local/uci get aredn.@supernode[0].enable)" = "1" ]; then
+    if [ "$(uci get aredn.@supernode[0].enable)" = "1" ]; then
         echo "redistribute ip 172.30.0.0/16 deny" >> ${C}
     else
         echo "redistribute ip 172.31.0.0/16 deny" >> ${C}
