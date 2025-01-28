@@ -441,6 +441,7 @@ function channelProcess(event) {
         {
             switch (event) {
                 case POLLIN:
+                case POLLRDHUP|POLLIN:
                     call(processRequest, this);
                     break;
                 case POLLOUT:
@@ -455,7 +456,6 @@ function channelProcess(event) {
                     }
                     break;
                 case POLLRDHUP:
-                case POLLRDHUP|POLLIN:
                 case POLLRDHUP|POLLOUT:
                 case POLLRDHUP|POLLIN|POLLOUT:
                     if (this.connection) {
@@ -494,6 +494,7 @@ function channelProcess(event) {
         {
             switch (event) {
                 case POLLIN:
+                case POLLRDHUP|POLLIN:
                     call(processRequest, this);
                     break;
                 case POLLOUT:
@@ -508,7 +509,6 @@ function channelProcess(event) {
                     }
                     break;
                 case POLLRDHUP:
-                case POLLRDHUP|POLLIN:
                 case POLLRDHUP|POLLOUT:
                 case POLLRDHUP|POLLIN|POLLOUT:
                     // Force neighbor update
@@ -656,13 +656,7 @@ function managerProcess(event) {
         case "READING":
         default:
         {
-            if (event & POLLRDHUP) {
-                this.state = "CLOSED";
-                this.polling = 0;
-                this.connection.close();
-                delete channels[this.id];
-            }
-            else if (event & POLLIN) {
+            if (event & POLLIN) {
                 const cmds = split(this.connection.recv(), "\n");
                 for (let i = 0; i < length(cmds) && this.state != "CLOSED"; i++) {
                     const r = commandProcess(cmds[i]);
@@ -676,6 +670,12 @@ function managerProcess(event) {
                         }
                     }
                 }
+            }
+            else if (event & POLLRDHUP) {
+                this.state = "CLOSED";
+                this.polling = 0;
+                this.connection.close();
+                delete channels[this.id];
             }
             break;
         }
