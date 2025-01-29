@@ -324,6 +324,7 @@ local_read(struct local_socket *s)
     const char *message = NULL;
     struct interface *ifp;
     struct neighbour *neigh;
+    struct route_stream *routes;
 
     if(s->buf == NULL)
         s->buf = malloc(LOCAL_BUFSIZE);
@@ -373,6 +374,23 @@ local_read(struct local_socket *s)
             break;
         case CONFIG_ACTION_UNMONITOR:
             s->monitor = 0;
+            break;
+        case CONFIG_ACTION_DUMP_ROUTABLE_NEIGHBORS:
+            FOR_ALL_NEIGHBOURS(neigh) {
+                routes = route_stream(1);
+                if(routes) {
+                    while(1) {
+                        struct babel_route *route = route_stream_next(routes);
+                        if(route == NULL)
+                            break;
+                        if(route->neigh == neigh) {
+                            local_notify_neighbour_1(s, route->neigh, LOCAL_ADD);
+                            break;
+                        }
+                    }
+                    route_stream_done(routes);
+                }
+            }
             break;
         case CONFIG_ACTION_NO:
             snprintf(reply, sizeof(reply), "no%s%s\n",

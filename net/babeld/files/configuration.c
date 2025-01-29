@@ -989,6 +989,11 @@ parse_config_line(int c, gnc_t gnc, void *closure,
         if(c < -1 || !action_return)
             goto fail;
         *action_return = CONFIG_ACTION_DUMP_NEIGHBORS;
+     } else if(strcmp(token, "dump-routable-neighbors") == 0) {
+        c = skip_eol(c, gnc, closure);
+        if(c < -1 || !action_return)
+            goto fail;
+        *action_return = CONFIG_ACTION_DUMP_ROUTABLE_NEIGHBORS;
     } else if(strcmp(token, "monitor") == 0) {
         c = skip_eol(c, gnc, closure);
         if(c < -1 || !action_return)
