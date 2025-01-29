@@ -758,11 +758,12 @@ function neighborhoodProcess(event) {
         }
         else if (oldinterfaces[name]) {
             interfaces[name] = oldinterfaces[name];
+            interfaces[name].best = iface.ipv6address;
             delete oldinterfaces[name];
         }
         else {
             // Found new interface
-            interfaces[name] = { address: iface.ipv6address, channel: null };
+            interfaces[name] = { address: iface.ipv6address, best: iface.ipv6address, channel: null };
         }
     }
     for (let name in oldinterfaces) {
@@ -776,17 +777,15 @@ function neighborhoodProcess(event) {
     // Get list of neighbors we might connect to. Only get those neighbors we
     // have routes to as we ignore traffic from anything unroutable anyway.
     const neighbors = babel.getRoutableNeighbors();
-    const ifacea = {};
     const now = when(0);
     for (let i = 0; i < length(neighbors); i++) {
         const n = neighbors[i];
         const gray = graylist[n.ipv6address];
         if (!gray || gray.timer < now) {
-            ifacea[n.interface] = bestAddress(ifacea[n.interface], n.ipv6address);
+            interfaces[n.interface].best = bestAddress(interfaces[n.interface].best, n.ipv6address);
         }
     }
-    for (let name in ifacea) {
-        const address = ifacea[name];
+    for (let name in interfaces) {
         const iface = interfaces[name];
         if (!iface.channel) {
             const channel = createChannel("IDLE", null, 0, 0);
@@ -795,8 +794,13 @@ function neighborhoodProcess(event) {
             iface.channel = channel;
         }
         if (iface.channel.state === "IDLE") {
-            iface.channel.address = address;
+            iface.channel.address = iface.best;
             iface.channel.process(NEWADDRESS);
+        }
+        // I have become the best, so disconnected. This will happen when a previous best neighbor
+        // is no longer routable (even if they're still online).
+        else if (iface.best === iface.address && iface.channel.state === "CONNECTED") {
+            iface.channel.process(CLOSECONN);
         }
     }
 
