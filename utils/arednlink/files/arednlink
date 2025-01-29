@@ -773,7 +773,9 @@ function neighborhoodProcess(event) {
         }
     }
 
-    const neighbors = babel.getNeighbors();
+    // Get list of neighbors we might connect to. Only get those neighbors we
+    // have routes to as we ignore traffic from anything unroutable anyway.
+    const neighbors = babel.getRoutableNeighbors();
     const ifacea = {};
     const now = when(0);
     for (let i = 0; i < length(neighbors); i++) {
