@@ -787,20 +787,24 @@ function neighborhoodProcess(event) {
     }
     for (let name in interfaces) {
         const iface = interfaces[name];
-        if (!iface.channel) {
-            const channel = createChannel("IDLE", null, 0, 0);
-            channel.interface = name;
-            channel.myaddress = iface.address;
-            iface.channel = channel;
+        if (iface.best === iface.address) {
+            // I have become the best, so disconnected. This will happen when a previous best
+            // neighbor is no longer routable (even if they're still online).
+            if (iface.channel && iface.channel.state === "CONNECTED") {
+                iface.channel.process(CLOSECONN);
+            }
         }
-        if (iface.channel.state === "IDLE") {
-            iface.channel.address = iface.best;
-            iface.channel.process(NEWADDRESS);
-        }
-        // I have become the best, so disconnected. This will happen when a previous best neighbor
-        // is no longer routable (even if they're still online).
-        else if (iface.best === iface.address && iface.channel.state === "CONNECTED") {
-            iface.channel.process(CLOSECONN);
+        else {
+            if (!iface.channel) {
+                const channel = createChannel("IDLE", null, 0, 0);
+                channel.interface = name;
+                channel.myaddress = iface.address;
+                iface.channel = channel;
+            }
+            if (iface.channel.state === "IDLE") {
+                iface.channel.address = iface.best;
+                iface.channel.process(NEWADDRESS);
+            }
         }
     }
 
