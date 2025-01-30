@@ -114,6 +114,10 @@ let hostroutes = {};
 //
 const graylist = {};
 //
+// Set of isolated interfaces
+//
+const isolated = {};
+//
 // Our IPv4 address, used for all messages we generate
 //
 const myipv4address = uci.cursor("/etc/config.mesh").get("setup", "globals", "wifi_ip");
@@ -255,10 +259,11 @@ function buildTargettedSyncMessage(target) {
 //
 // Send message to all (most) of our connected channels.
 //
-function sendMsgToAll(msg, except) {
+function sendMsgToAll(msg, from) {
+    const from = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
-        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== except) {
+        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (!isolated[channel.interface] || channel.interface === from)) {
             channel.outgoing += msg;
             channel.polling |= POLLOUT;
         }
@@ -682,12 +687,26 @@ function commandProcess(cmd) {
         {
             const now = clock(true)[0];
             let r = "";
+            for (let i in interfaces) {
+                r += `interface ${i}\n`;
+            }
+            for (let i in isolated) {
+                r += `isolated ${i}\n`;
+            }
             for (let id in channels) {
                 const c = channels[id];
                 r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
             }
             return r + "ok";
         }
+        case "isolate":
+            if (length(cv[1])) {
+                isolated[cv[1]] = true;
+                return "ok";
+            }
+            else {
+                return "bad";
+            }
         case "quit":
             return "ok quitting";
         case "debug":
