@@ -985,6 +985,13 @@ kernel_route(int operation, int table,
         }
     }
 
+    kdebugf("kernel_route (before): %s %s from %s "
+            "table %d metric %d dev %d nexthop %s\n",
+            operation == ROUTE_ADD ? "add" :
+            operation == ROUTE_FLUSH ? "flush" : "???",
+            format_prefix(dest, plen), format_prefix(src, src_plen),
+            table, metric, ifindex, format_address(gate));
+
     /* Check that the protocol family is consistent. */
     if(plen >= 96 && v4mapped(dest)) {
         if(!v4mapped(src)) {
@@ -1210,19 +1217,19 @@ print_kernel_route(int add, int protocol, int type,
                   addr_prefix, sizeof(addr_prefix)) ||
        !inet_ntop(AF_INET6,route->gw, addr_gw, sizeof(addr_gw)) ||
        !if_indextoname(route->ifindex, ifname)) {
-        kdebugf("Couldn't format kernel route for printing.");
+        kdebugf("Couldn't format kernel route for printing.\n");
         return;
     }
 
     if(route->src_plen >= 0) {
         if(!inet_ntop(AF_INET6, route->src_prefix,
                       src_addr_prefix, sizeof(src_addr_prefix))) {
-            kdebugf("Couldn't format kernel route for printing.");
+            kdebugf("Couldn't format kernel route for printing.\n");
             return;
         }
 
         kdebugf("%s kernel route: dest: %s/%d gw: %s metric: %d if: %s "
-                "(proto: %d, type: %d, from: %s/%d)",
+                "(proto: %d, type: %d, from: %s/%d)\n",
                 add == RTM_NEWROUTE ? "Add" : "Delete",
                 addr_prefix, route->plen, addr_gw, route->metric, ifname,
                 protocol, type, src_addr_prefix, route->src_plen);
@@ -1230,7 +1237,7 @@ print_kernel_route(int add, int protocol, int type,
     }
 
     kdebugf("%s kernel route: dest: %s/%d gw: %s metric: %d if: %s "
-            "(proto: %d, type: %d)",
+            "(proto: %d, type: %d)\n",
             add == RTM_NEWROUTE ? "Add" : "Delete",
             addr_prefix, route->plen, addr_gw, route->metric, ifname,
             protocol, type);
@@ -1242,6 +1249,8 @@ filter_kernel_routes(struct nlmsghdr *nh, struct kernel_route *route)
     int rc, len;
     struct rtmsg *rtm;
 
+    kdebugf("filter_kernel_routes:\n");
+
     len = nh->nlmsg_len;
 
     if(nh->nlmsg_type != RTM_NEWROUTE &&
@@ -1250,6 +1259,8 @@ filter_kernel_routes(struct nlmsghdr *nh, struct kernel_route *route)
 
     rtm = (struct rtmsg*)NLMSG_DATA(nh);
     len -= NLMSG_LENGTH(0);
+
+    print_kernel_route(nh->nlmsg_type, rtm->rtm_protocol, rtm->rtm_type, route);
 
     if(rtm->rtm_protocol == RTPROT_BABEL)
         return 0;
@@ -1272,6 +1283,8 @@ filter_kernel_routes(struct nlmsghdr *nh, struct kernel_route *route)
                                rtm->rtm_type, route);
         }
     }
+
+    kdebugf("filter_kernel_routes: route ok\n");
 
     return 1;
 
