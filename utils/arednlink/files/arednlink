@@ -72,7 +72,8 @@ const KEEPALIVE_LIMIT       = 3;
 //
 // Gray list timers
 //
-const GRAY_TIMEOUT          = 45;
+const GRAY_TIMEOUT          = NEIGHBORHOOD_POLL;
+const GRAY_BACKOFF          = 30;
 const GRAY_MAX_SCALE        = 15;
 //
 // TCP configuration
@@ -268,7 +269,7 @@ function processMessage(cmd, hop, srcipv4, payload)
     switch (cmd) {
         case CMD_VERSION:
             if (payload != VERSION) {
-                graylist[this.address] = { timer: when(GRAY_TIMEOUT * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
+                graylist[this.address] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
                 this.process(CLOSECONN);
             }
             return false;
@@ -419,7 +420,7 @@ function channelProcess(event) {
                         const gray = graylist[this.address];
                         if (gray) {
                             gray.scale = min(gray.scale * 1.5, GRAY_MAX_SCALE);
-                            gray.timer = when(GRAY_TIMEOUT * gray.scale);
+                            gray.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * gray.scale);
                         }
                         else {
                             graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
@@ -592,6 +593,7 @@ function channelProcess(event) {
             if (iface.channel === this) {
                 iface.channel = null;
             }
+            graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
             break;
         }
     }
