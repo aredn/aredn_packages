@@ -206,14 +206,15 @@ function when(timeout) {
 //
 // Graylist an address
 //
-function gray(address) {
-    const g = graylist[address];
+function gray(iface, address) {
+    const key = `${iface}/${address}`;
+    const g = graylist[key];
     if (g) {
         g.scale = min(g.scale * 1.5, GRAY_MAX_SCALE);
         g.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * g.scale);
     }
     else {
-        graylist[address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+        graylist[key] = { timer: when(GRAY_TIMEOUT), scale: 1 };
     }
 }
 
@@ -283,7 +284,7 @@ function processMessage(cmd, hop, srcipv4, payload)
     switch (cmd) {
         case CMD_VERSION:
             if (payload != VERSION) {
-                graylist[this.address] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
+                graylist[`${this.interface}/${this.address}`] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
                 this.process(CLOSECONN);
             }
             return false;
@@ -431,13 +432,13 @@ function channelProcess(event) {
                     if (!this.connection) {
                         // Failed to connect
                         // Timeout address to graylist
-                        gray(this.address);
+                        gray(this.interface, this.address);
                         this.state = "EXIT";
                         this.timer = 0;
                     }
                     else {
                         // No longer gray (in case were were)
-                        delete graylist[this.address];
+                        delete graylist[`${this.interface}/${this.address}`];
                         this.state = "CONNECTED";
                         this.polling = POLLIN|POLLOUT|POLLRDHUP;
                         this.keepalive = 0;
@@ -445,14 +446,6 @@ function channelProcess(event) {
                         this.timer = this.keepalivetime;
                         this.incoming = "";
                         this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
-                        // If we are initiating a connection, then we should terminate any incoming connections
-                        // on the same interface, as they are no longer connected to the best node.
-                        for (let id in channels) {
-                            const channel = channels[id];
-                            if (channel.interface === this.interface && channel !== this) {
-                                channel.process(CLOSECONN);
-                            }
-                        }
                     }
                     break;
                 case NEWADDRESS:
@@ -499,7 +492,7 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    gray(this.address);
+                    gray(this.interface, this.address);
                     this.address = null;
                     this.state = "IDLE";
                     // Force neighbor update
@@ -601,7 +594,7 @@ function channelProcess(event) {
             if (iface.channel === this) {
                 iface.channel = null;
             }
-            gray(this.address);
+            gray(this.interface, this.address);
             break;
         }
     }
@@ -782,6 +775,12 @@ function neighborhoodProcess(event) {
             iface.channel.timer = null;
             iface.channel.process(NOINTERFACE);
         }
+        // Remove any graylist entries when the interface disappears
+        for (let key in graylist) {
+            if (index(key, name) === 0) {
+                delete graylist[key];
+            }
+        }
     }
 
     // Get list of neighbors we might connect to. Only get those neighbors we
@@ -790,7 +789,7 @@ function neighborhoodProcess(event) {
     const now = when(0);
     for (let i = 0; i < length(neighbors); i++) {
         const n = neighbors[i];
-        const gray = graylist[n.ipv6address];
+        const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
             interfaces[n.interface].best = bestAddress(interfaces[n.interface].best, n.ipv6address);
         }
@@ -798,7 +797,7 @@ function neighborhoodProcess(event) {
     for (let name in interfaces) {
         const iface = interfaces[name];
         if (iface.best === iface.address) {
-            // I have become the best, so disconnected. This will happen when a previous best
+            // I have become the best, so disconnect. This will happen when a previous best
             // neighbor is no longer routable (even if they're still online).
             if (iface.channel && iface.channel.state === "CONNECTED") {
                 iface.channel.process(CLOSECONN);
