@@ -1226,58 +1226,58 @@ filter_match(struct filter *f, const unsigned char *id,
     debugf("filter_match: af %d id %d prefix %d plen %d src_prefix %d plen_ge %d plen_le %d src_plen_ge %d src_plen_le %d neigh %d ifname %d proto %d\n", !!f->af, !!f->id, !!f->prefix, f->plen, !!f->src_prefix, f->plen_ge, f->plen_le, f->src_plen_ge, f->src_plen_le, !!f->neigh, !!f->ifname, f->proto);
     if(f->af) {
         if(plen >= 96 && v4mapped(prefix)) {
-            if(f->af == AF_INET6) return 0;
+            if(f->af == AF_INET6) return -1;
         } else {
-            if(f->af == AF_INET) return 0;
+            if(f->af == AF_INET) return -2;
         }
     }
     if(f->id) {
         if(!id || memcmp(f->id, id, 8) != 0)
-            return 0;
+            return -3;
     }
     if(f->prefix) {
         if(!prefix || plen < f->plen || !in_prefix(prefix, f->prefix, f->plen))
-            return 0;
+            return -4;
     }
     if(f->src_prefix) {
         if(!src_prefix || src_plen < f->src_plen ||
            !in_prefix(src_prefix, f->src_prefix, f->src_plen))
-            return 0;
+            return -5;
     }
     if(f->plen_ge > 0 || f->plen_le < 128) {
         if(!prefix)
-            return 0;
+            return -6;
         if(plen > f->plen_le)
-            return 0;
+            return -7;
         if(plen < f->plen_ge)
-            return 0;
+            return -8;
     }
     if(f->src_plen_ge > 0 || f->src_plen_le < 128) {
         if(!src_prefix)
-            return 0;
+            return -9;
         if(src_plen > f->src_plen_le)
-            return 0;
+            return -10;
         if(src_plen < f->src_plen_ge)
-            return 0;
+            return -11;
     }
     if(f->neigh) {
         if(!neigh || memcmp(f->neigh, neigh, 16) != 0)
-            return 0;
+            return -12;
     }
     if(f->ifname) {
         if(!f->ifindex)         /* no such interface */
-            return 0;
+            return -13;
         if(!ifindex || f->ifindex != ifindex)
-            return 0;
+            return -14;
     }
     if(f->proto) {
         if(!proto || f->proto != proto)
-            return 0;
+            return -15;
     } else if(proto == RTPROT_BABEL_LOCAL) {
-        return 0;
+        return -16;
 #ifdef __linux
     } else if(proto == RTPROT_BOOT) {
-        return 0;
+        return -17;
 #endif
     }
 
@@ -1296,8 +1296,10 @@ do_filter(struct filter *f, const unsigned char *id,
 
     debugf("do_filter: prefix %s src %s if %d proto %d id %s\n", format_prefix(prefix, plen), format_prefix(src_prefix, src_plen), ifindex, proto, id ? format_eui64(id) : "-");
     while(f) {
-        if(filter_match(f, id, prefix, plen, src_prefix, src_plen,
-                        neigh, ifindex, proto)) {
+        int r = filter_match(f, id, prefix, plen, src_prefix, src_plen,
+                        neigh, ifindex, proto);
+        debugf("-- r = %d\n", r);
+        if (r >= 0) {
             if(result)
                 memcpy(result, &f->action, sizeof(struct filter_result));
             debugf("- do_filter: success\n");
