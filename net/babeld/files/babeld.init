@@ -56,6 +56,7 @@ build_active() {
     fi
     echo "redistribute local if br-wan deny" >> ${C}
     echo "redistribute local if br-lan deny" >> ${C}
+    echo "install ip 0.0.0.0/0 eq 0 allow table 21" >> ${C}
 }
 
 start_service() {
