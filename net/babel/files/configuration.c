@@ -1223,7 +1223,7 @@ filter_match(struct filter *f, const unsigned char *id,
              const unsigned char *src_prefix, unsigned short src_plen,
              const unsigned char *neigh, unsigned int ifindex, int proto)
 {
-    debugf("filter_match: prefix %s src %s if %d proto %d id %s\n", format_prefix(prefix, plen), format_prefix(src_prefix, src_plen), ifindex, proto, id ? format_eui64(id) : "-");
+    debugf("filter_match: af %d id %d prefix %d src_prefix %d plen_ge %d plen_le %d src_plen_ge %d src_plen_le %d neigh %d ifname %d proto %d\n", !!f->af, !!f->id, !!f->prefix, !!f->src_prefix, f->plen_ge, f->plen_le, f->src_plen_ge, f->src_plen_le, !!f->neigh, !!f->ifname, f->proto);
     if(f->af) {
         if(plen >= 96 && v4mapped(prefix)) {
             if(f->af == AF_INET6) return 0;
@@ -1294,15 +1294,18 @@ do_filter(struct filter *f, const unsigned char *id,
     if(result)
         memset(result, 0, sizeof(struct filter_result));
 
+    debugf("do_filter: prefix %s src %s if %d proto %d id %s\n", format_prefix(prefix, plen), format_prefix(src_prefix, src_plen), ifindex, proto, id ? format_eui64(id) : "-");
     while(f) {
         if(filter_match(f, id, prefix, plen, src_prefix, src_plen,
                         neigh, ifindex, proto)) {
             if(result)
                 memcpy(result, &f->action, sizeof(struct filter_result));
+            debugf("- do_filter: success\n");
             return f->action.add_metric;
         }
         f = f->next;
     }
+    debugf("- do_filter: failed\n");
 
     return -1;
 }
