@@ -46,9 +46,9 @@ build_active() {
     sn="$(uci get aredn.@supernode[0].enable)"
     gw="$(uci get aredn.@wan[0].olsrd_gw)"
     if [ "$sn" = "1" ]; then
-        echo "redistribute ip 10.0.0.0/8 proto 3 allow" >> ${C}
-        echo "redistribute ip 44.0.0.0/9 proto 3 allow" >> ${C}
-        echo "redistribute ip 44.128.0.0/10 proto 3 allow" >> ${C}
+        echo "redistribute ip 10.0.0.0/8 allow" >> ${C}
+        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
+        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
         echo "out ip 10.0.0.0/8 eq 8 allow" >> ${C}
         echo "out ip 44.0.0.0/9 eq 9 allow" >> ${C}
         echo "out ip 44.128.0.0/10 eq 10 allow" >> ${C}
