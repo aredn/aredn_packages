@@ -43,13 +43,25 @@ build_active() {
         fi
     done
     # Limit what we redistribute
-    echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
-    echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
-    echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
-    if [ "$(uci get aredn.@wan[0].olsrd_gw)" = "1" ]; then
+    sn="$(uci get aredn.@supernode[0].enable)"
+    gw="$(uci get aredn.@wan[0].olsrd_gw)"
+    if [ "$sn" = "1" ]; then
+        echo "redistribute ip 10.0.0.0/8 proto 3 allow" >> ${C}
+        echo "redistribute ip 44.0.0.0/9 proto 3 allow" >> ${C}
+        echo "redistribute ip 44.128.0.0/10 proto 3 allow" >> ${C}
+        echo "out ip 10.0.0.0/8 eq 8 allow" >> ${C}
+        echo "out ip 44.0.0.0/9 eq 9 allow" >> ${C}
+        echo "out ip 44.128.0.0/10 eq 10 allow" >> ${C}
+        echo "out if br-dtdlink deny" >> ${C}
+    else
+        echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
+        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
+        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+    fi
+    if [ "$gw" = "1" ]; then
         echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
     fi
-    if [ "$(uci get aredn.@supernode[0].enable)" = "1" ]; then
+    if [ "$sn" = "1" ]; then
         echo "redistribute ip 172.30.0.0/16 deny" >> ${C}
     else
         echo "redistribute ip 172.31.0.0/16 deny" >> ${C}
