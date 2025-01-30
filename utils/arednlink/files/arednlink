@@ -204,6 +204,20 @@ function when(timeout) {
 }
 
 //
+// Graylist an address
+//
+function gray(address) {
+    const g = graylist[address];
+    if (g) {
+        g.scale = min(g.scale * 1.5, GRAY_MAX_SCALE);
+        g.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * g.scale);
+    }
+    else {
+        graylist[address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+    }
+}
+
+//
 // Build a message
 //
 function buildMessage(cmd, ipv4addr, hop, payload) {
@@ -417,14 +431,7 @@ function channelProcess(event) {
                     if (!this.connection) {
                         // Failed to connect
                         // Timeout address to graylist
-                        const gray = graylist[this.address];
-                        if (gray) {
-                            gray.scale = min(gray.scale * 1.5, GRAY_MAX_SCALE);
-                            gray.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * gray.scale);
-                        }
-                        else {
-                            graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
-                        }
+                        gray(this.address);
                         this.state = "EXIT";
                         this.timer = 0;
                     }
@@ -467,7 +474,7 @@ function channelProcess(event) {
                         this.polling &= ~POLLIN;
                     }
                     this.keepalive = 0;
-                    this.timer = max(when(0), this.keepalivetime);
+                    this.timer = this.keepalivetime;
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -492,6 +499,7 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
+                    gray(this.address);
                     this.address = null;
                     this.state = "IDLE";
                     // Force neighbor update
@@ -538,7 +546,7 @@ function channelProcess(event) {
                         this.polling &= ~POLLIN;
                     }
                     this.keepalive = 0;
-                    this.timer = max(when(0), this.keepalivetime);
+                    this.timer = this.keepalivetime;
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
@@ -593,7 +601,7 @@ function channelProcess(event) {
             if (iface.channel === this) {
                 iface.channel = null;
             }
-            graylist[this.address] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+            gray(this.address);
             break;
         }
     }
