@@ -1223,7 +1223,7 @@ filter_match(struct filter *f, const unsigned char *id,
              const unsigned char *src_prefix, unsigned short src_plen,
              const unsigned char *neigh, unsigned int ifindex, int proto)
 {
-    debugf("filter_match: af %d id %d prefix %d src_prefix %d plen_ge %d plen_le %d src_plen_ge %d src_plen_le %d neigh %d ifname %d proto %d\n", !!f->af, !!f->id, !!f->prefix, !!f->src_prefix, f->plen_ge, f->plen_le, f->src_plen_ge, f->src_plen_le, !!f->neigh, !!f->ifname, f->proto);
+    debugf("filter_match: af %d id %d prefix %d plen %d src_prefix %d plen_ge %d plen_le %d src_plen_ge %d src_plen_le %d neigh %d ifname %d proto %d\n", !!f->af, !!f->id, !!f->prefix, f->plen, !!f->src_prefix, f->plen_ge, f->plen_le, f->src_plen_ge, f->src_plen_le, !!f->neigh, !!f->ifname, f->proto);
     if(f->af) {
         if(plen >= 96 && v4mapped(prefix)) {
             if(f->af == AF_INET6) return 0;
