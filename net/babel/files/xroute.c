@@ -541,6 +541,9 @@ check_xroutes(int send_updates, int warn)
     free(routes);
     /* Set up maxroutes for the next call. */
     maxroutes = MIN(numroutes + 8, maxmaxroutes);
+
+    debugf("\nChecking kernel routes - done.\n");
+
     return change;
 
  resize:
