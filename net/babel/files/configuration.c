@@ -1223,7 +1223,7 @@ filter_match(struct filter *f, const unsigned char *id,
              const unsigned char *src_prefix, unsigned short src_plen,
              const unsigned char *neigh, unsigned int ifindex, int proto)
 {
-    debugf("filter_match: prefix %s src %s if %d proto %d id %s\n", format_prefix(prefix, plen), format_prefix(src_prefix, src_plen), ifindex, proto, format_eui64(id));
+    debugf("filter_match: prefix %s src %s if %d proto %d id %s\n", format_prefix(prefix, plen), format_prefix(src_prefix, src_plen), ifindex, proto, id ? format_eui64(id) : "-");
     if(f->af) {
         if(plen >= 96 && v4mapped(prefix)) {
             if(f->af == AF_INET6) return 0;
