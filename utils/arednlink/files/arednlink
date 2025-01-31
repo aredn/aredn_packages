@@ -260,10 +260,10 @@ function buildTargettedSyncMessage(target) {
 // Send message to all (most) of our connected channels.
 //
 function sendMsgToAll(msg, from) {
-    const from = from?.interface;
+    const fromiface = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
-        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (!isolated[channel.interface] || channel.interface === from)) {
+        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface])) {
             channel.outgoing += msg;
             channel.polling |= POLLOUT;
         }
@@ -655,7 +655,7 @@ function commandProcess(cmd) {
         case "upload-services":
         {
             const data = fs.readfile(cv[1]);
-            if (!data) {
+            if (data === null) {
                 return "bad file";
             }
             else {
