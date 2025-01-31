@@ -302,11 +302,11 @@ function processMessage(cmd, hop, srcipv4, payload)
             for (let i = 0; i < len; i += 4) {
                 const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
                 const name = fs.readfile(`${ROOT_DIR_HOSTS}${ip}`);
-                if (name) {
+                if (name !== null) {
                     this.outgoing += buildMessage(CMD_UPDATE_HOSTS, ip, HOP_DEFAULT, name);
                 }
                 const service = fs.readfile(`${ROOT_DIR_SERVICES}${ip}`);
-                if (service) {
+                if (service !== null) {
                     this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, service);
                 }
             }
@@ -636,7 +636,7 @@ function commandProcess(cmd) {
         case "upload-hosts":
         {
             const data = fs.readfile(cv[1]);
-            if (!data) {
+            if (data === null) {
                 return "bad file";
             }
             else {
@@ -674,11 +674,11 @@ function commandProcess(cmd) {
         case "force-update":
         {
             const n = fs.readfile(`${ROOT_DIR_HOSTS}${myipv4address}`);
-            if (n) {
+            if (n !== null) {
                 sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, n));
             }
             const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
-            if (s) {
+            if (s !== null) {
                 sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
             }
             return "ok";
