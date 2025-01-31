@@ -186,16 +186,8 @@ function eventString(polling) {
 // Determine if this interface is a valid next hop to the ip.
 //
 function validNextHop(channel, ipv4address) {
-    if (!ipv4address || ipv4address == myipv4address) {
-        return false;
-    }
-    const f = fs.popen(`/sbin/ip route get ${ipv4address}`);
-    if (f) {
-        const hop = f.read("all");
-        f.close();
-        if (index(hop, `dev ${channel.interface} `) !== -1) {
-            return true;
-        }
+    if (ipv4address && ipv4address !== myipv4address && hostroutes[ipv4address] === channel.interface) {
+        return true;
     }
     return false;
 }
@@ -843,7 +835,7 @@ function routeProcess(event) {
     for (let i = length(broutes) - 1; i >= 0; i--) {
         const route = broutes[i];
         const dst = route.dst;
-        const iface = route.iface;
+        const iface = route.oif;
         hostroutes[dst] = iface;
         if (oldr[dst]) {
             delete oldr[dst];
@@ -852,11 +844,9 @@ function routeProcess(event) {
             // Build the sync message payloads as we go
             const addr = iptoarr(dst);
             if (!newr[iface]) {
-                newr[iface] = chr(addr[0], addr[1], addr[2], addr[3]);
+                newr[iface] = "";
             }
-            else {
-                newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
-            }
+            newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
         }
     }
 
@@ -943,12 +933,8 @@ function pollWorkers() {
 //
 // Signals
 //
-signal("SIGINT", _ => {
-    exiting = true;
-});
-signal("SIGTERM", _ => {
-    exiting = true;
-});
+signal("SIGINT", _ => exiting = true);
+signal("SIGTERM", _ => exiting = true);
 
 //
 // Create data directores and empty them.
