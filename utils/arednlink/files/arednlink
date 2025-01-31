@@ -226,7 +226,7 @@ function gray(iface, address) {
 // Build a message
 //
 function buildMessage(cmd, ipv4addr, hop, payload) {
-    DEBUG && print(`buildMessage: cmd ${cmd} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
+    DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
     payload = payload ?? "";
     const len =  8 + length(payload); // Length is the entire message including the length itself.
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
@@ -285,7 +285,7 @@ const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK
 //
 function processMessage(cmd, hop, srcipv4, payload)
 {
-    DEBUG && print(`processMessage: cmd ${cmd} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
+    DEBUG && print(`processMessage: cmd ${chr(cmd)} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
     switch (cmd) {
         case CMD_VERSION:
             if (payload != VERSION) {
