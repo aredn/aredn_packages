@@ -208,21 +208,6 @@ function when(timeout) {
 }
 
 //
-// Graylist an address
-//
-function gray(iface, address) {
-    const key = `${iface}/${address}`;
-    const g = graylist[key];
-    if (g) {
-        g.scale = min(g.scale * 1.5, GRAY_MAX_SCALE);
-        g.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * g.scale);
-    }
-    else {
-        graylist[key] = { timer: when(GRAY_TIMEOUT), scale: 1 };
-    }
-}
-
-//
 // Build a message
 //
 function buildMessage(cmd, ipv4addr, hop, payload) {
@@ -437,7 +422,15 @@ function channelProcess(event) {
                     if (!this.connection) {
                         // Failed to connect
                         // Timeout address to graylist
-                        gray(this.interface, this.address);
+                        const key = `${this.interface}/${this.address}`;
+                        const g = graylist[key];
+                        if (g) {
+                            g.scale = min(g.scale * 1.5, GRAY_MAX_SCALE);
+                            g.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * g.scale);
+                        }
+                        else {
+                            graylist[key] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+                        }
                         this.state = "EXIT";
                         this.timer = 0;
                     }
@@ -497,7 +490,6 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    gray(this.interface, this.address);
                     this.address = null;
                     this.state = "IDLE";
                     // Force neighbor update
@@ -599,7 +591,6 @@ function channelProcess(event) {
             if (iface.channel === this) {
                 iface.channel = null;
             }
-            gray(this.interface, this.address);
             break;
         }
     }
@@ -685,7 +676,7 @@ function commandProcess(cmd) {
         }
         case "dump":
         {
-            const now = clock(true)[0];
+            const now = when(0);
             let r = "";
             for (let i in interfaces) {
                 r += `interface ${i}\n`;
@@ -922,7 +913,7 @@ function mgrProcess(event) {
 function pollWorkers() {
     const workers = [];
     let timeout = 24 * 60 * 60; // 1 day
-    const now = clock(true)[0];
+    const now = when(0);
     for (let id in channels) {
         const channel = channels[id];
         if (channel.timer !== null) {
@@ -1003,7 +994,7 @@ while (!exiting) {
         }
     }
     // Check for expired timers
-    const now = clock(true)[0];
+    const now = when(0);
     for (let id in channels) {
         const channel = channels[id];
         if (channel.timer !== null && channel.timer <= now) {
