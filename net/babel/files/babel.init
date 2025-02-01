@@ -47,6 +47,7 @@ build_active() {
     gw="$(uci get aredn.@wan[0].olsrd_gw)"
     if [ "$sn" = "1" ]; then
         me="$(uci -c /etc/config.mesh get setup.globals.wifi_ip)"
+        echo "import-table 21" >> ${C}
         echo "redistribute ip 10.0.0.0/8 allow" >> ${C}
         echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
         echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
@@ -71,10 +72,16 @@ build_active() {
     fi
     echo "redistribute local if br-wan deny" >> ${C}
     echo "redistribute local if br-lan deny" >> ${C}
-    echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
-    echo "install ip 44.0.0.0/9 eq 9 allow table 21" >> ${C}
-    echo "install ip 44.128.0.0/10 eq 10 allow table 21" >> ${C}
-    echo "install ip 0.0.0.0/0 eq 0 allow table 21" >> ${C}
+    if [ "$sn" = "1" ]; then
+        echo "install ip 10.0.0.0/8 eq 8 deny" >> ${C}
+        echo "install ip 44.0.0.0/9 eq 9 deny" >> ${C}
+        echo "install ip 44.128.0.0/10 eq 10 deny" >> ${C}
+    else
+        echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
+        echo "install ip 44.0.0.0/9 eq 9 allow table 21" >> ${C}
+        echo "install ip 44.128.0.0/10 eq 10 allow table 21" >> ${C}
+    fi
+    echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
 }
 
 start_service() {
