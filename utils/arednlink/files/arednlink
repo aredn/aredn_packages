@@ -118,6 +118,37 @@ const graylist = {};
 //
 const isolated = {};
 //
+// Statistics
+//
+const statistics = {
+    incoming: {
+        connection: 0,
+        sync: 0,
+        keepalive: 0,
+        version: 0,
+        host: 0,
+        service: 0
+    },
+    outgoing: {
+        connection: 0,
+        sync: 0,
+        keepalive: 0,
+        version: 0,
+        host: 0,
+        service: 0
+    },
+    forward: {
+        host: 0,
+        service: 0
+    },
+    error: {
+        connection: 0,
+        version: 0,
+        hop: 0,
+        command: 0
+    }
+};
+//
 // Our IPv4 address, used for all messages we generate
 //
 const myipv4address = uci.cursor("/etc/config.mesh").get("setup", "globals", "wifi_ip");
@@ -237,14 +268,17 @@ function buildTargettedSyncMessage(target) {
 // Send message to all (most) of our connected channels.
 //
 function sendMsgToAll(msg, from) {
+    let count = 0;
     const fromiface = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
         if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface])) {
             channel.outgoing += msg;
             channel.polling |= POLLOUT;
+            count++;
         }
     }
+    return count;
 }
 
 //
@@ -265,25 +299,31 @@ function processMessage(cmd, hop, srcipv4, payload)
     DEBUG && print(`processMessage: cmd ${chr(cmd)} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
     switch (cmd) {
         case CMD_VERSION:
+            statistics.incoming.version++;
             if (payload != VERSION) {
                 graylist[`${this.interface}/${this.address}`] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
                 this.process(CLOSECONN);
+                statistics.error.version++;
             }
             return false;
-        case CMD_KEEALIVE:
-            break;
+        case CMD_KEEPALIVE:
+            statistics.incoming.keepalive++;
+            return false;
         case CMD_SYNC:
             // A sync request from a neighbor. Payload contains a list of addresses the neighbor is soliciting data for.
             // Return false so the request is not forwarded (it should have a hop of 1);
+            statistics.incoming.sync++;
             const len = length(payload);
             for (let i = 0; i < len; i += 4) {
                 const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
                 const name = fs.readfile(`${ROOT_DIR_HOSTS}${ip}`);
                 if (name !== null) {
+                    statistics.outgoing.host++;
                     this.outgoing += buildMessage(CMD_UPDATE_HOSTS, ip, HOP_DEFAULT, name);
                 }
                 const service = fs.readfile(`${ROOT_DIR_SERVICES}${ip}`);
                 if (service !== null) {
+                    statistics.outgoing.service++;
                     this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, service);
                 }
             }
@@ -295,6 +335,7 @@ function processMessage(cmd, hop, srcipv4, payload)
         {
             // Updates the name entries published by the srvipv4 node. We read and compare so we
             // dont write to the file unless it has changed nor do we forward the update.
+            statistics.incoming.host++;
             const path = `${ROOT_DIR_HOSTS}${srcipv4}`;
             const old = fs.readfile(path);
             if (old == payload) {
@@ -307,6 +348,7 @@ function processMessage(cmd, hop, srcipv4, payload)
         {
             // Updates the service entries published by the srvipv4 node. We read and compare so
             // we dont write to tjhe file unless it has changed nor do we forward the update.
+            statistics.incoming.service++;
             const path = `${ROOT_DIR_SERVICES}${srcipv4}`;
             const old = fs.readfile(path);
             if (old == payload) {
@@ -316,6 +358,7 @@ function processMessage(cmd, hop, srcipv4, payload)
             return true;
         }
         default:
+            statistics.error.command++;
             return true;
     }
 }
@@ -356,9 +399,24 @@ function processRequest() {
         if (validhop) {
             const payload = substr(this.incoming, i + 8, len - 8);
             const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
-            if (forward && hop > 1) {
-                // Build and forward message
-                sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+            if (forward) {
+                if (hop > 1) {
+                    // Build and forward message
+                    const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+                    switch (cmd) {
+                        case CMD_UPDATE_HOSTS:
+                            statistics.forward.host += count;
+                            break;
+                        case CMD_UPDATE_SERVICES:
+                            statistics.forward.service += count;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                else {
+                    statistics.error.hop++;
+                }
             }
         }
         i += len;
@@ -408,12 +466,14 @@ function channelProcess(event) {
         {
             switch (event) {
                 case POLLTIMER:
+                    statistics.outgoing.connection++;
                     DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
                     this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CHANNEL_CONN_TIMEOUT * 1000);
                     DEBUG && print(`Connection: ${this.connection}\n`);
                     if (!this.connection) {
                         // Failed to connect
                         // Timeout address to graylist
+                        statistics.error.connection++;
                         const key = `${this.interface}/${this.address}`;
                         const g = graylist[key];
                         if (g) {
@@ -435,6 +495,8 @@ function channelProcess(event) {
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         this.incoming = "";
+                        statistics.outgoing.version++;
+                        statistics.outgoing.sync++;
                         this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
                     }
                     break;
@@ -491,6 +553,7 @@ function channelProcess(event) {
                 case POLLTIMER:
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
+                        statistics.outgoing.keepalive++;
                         this.outgoing += keepaliveMsg;
                         this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
@@ -511,7 +574,10 @@ function channelProcess(event) {
         }
         case "INCOMING":
         {
+            statistics.incoming.connection++;
             this.incoming = "";
+            statistics.outgoing.version++;
+            statistics.outgoing.sync++;
             this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
             this.state = "CONNECTED_INCOMING";
             this.keepalive = 0;
@@ -546,6 +612,7 @@ function channelProcess(event) {
                 case POLLTIMER:
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
+                        statistics.outgoing.keepalive++;
                         this.outgoing += keepaliveMsg;
                         this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
@@ -627,7 +694,8 @@ function commandProcess(cmd) {
                 const old = fs.readfile(path);
                 if (old != data) {
                     fs.writefile(path, data);
-                    sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, data));
+                    const count = sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, data));
+                    statistics.outgoing.host += count;
                     return old ? "ok updated" : "ok new";
                 }
                 else {
@@ -646,7 +714,8 @@ function commandProcess(cmd) {
                 const old = fs.readfile(path);
                 if (old != data) {
                     fs.writefile(path, data);
-                    sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data));
+                    const count = sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data));
+                    statistics.outgoing.service += count;
                     return old ? "ok updated" : "ok new";
                 }
                 else {
@@ -658,11 +727,13 @@ function commandProcess(cmd) {
         {
             const n = fs.readfile(`${ROOT_DIR_HOSTS}${myipv4address}`);
             if (n !== null) {
-                sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, n));
+                const count = sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, n));
+                statistics.outgoing.host += count;
             }
             const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
             if (s !== null) {
-                sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
+                const count = sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
+                statistics.outgoing.service += count;
             }
             return "ok";
         }
@@ -679,6 +750,14 @@ function commandProcess(cmd) {
             for (let id in channels) {
                 const c = channels[id];
                 r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
+            }
+            for (let k in statistics) {
+                r += `statistics ${k}`;
+                const stat = statistics[k];
+                for (let j in stat) {
+                    r += ` ${j} ${stat[j]}`;
+                }
+                r += "\n";
             }
             return r + "ok";
         }
