@@ -85,10 +85,12 @@ const CHANNEL_CONN_TIMEOUT  = 10;
 const AREDNLINK_PORT        = 9623;
 const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 //
-// DNS and services file locations.
+// Resources
 //
-const ROOT_DIR_HOSTS        = "/tmp/arednlink/hosts/";
-const ROOT_DIR_SERVICES     = "/tmp/arednlink/services/";
+const resources = [
+    { name: "hosts",    dir: "/tmp/arednlink/hosts/",       cmd: CMD_UPDATE_HOSTS       },
+    { name: "services", dir: "/tmp/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
+];
 //
 // Default hop count for messages.
 //
@@ -121,31 +123,35 @@ const isolated = {};
 // Statistics
 //
 const statistics = {
+    count: {
+        route: 0
+    },
     incoming: {
         connection: 0,
         sync: 0,
         keepalive: 0,
         version: 0,
-        host: 0,
-        service: 0
+        hosts: 0,
+        services: 0
     },
     outgoing: {
         connection: 0,
         sync: 0,
         keepalive: 0,
         version: 0,
-        host: 0,
-        service: 0
+        hosts: 0,
+        services: 0
     },
     forward: {
-        host: 0,
-        service: 0
+        hosts: 0,
+        services: 0
     },
     error: {
         connection: 0,
         version: 0,
         hop: 0,
-        command: 0
+        command: 0,
+        resourceself: 0
     }
 };
 //
@@ -256,7 +262,7 @@ const keepaliveMsg = buildMessage(CMD_KEEPALIVE, myipv4address, 1);
 function buildTargettedSyncMessage(target) {
     let sync = "";
     for (let ip in hostroutes) {
-        if (hostroutes[ip] === target) {
+        if (ip !== myipv4address && hostroutes[ip] === target) {
             const addr = iptoarr(ip);
             sync += chr(addr[0], addr[1], addr[2], addr[3]);
         }
@@ -316,48 +322,37 @@ function processMessage(cmd, hop, srcipv4, payload)
             const len = length(payload);
             for (let i = 0; i < len; i += 4) {
                 const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
-                const name = fs.readfile(`${ROOT_DIR_HOSTS}${ip}`);
-                if (name !== null) {
-                    statistics.outgoing.host++;
-                    this.outgoing += buildMessage(CMD_UPDATE_HOSTS, ip, HOP_DEFAULT, name);
-                }
-                const service = fs.readfile(`${ROOT_DIR_SERVICES}${ip}`);
-                if (service !== null) {
-                    statistics.outgoing.service++;
-                    this.outgoing += buildMessage(CMD_UPDATE_SERVICES, ip, HOP_DEFAULT, service);
+                for (let r = 0; r < length(resources); r++) {
+                    const res = resources[r];
+                    const name = fs.readfile(`${res.dir}${ip}`);
+                    if (name !== null) {
+                        statistics.outgoing[res.name]++;
+                        this.outgoing += buildMessage(res.cmd, ip, HOP_DEFAULT, name);
+                    }
                 }
             }
             if (length(this.outgoing)) {
                 this.polling |= POLLOUT;
             }
             return false;
-        case CMD_UPDATE_HOSTS:
-        {
-            // Updates the name entries published by the srvipv4 node. We read and compare so we
-            // dont write to the file unless it has changed nor do we forward the update.
-            statistics.incoming.host++;
-            const path = `${ROOT_DIR_HOSTS}${srcipv4}`;
-            const old = fs.readfile(path);
-            if (old == payload) {
-                return false;
-            }
-            fs.writefile(path, payload);
-            return true;
-        }
-        case CMD_UPDATE_SERVICES:
-        {
-            // Updates the service entries published by the srvipv4 node. We read and compare so
-            // we dont write to tjhe file unless it has changed nor do we forward the update.
-            statistics.incoming.service++;
-            const path = `${ROOT_DIR_SERVICES}${srcipv4}`;
-            const old = fs.readfile(path);
-            if (old == payload) {
-                return false;
-            }
-            fs.writefile(path, payload);
-            return true;
-        }
         default:
+            if (srcipv4 == myipv4address) {
+                statistics.error.resourceself++;
+                return false;
+            }
+            for (let r = 0; r < length(resources); r++) {
+                const res = resources[r];
+                if (cmd === res.cmd) {
+                    statistics.incoming[res.name]++;
+                    const path = `${res.dir}${srcipv4}`;
+                    const old = fs.readfile(path);
+                    if (old == payload) {
+                        return false;
+                    }
+                    fs.writefile(path, payload);
+                    return true;
+                }
+            }
             statistics.error.command++;
             return true;
     }
@@ -403,15 +398,12 @@ function processRequest() {
                 if (hop > 1) {
                     // Build and forward message
                     const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
-                    switch (cmd) {
-                        case CMD_UPDATE_HOSTS:
-                            statistics.forward.host += count;
+                    for (let r = 0; r < length(resources); r++) {
+                        const res = resources[r];
+                        if (cmd === res.cmd) {
+                            statistics.forward[res.name]++;
                             break;
-                        case CMD_UPDATE_SERVICES:
-                            statistics.forward.service += count;
-                            break;
-                        default:
-                            break;
+                        }
                     }
                 }
                 else {
@@ -683,59 +675,29 @@ function commandProcess(cmd) {
     const cv = split(trim(cmd), " ", 2);
     cv[1] = trim(cv[1]);
     switch (cv[0]) {
-        case "upload-hosts":
+        case "upload":
         {
-            const data = fs.readfile(cv[1]);
+            const tf = split(cv[1], " ", 2);
+            const type = tf[0];
+            const data = fs.readfile(trim(tf[1]));
             if (data === null) {
                 return "bad file";
             }
-            else {
-                const path = `${ROOT_DIR_HOSTS}${myipv4address}`;
-                const old = fs.readfile(path);
-                if (old != data) {
+            for (let r = 0; r < length(resources); r++) {
+                const res = resources[r];
+                if (res.name === type) {
+                    const path = `${res.dir}${myipv4address}`;
+                    const old = fs.readfile(path);
+                    if (old == data) {
+                        return "ok nochange";
+                    }
                     fs.writefile(path, data);
-                    const count = sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, data));
-                    statistics.outgoing.host += count;
+                    const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
+                    statistics.outgoing[res.name] += count;
                     return old ? "ok updated" : "ok new";
                 }
-                else {
-                    return "ok nochange";
-                }
             }
-        }
-        case "upload-services":
-        {
-            const data = fs.readfile(cv[1]);
-            if (data === null) {
-                return "bad file";
-            }
-            else {
-                const path = `${ROOT_DIR_SERVICES}${myipv4address}`;
-                const old = fs.readfile(path);
-                if (old != data) {
-                    fs.writefile(path, data);
-                    const count = sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, data));
-                    statistics.outgoing.service += count;
-                    return old ? "ok updated" : "ok new";
-                }
-                else {
-                    return "ok nochange";
-                }
-            }
-        }
-        case "force-update":
-        {
-            const n = fs.readfile(`${ROOT_DIR_HOSTS}${myipv4address}`);
-            if (n !== null) {
-                const count = sendMsgToAll(buildMessage(CMD_UPDATE_HOSTS, myipv4address, HOP_DEFAULT, n));
-                statistics.outgoing.host += count;
-            }
-            const s = fs.readfile(`${ROOT_DIR_SERVICES}${myipv4address}`);
-            if (s !== null) {
-                const count = sendMsgToAll(buildMessage(CMD_UPDATE_SERVICES, myipv4address, HOP_DEFAULT, s));
-                statistics.outgoing.service += count;
-            }
-            return "ok";
+            return "bad name";
         }
         case "dump":
         {
@@ -908,6 +870,8 @@ function routeProcess(event) {
     DEBUG && print("routeProcess\n");
     const broutes = babel.getHostRoutes();
 
+    statistics.count.route = length(broutes);
+
     const oldr = hostroutes;
     const newr = {};
     hostroutes = {};
@@ -933,8 +897,9 @@ function routeProcess(event) {
 
     // Remove any data we no longer need
     for (let ip in oldr) {
-        fs.unlink(`${ROOT_DIR_HOSTS}${ip}`);
-        fs.unlink(`${ROOT_DIR_SERVICES}${ip}`);
+        for (let r = 0; r < length(resources); r++) {
+            fs.unlink(`${resources[r].dir}${ip}`);
+        }
     }
 
     // Sync our neighbors for information about the new routes
@@ -1016,12 +981,12 @@ signal("SIGINT", _ => exiting = true);
 signal("SIGTERM", _ => exiting = true);
 
 //
-// Create data directores and empty them.
+// Create resource directories and empty them.
 //
-system(`mkdir -p ${ROOT_DIR_HOSTS}`);
-system(`rm -f ${ROOT_DIR_HOSTS}*`);
-system(`mkdir -p ${ROOT_DIR_SERVICES}`);
-system(`rm -f ${ROOT_DIR_SERVICES}*`);
+for (let r = 0; r < length(resources); r++) {
+    system(`/bin/mkdir -p ${resources[r].dir}`);
+    system(`/bin/rm -f ${resources[r].dir}*`);
+}
 
 //
 // Start connecting
