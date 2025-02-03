@@ -124,6 +124,7 @@ const isolated = {};
 //
 const statistics = {
     count: {
+        neighbors: 0,
         route: 0
     },
     incoming: {
@@ -838,6 +839,7 @@ function neighborhoodProcess(event) {
     // Get list of neighbors we might connect to. Only get those neighbors we
     // have routes to as we ignore traffic from anything unroutable anyway.
     const neighbors = babel.getRoutableNeighbors() || [];
+    statistics.count.neighbors = length(neighbors);
     const now = when(0);
     for (let i = 0; i < length(neighbors); i++) {
         const n = neighbors[i];
@@ -857,7 +859,7 @@ function neighborhoodProcess(event) {
         }
         else {
             if (!iface.channel) {
-                const channel = createChannel("IDLE", null, 0, 0);
+                const channel = createChannel("IDLE", null, 0, 0, null);
                 channel.interface = name;
                 channel.myaddress = iface.address;
                 iface.channel = channel;
@@ -931,7 +933,7 @@ function routeProcess(event) {
 function mainProcess(event) {
     if (event & POLLIN) {
         const address = {};
-        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null);
+        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null, null);
         channel.interface = address.interface;
         channel.address = address.address;
     }
@@ -1003,7 +1005,7 @@ for (let r = 0; r < length(resources); r++) {
 createChannel("MAIN", main, POLLIN, null, mainProcess);
 createChannel("MGR", mgr, POLLIN, null, mgrProcess);
 createChannel("ROUTES", null, 0, 0, routeProcess);
-neighborhood = createChannel("NEIGHBORHOOD", null, 0, 0, neighborhoodProcess);
+neighborhood = createChannel("NEIGHBORHOOD", null, 0, when(10), neighborhoodProcess);
 
 //
 // Command line
