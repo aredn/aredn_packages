@@ -220,10 +220,10 @@ function eventString(polling) {
 }
 
 //
-// Determine if this interface is a valid next hop to the ip.
+// Determine if this interface is a valid next hop for the command/ip pair.
 //
-function validNextHop(channel, ipv4address) {
-    if (ipv4address && ipv4address !== myipv4address && hostroutes[ipv4address] === channel.interface) {
+function validNextHop(channel, cmd, ipv4address) {
+    if (ipv4address && ipv4address !== myipv4address && (cmd === CMD_SYNC || hostroutes[ipv4address] === channel.interface)) {
         return true;
     }
     return false;
@@ -394,11 +394,9 @@ function processRequest() {
         const hop = ord(this.incoming, i + 3);
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
         const srcipv4str = arrtoip(srcipv4);
-        const validhop = validNextHop(this, srcipv4str);
+        const validhop = validNextHop(this, cmd, srcipv4str);
         DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} validhop ${validhop} ${srcipv4src}\n`);
-        // Process incoming message if it's from a valid next hop or if its a sync command. We *always* respond to sync command because
-        // when a new route comes online with a neighbor, we might not yet have that change. So we assume the request is valid.
-        if (validhop || cmd === CMD_SYNC) {
+        if (validhop) {
             const payload = substr(this.incoming, i + 8, len - 8);
             const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
             if (forward) {
