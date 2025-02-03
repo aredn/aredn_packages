@@ -132,7 +132,8 @@ const statistics = {
         keepalive: 0,
         version: 0,
         hosts: 0,
-        services: 0
+        services: 0,
+        invalidhop: 0
     },
     outgoing: {
         connection: 0,
@@ -395,6 +396,9 @@ function processRequest() {
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
         const srcipv4str = arrtoip(srcipv4);
         const validhop = validNextHop(this, cmd, srcipv4str);
+        if (!validhop) {
+            statistics.incoming.invalidhop++;
+        }
         DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} validhop ${validhop} ${srcipv4src}\n`);
         if (validhop) {
             const payload = substr(this.incoming, i + 8, len - 8);
