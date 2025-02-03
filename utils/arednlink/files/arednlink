@@ -396,7 +396,9 @@ function processRequest() {
         const srcipv4str = arrtoip(srcipv4);
         const validhop = validNextHop(this, srcipv4str);
         DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} validhop ${validhop} ${srcipv4src}\n`);
-        if (validhop) {
+        // Process incoming message if it's from a valid next hop or if its a sync command. We *always* respond to sync command because
+        // when a new route comes online with a neighbor, we might not yet have that change. So we assume the request is valid.
+        if (validhop || cmd === CMD_SYNC) {
             const payload = substr(this.incoming, i + 8, len - 8);
             const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
             if (forward) {
