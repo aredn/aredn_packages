@@ -88,8 +88,8 @@ const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 // Resources
 //
 const resources = [
-    { name: "hosts",    dir: "/tmp/arednlink/hosts/",       cmd: CMD_UPDATE_HOSTS       },
-    { name: "services", dir: "/tmp/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
+    { name: "hosts",    dir: "/var/run/arednlink/hosts/",       cmd: CMD_UPDATE_HOSTS       },
+    { name: "services", dir: "/var/run/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
 ];
 //
 // Default hop count for messages.
