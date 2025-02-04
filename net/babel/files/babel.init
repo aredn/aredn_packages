@@ -17,9 +17,6 @@ build_active() {
             i=$(basename $p)
             case $i in
             br-nomesh)
-                echo "interface ${i} type wired" >> ${C}
-                echo "interface ${i} rxcost $(uci get babel.wired.rxcost)" >> ${C}
-                echo "interface ${i} split-horizon $(uci get babel.wired.split_horizon)" >> ${C}
                 ;;
             wifi*)
                 echo "interface ${i} type wireless" >> ${C}

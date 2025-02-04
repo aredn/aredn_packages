@@ -33,7 +33,7 @@ define Package/babel/install
 	$(INSTALL_CONF) ./files/babel.conf $(1)/etc/babel.conf
 	$(INSTALL_BIN) ./files/babel.init $(1)/etc/init.d/babel
 	$(INSTALL_CONF) ./files/babel.mesh $(1)/etc/config.mesh/babel
-	$(INSTALL_BIN) ./files/babel.hotplug $(1)/etc/hotplug.d/12-babel
+	$(INSTALL_BIN) ./files/babel.hotplug $(1)/etc/hotplug.d/iface/12-babel
 endef
 
 define Build/Prepare

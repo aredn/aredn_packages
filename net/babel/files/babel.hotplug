@@ -11,13 +11,7 @@ __END__
         ;;
     ifup)
         if [ "${INTERFACE}" == "wifi" ]; then
-            if [ "${DEVICE}" == "br-nomesh" ]; then
-                socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
-interface ${DEVICE} type wired
-interface ${DEVICE} rxcost $(uci get babel.wired.rxcost)
-interface ${DEVICE} split-horizon $(uci get babel.wired.split_horizon)
-__END__
-            else
+            if [ "${DEVICE}" != "br-nomesh" ]; then
                 socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
 interface ${DEVICE} link-quality true
