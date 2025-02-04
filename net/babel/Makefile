@@ -24,7 +24,7 @@ define Package/babel/install
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc/
 	$(INSTALL_DIR) $(1)/etc/config.mesh/
-	$(INSTALL_DIR) $(1)/etc/hotplug.d/
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface/
 	$(INSTALL_DIR) $(1)/etc/init.d/
 	$(INSTALL_DIR) $(1)/etc/state/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/babeld $(1)/usr/sbin/
