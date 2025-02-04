@@ -23,6 +23,8 @@ endef
 define Package/babel/install
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc/
+	$(INSTALL_DIR) $(1)/etc/config.mesh/
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/
 	$(INSTALL_DIR) $(1)/etc/init.d/
 	$(INSTALL_DIR) $(1)/etc/state/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/babeld $(1)/usr/sbin/
@@ -30,6 +32,8 @@ define Package/babel/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/utils/babel-dump $(1)/usr/sbin/
 	$(INSTALL_CONF) ./files/babel.conf $(1)/etc/babel.conf
 	$(INSTALL_BIN) ./files/babel.init $(1)/etc/init.d/babel
+	$(INSTALL_CONF) ./files/babel.mesh $(1)/etc/config.mesh/babel
+	$(INSTALL_BIN) ./files/babel.hotplug $(1)/etc/hotplug.d/12-babel
 endef
 
 define Build/Prepare

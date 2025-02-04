@@ -23,20 +23,34 @@ build_active() {
                 ;;
             wifi*)
                 echo "interface ${i} type wireless" >> ${C}
-                echo "interface ${i} link-quality yes" >> ${C}
+                echo "interface ${i} link-quality true" >> ${C}
                 echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
                 echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
                 ;;
-            wg*|tun[0-9]*)
+            wg*)
+                cost=$(uci -q get babel.tunnel.rxcost)
+                scale=$(uci -q get babel.tunnel.rxscale)
+                weight=$(uci -q get network.${i}.weight)
+                if [ "$weight" != "" ]; then
+                    cost=$(expr $cost + $scale \* $weight)
+                fi
                 echo "interface ${i} type tunnel" >> ${C}
-                echo "interface ${i} rxcost $(uci get babel.tunnel.rxcost)" >> ${C}
+                echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
                 ;;
             *)
-                xlink=$(uci -q show network | grep "xlink.*ifname='${i}'")
+                xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
                 if [ "${xlink}" != "" ]; then
+                    cost=$(uci -q get babel.xlink.rxcost)
+                    scale=$(uci -q get babel.xlink.rxscale)
+                    weight=$(uci -q get network.${xlink}.weight)
+                    if [ "$weight" != "" ]; then
+                        cost=$(expr $cost + $scale \* $weight)
+                    fi
                     echo "interface ${i} type auto" >> ${C}
+                    echo "interface ${i} link-quality true" >> ${C}
+                    echo "interface ${i} rxcost $(uci get babel.xlink.rxcost)" >> ${C}
                 fi
                 ;;
             esac
