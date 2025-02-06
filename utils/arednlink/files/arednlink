@@ -714,7 +714,7 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i}\n`;
+                r += `interface ${i}${interfaces[i].best == interfaces[i].address ? " best" : ""}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
@@ -891,10 +891,13 @@ function routeProcess(event) {
         const dst = route.dst;
         const iface = route.oif;
         hostroutes[dst] = iface;
-        if (oldr[dst]) {
+        if (oldr[dst] === iface) {
             delete oldr[dst];
         }
         else {
+            if (oldr[dst]) {
+                delete oldr[dst];
+            }
             // Build the sync message payloads as we go
             const addr = iptoarr(dst);
             if (!newr[iface]) {
