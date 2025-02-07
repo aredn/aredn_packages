@@ -35,6 +35,7 @@ build_active() {
                 echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
+                echo "redistribute local if ${i} deny" >> ${C}
                 ;;
             *)
                 xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
@@ -47,7 +48,8 @@ build_active() {
                     fi
                     echo "interface ${i} type auto" >> ${C}
                     echo "interface ${i} link-quality true" >> ${C}
-                    echo "interface ${i} rxcost $(uci get babel.xlink.rxcost)" >> ${C}
+                    echo "interface ${i} rxcost ${cost}" >> ${C}
+                    echo "redistribute local if ${i} deny" >> ${C}
                 fi
                 ;;
             esac
