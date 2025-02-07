@@ -28,6 +28,7 @@ THE SOFTWARE.
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <errno.h>
 
 #include "babeld.h"
 #include "util.h"
@@ -1008,7 +1009,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                         (struct sockaddr*)&buf->sin6,
                         sizeof(buf->sin6), probe);
         if(rc < 0)
-            perror("send");
+            debugf("send: %s\n", strerror(errno));
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
     buf->len = 0;
