@@ -125,7 +125,7 @@ const isolated = {};
 const statistics = {
     count: {
         neighbors: 0,
-        route: 0
+        routes: 0
     },
     incoming: {
         connection: 0,
@@ -881,7 +881,7 @@ function routeProcess(event) {
     DEBUG && print("routeProcess\n");
     const broutes = babel.getHostRoutes();
 
-    statistics.count.route = length(broutes);
+    statistics.count.routes = length(broutes);
 
     const oldr = hostroutes;
     const newr = {};
