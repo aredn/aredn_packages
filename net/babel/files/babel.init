@@ -1,0 +1,114 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=97
+
+C=/var/etc/babel-active.conf
+
+build_active() {
+    echo "router-id $(uci -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
+    # Alway DtD so Babel is happy to have one interface
+    echo "interface br-dtdlink type wired" >> ${C}
+    echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
+    echo "interface br-dtdlink split-horizon true" >> ${C}
+    for p in /sys/class/net/*
+    do
+        if [ "$(cat ${p}/operstate)" != "down" ]; then
+            i=$(basename $p)
+            case $i in
+            br-nomesh)
+                ;;
+            wifi*)
+                echo "interface ${i} type wireless" >> ${C}
+                echo "interface ${i} link-quality true" >> ${C}
+                echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
+                echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
+                ;;
+            wg*)
+                cost=$(uci -q get babel.tunnel.rxcost)
+                scale=$(uci -q get babel.tunnel.rxscale)
+                weight=$(uci -q get network.${i}.weight)
+                if [ "$weight" != "" ]; then
+                    cost=$(expr $cost + $scale \* $weight)
+                fi
+                echo "interface ${i} type tunnel" >> ${C}
+                echo "interface ${i} rxcost ${cost}" >> ${C}
+                echo "interface ${i} enable-timestamps true" >> ${C}
+                echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
+                echo "redistribute local if ${i} deny" >> ${C}
+                ;;
+            *)
+                xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
+                if [ "${xlink}" != "" ]; then
+                    cost=$(uci -q get babel.xlink.rxcost)
+                    scale=$(uci -q get babel.xlink.rxscale)
+                    weight=$(uci -q get network.${xlink}.weight)
+                    if [ "$weight" != "" ]; then
+                        cost=$(expr $cost + $scale \* $weight)
+                    fi
+                    echo "interface ${i} type auto" >> ${C}
+                    echo "interface ${i} link-quality true" >> ${C}
+                    echo "interface ${i} rxcost ${cost}" >> ${C}
+                    echo "redistribute local if ${i} deny" >> ${C}
+                fi
+                ;;
+            esac
+        fi
+    done
+    # Limit what we redistribute
+    sn="$(uci get aredn.@supernode[0].enable)"
+    gw="$(uci get aredn.@wan[0].olsrd_gw)"
+    if [ "$sn" = "1" ]; then
+        me="$(uci -c /etc/config.mesh get setup.globals.wifi_ip)"
+        echo "import-table 21" >> ${C}
+        echo "redistribute ip 10.0.0.0/8 allow" >> ${C}
+        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
+        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+        echo "redistribute ip ${me}/32 eq 32 allow" >> ${C}
+        echo "out ip ${me}/32 eq 32 allow" >> ${C}
+        echo "out ip 10.0.0.0/8 eq 8 allow" >> ${C}
+        echo "out ip 44.0.0.0/9 eq 9 allow" >> ${C}
+        echo "out ip 44.128.0.0/10 eq 10 allow" >> ${C}
+        echo "out if br-dtdlink deny" >> ${C}
+    else
+        echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
+        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
+        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+    fi
+    if [ "$gw" = "1" ]; then
+        echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
+    fi
+    if [ "$sn" = "1" ]; then
+        echo "redistribute ip 172.30.0.0/16 deny" >> ${C}
+    else
+        echo "redistribute ip 172.31.0.0/16 deny" >> ${C}
+    fi
+    echo "redistribute local if br-wan deny" >> ${C}
+    echo "redistribute local if br-lan deny" >> ${C}
+    if [ "$sn" = "1" ]; then
+        echo "install ip 10.0.0.0/8 eq 8 deny" >> ${C}
+        echo "install ip 44.0.0.0/9 eq 9 deny" >> ${C}
+        echo "install ip 44.128.0.0/10 eq 10 deny" >> ${C}
+    else
+        echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
+        echo "install ip 44.0.0.0/9 eq 9 allow table 21" >> ${C}
+        echo "install ip 44.128.0.0/10 eq 10 allow table 21" >> ${C}
+    fi
+    echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
+}
+
+start_service() {
+    build_active
+    procd_open_instance babel
+    procd_set_param command /usr/sbin/babeld -c /etc/babel.conf -c ${C}
+    procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param user root
+    procd_close_instance
+}
+
+reload_service() {
+    stop
+    start
+}

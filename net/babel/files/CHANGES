@@ -1,0 +1,639 @@
+26 July 2023: babeld-1.13.1
+
+  * Implemented the per-interface option "probe-mtu", which automatically
+    discards links with a mis-configured MTU.  Thanks to Daniel Gröber.
+  * Fixed a typo in the handing of the option "v4viav6".
+
+16 July 2023: babeld-1.13
+
+  * Removed diversity support and related configuration file directives.
+    This is an incompatible change.
+  * Optimised route redistribution.  We now install just the route that the
+    kernel sent us rather than doing a full route dump on every change.
+  * Added optional delay to daemon shutdown; see the configuration option
+    "shutdown-delay-ms".  Thanks to Daniel Gröber.
+  * Fixed compilation under BSD.  Thanks to Antonin Décimo.
+
+7 February 2023: babeld-1.12.2
+
+  * Fixed reinstalling a Babel route after a redistributed route is
+    retracted.  This avoids waiting for a new update after a non-Babel
+    route is removed from the routing table.
+  * Fixed parsing of the "allow-duplicates" option.  Thanks to Daniel Gröber.
+  * Fixed parsing of multiple sub-TLVs in a single TLV.  Since we currently
+    never send multiple sub-TLVs, this was not visible in practice, but
+    is a serious bug in the packet parser.  Thanks to zmw12306.
+
+18 May 2022: babeld-1.12.1
+
+  * Implemented separate PC values for unicast and multicast, which avoids
+    dropping packets protected by MAC when WiFi powersave is active.
+    Thanks to Daniel Gröber.
+  * Schedule an interface check just after adding an interface.
+    Thanks to Andrew Hoff.
+
+5 May 2022: babeld-1.12
+
+  * Implemented v4-via-v6 routing (RFC 9229), which allows a router with
+    IPv4 addresses only to route IPv4.  Thanks to Théophile Bastian.
+  * Enableed extended Netlink acks when available.
+    Thanks to Toke Høyland-Jørgensen.
+  * Fixed restoring of interface configuration to avoid unbounded memory
+    consumption.  Thanks to andrew-hoff.
+  * Fixed handling of deny filters in the install chain.
+
+30 March 2022: babeld-1.11
+
+  * Implemented MAC authentication (RFC 8967).  Thanks to Clara Dô,
+    Weronika Kołodziejak and Antonin Décimo.
+  * Changed the interface of the add_filter function in order to simplify
+    integration in OpenWrt.  Thanks to Nick Hainke.
+
+25 April 2021: babeld-1.10
+
+  * Removed the disambiguation code: source-specific routing is no longer
+    supported for IPv4, and for IPv6 only on Linux 3.11 or later.
+  * Fixed an issue handling of retractions with no next hop, which caused
+    interoperability problems with BIRD.  Thanks to Fabian Bläse.
+  * If skip-kernel-setup is set, we no longer disable the rp_filter, which
+    makes babeld work in containers.  Thanks to Martin Weinelt.
+
+21 April 2020: babeld-1.9.2
+
+  * Fixed two issues that could cause IPv4 routes to be represented
+    incorrectly, with a range of confusing symptoms.  Thanks to
+    Fabian Bläse.
+  * Fixed incorrect parsing of TLVs with an unknown Address Encoding.
+    Thanks to Théophile Bastian.
+  * Fixed access to mis-aligned data structure.  Thanks to Antonin Décimo.
+
+20 August 2019: babeld-1.9.1
+
+  * Fixed a crash that could happen when unicast and RTT estimation are
+    both enabled on an interface.  Thanks to Dave Taht.
+  * Fixed compilation under BSD.  Thanks to Dave Taht.
+
+4 August 2019: babeld-1.9.0
+
+  * Reworked buffering of unicast packets to use a per-neighbour buffer
+    rather than a single buffer per interface.  This makes unicast as
+    efficient as multicast, at the cost of slightly higher memory usage.
+  * Added option "unicast" that allows sending most TLVs over unicast.
+    This is necessary for the DTLS extension.
+  * Implemented parsing of unicast Hellos.  This makes it possible to
+    interoperate with neighbours that only speak unicast (e.g. over some
+    kinds of tunnels that only do unicast).
+  * Implemented sending of unscheduled unicast Hellos.  This makes the
+    RTT extension work over unicast too.
+  * Reworked the xroute data structures to use binary search and
+    linear-time comparison.
+  * Don't attempt to modify the rp_filter sysctl if it already has the
+    desired value; this makes it possible to run babeld in an
+    unpriviledged container.  Thanks to Christof Schulze.
+  * Reinstated logging of late hellos.  Thanks to Dave Taht.
+  * Don't send wildcard requests or Hellos to newish nodes.  This makes
+    acquisition of new neighbours slower, but drastically reduces noise at
+    startup.  Thanks to Teco Boot.
+  * Remove an arbitrary limit on the number of interfaces.  Thanks to
+    Christof Schulze.
+  * Removed class E from martian filter.  Thanks to Dave Taht.
+  * Added the ability to set the preferred source address in install filters.
+    Thanks to Killian Lufau.
+  * Fixed a number of read-only buffer overflows.  Thanks to Leo Stefanesco.
+
+22 July 2019: babeld-1.8.5
+
+  * Fixed a bug that caused confustion between learned routes and
+    imported routes (thanks to Fabian Bläse).
+  * Fixed a bug that prevented install filters from being evaluated
+    (thanks to Killian Lufau).
+
+9 November 2018: babeld-1.8.4
+
+  * Fixed a bug that discarded pipelined commands received on the local
+    configuration interface.
+  * Added the per-interface option rfc6126-compatible.
+
+24 September 2018: babeld-1.8.3
+
+  * Fixed a read-only two byte buffer overflow in the packet parser.
+    This is a read-only overflow, and hence most probably not exploitable.
+  * Fixed an issue with creating unreachable routes on recent kernels
+    (4.16 and up).  Thanks to Christof Schulze.
+  * Notice interface changes faster by listening to more netlink events.
+    Thanks to Christof Schulze.
+  * Fixed a local interface issue when an interface has no link-local
+    address.  Thanks to Christof Schulze.
+
+12 May 2018: babeld-1.8.2
+
+  * Fixed a bug that prevented redistribution of IPv4 routes.  Thanks to
+    Niklas Yann Wettengel.
+
+7 April 2018: babeld-1.8.1
+
+  * Implemented parsing of mandatory sub-TLVs and unicast and unscheduled
+    Hellos.  This makes this version comply with RFC 6126bis.  However, we
+    don't send any of these yet, so this version remains compatible with
+    RFC 6126.
+  * Fixed a bug that prevented us from sending requests after we lose
+    a route.  This makes convergence much faster in some cases, at the
+    cost of slightly increased traffic.
+  * Fixed interface addresses on some kinds of point-to-point links.
+  * The keep-unfeasible (-u) option has been removed, this is now the
+    default behaviour.
+
+6 December 2016: babeld-1.8.0
+
+  * Added the ability to reconfigure babeld dynamically from the
+    monitoring interface.  This is an incompatible change.
+  * Changed the configuration language to use an enumerated type instead
+    of the "wired" boolean.  This is an incompatible change.
+  * Setting max-rtt-penalty no longer enables timestamps.  This is an
+    incompatible change.
+  * Added PF_UNIX support to the local interface.  Thanks to Julien Cristau.
+  * Made it possible to have a 0 channel number within the diversity extension,
+    which is consistent with draft-chroboczek-babel-diversity-routing-01.
+  * Fixed a bug (introduced in 1.7.0) that could cause spurious policy
+    rules to be created in the kernel.  Thanks to Matthieu Boutier.
+
+14 February 2016: babeld-1.7.1
+
+  * Fix compilation under musl.  Thanks to Gabriel Kerneis.
+
+3 February 2016: babeld-1.7.0
+
+  * Added the ability to choose the kernel routing table on a per-route
+    basis.  Thanks to Matthieu Boutier.
+  * Refactored the disambiguation code to live above the kernel interface.
+    Thanks to Matthieu Boutier.
+  * Reworked the source table to function in log time.
+  * Optimised the disambiguation code to avoid scanning all routes in
+    non-source-specific networks.  Thanks to Matthieu Boutier.
+  * Modified the triggered updates logic to no longer send multihop
+    requests.  This makes babeld slightly less noisy, at the cost of
+    slightly longer reconvergence after mobility.
+  * Increased the token bucket limits, which some large meshes are
+    starting to hit.
+  * Increased the size of the netlink socket buffer.
+
+1 October 2015: babeld-1.6.3
+
+  * Changed the handling of kernel configuration and added the
+    skip-kernel-setup option.  Thanks to Toke Høiland-Jørgensen.
+  * Added the option "router-id" and removed the flag "-R".  This is an
+    incompatible change.
+
+31 July 2015: babeld-1.6.2
+
+  * Added the ability to specify a router-id explicitly (-R).
+  * Changed router-id computation to use all interfaces, which increases
+    the chances of a stable id.
+  * Changed the format of babel-state to only contain the seqno -- the
+    validation of router-id was useless, and actually harmful when the
+    router-id changed multiple times.
+  * Fixed a bug with native source-specific routing.  Thanks to Matthieu
+    Boutier.
+
+16 June 2015: babeld-1.6.1
+
+  * Fixed a buffer overflow in zone_equal.  This is probably not
+    exploitable, but might cause incorrect routing tables in the presence
+    of source-specific routing.
+  * Added support for defaulting ipv6-subtrees automatically based on the
+    kernel version.
+  * Fixed compilation under musl.
+
+14 April 2015: babeld-1.6.0
+
+  * Added support for source-specific routing.  Thanks to Matthieu Boutier.
+  * Added support for reflecting metrics as kernel priorities.  Thanks to
+    Pierre Pfister.
+  * Worked around a Linux kernel bug with an infinite EAGAIN loop.  Thanks
+    to Dave Taht.
+  * Changed wildcard updates to not set flag 0x40.  Reported by Markus
+    Stenberg.
+  * Made ipv6-subtrees a runtime option.  Thanks to Matthieu Boutier.
+
+4 July 2014: babeld-1.5.1
+
+  * Added support for reading multiple configuration files by specifying
+    the -c command-line flag multiple times.
+  * Be less noisy about unknown TLV types.  Thanks to Baptiste Jonglez.
+
+22 May 2014: babeld-1.5.0
+
+  * Added support for an RTT-based metric -- see the description of
+    "enable-timestamps" in the manual page.  This work was done by
+    Baptiste Jonglez with help from Matthieu Boutier.
+
+15 November 2013: babeld-1.4.3
+
+  * Added random-id option to config file (equivalent to -r).
+  * Fixed parsing of compressed IPv4 updates.  Thanks to Matthieu Boutier.
+  * Fixed formatting of seqno requests with short prefixes.  Thanks to
+    Matthieu Boutier.
+  * Fixed possible DoS on the local interface.  Thanks to Baptiste Jonglez.
+  * Fixed advertising costs higher than INFINITY on the local interface.
+    Thanks to Baptiste Jonglez.
+  * Fixed an assertion failure when an interface configuration is
+    split into multiple config file directives.
+  * Disable atomic route changes on BSD, which are buggy at least under
+    Mac OS X.  Thanks to Grégoire Henry.
+
+19 June 2013: babeld-1.4.2
+
+  * Extensive changes to the configuration parser.  It is now possible
+    to set all command-line options from the configuration file, and
+    to specify default values for interface parameters.
+  * Allow redistributing routes from multiple kernel tables.  Thanks
+    to Toke Høiland-Jørgensen.
+  * Fix some whitespace issues in the configuration parser.
+  * Fix a bug in the configuration parser that could give wrong values
+    to some exotic interface parameters (channel and faraway).
+  * Fix a bug that could cause some extra traffic at shutdown.  Thanks
+    to Matthieu Boutier.
+  * Under Linux, set rp_filter explicitly for all interfaces.  This
+    avoids mysterious routing failures on distributions that set
+    rp_filter by default.  Reported by Baptiste Jonglez.
+
+19 June 2013: babeld-1.3.8
+
+  * Fix a bug in the configuration parser that could give wrong values
+    to some exotic interface parameters (channel and faraway).
+  * Fix a bug that could cause some extra traffic at shutdown.  Thanks
+    to Matthieu Boutier.
+  * Under Linux, set rp_filter explicitly for all interfaces.  This
+    avoids mysterious routing failures on distributions that set
+    rp_filter by default.  Reported by Baptiste Jonglez.
+
+26 May 2013: babeld-1.4.1
+
+  * Fix a bug that would cause the channel list to remain stuck at its
+    initial value when running with -z3.
+
+26 May 2013: babeld-1.3.7
+
+  * Fix a bug that would cause the channel list to remain stuck at its
+    initial value when running with -z3.
+
+3 May 2013: babeld-1.4.0
+
+  * Change the route selection algorithm to used a smoothed metric in
+    addition to the "real" metric.  This reduces the amount of route
+    flapping without any special case hacks.
+  * New flag -r, use a random router-id.  This avoids temporarily
+    unreachable nodes after a reboot when persistent storage is not
+    available.
+  * INCOMPATIBLE CHANGE: the local interface now announces the local
+    hostname, and marks the end of the initial route dump.  (Thanks to
+    Gabriel Kerneis.)
+  * The local interface is now able to accept multiple simultaneous
+    connections.
+  * Detect BATMAN interfaces, don't assume they are wired.
+
+2 May 2013: babeld-1.3.6
+
+  * Work around recent Linux kernels advertising the IPv6 route cache
+    as if it were part of the routing table.  Thanks to Baptiste Jonglez.
+
+12 April 2013: babeld-1.3.5
+
+  * Fix parsing of "channel interfering".  Reported by Gioacchino
+    Mazzurco.
+  * Correctly reset rp_filter to its old value at shutdown.  Thanks to
+    Matthias Schiffer.
+  * Work around a race condition that could cause us to fail to notice
+    an interface's link-local address, and hence mark all neighbours
+    as unreachable.  Reported by Gabriel Kerneis.
+
+8 August 2012: babeld-1.3.4
+
+  * Disable atomic route changes on Linux; this used to cause stuck
+    unreachable routes on non-multipath kernels.
+  * Improve error checking in command-line and configuration parser.
+
+12 July 2012: babeld-1.3.3
+
+  * More fixes to IPv4 support on BSD -- pure meshes are now
+    supported.
+  * Fixed a very rare bug where an unfeasible route could be
+    selected.
+
+30 June 2012: babeld-1.3.2
+
+  * INCOMPATIBLE CHANGE: removed parasitic mode (-P).
+  * Fixes to IPv4 support on BSD.
+  * More reduction to the rate of sending requests.  
+
+11 February 2012: babeld-1.3.1
+
+  * Made the resend logic less aggressive.  This should lead to fewer
+    request messages upon link failure, at the cost of somewhat worse
+    behaviour in the presence of heavy packet loss.
+  * INCOMPATIBLE CHANGE: removed the idle detection functionality (-i).
+    This feature was little used and complicated the code somewhat.
+  * Various internal tweaks to bring babeld closer to the Quagga version.
+
+8 December 2011: babeld-1.3.0
+
+  * Made the route table into a sorted array, and use binary sort for
+    searching for routes.  This makes most route operations O(log n), at
+    a slight cost in memory usage.
+  * Changed the update sending strategy to use buffers large enough for
+    a full update.  This makes the duplicate suppression mechanism
+    effective in large networks, at a small cost in memory usage.
+  * Rate-limit the reaction to wildcard requests.  This avoids an update
+    storm at boot in large networks.
+  * Fixed a bug that prevented usage of the "default" keyword in
+    configuration files.
+
+16 October 2011: babeld-1.2.1
+
+  * Fixed an incorrect assertion that would cause a crash when -w was
+    being used (reported by Thomas McLure).
+
+9 September 2011: babeld 1.2.0
+
+  * Merged the interference-aware branch ("babelz").  Please see the
+    "-z" flag in the manual page.
+  * Fixed a memory leak when expiring resent messages.
+  * Fixed a buffer overflow when parsing MAC addresses (Matthieu Boutier).
+  * Implemented MAC address parsing for BSD (Matthieu Boutier).
+
+27 August 2011: babeld 1.1.4
+
+  * Change the default port number to 6696, as allocated by IANA.
+
+3 August 2011: babeld 1.1.3
+
+  * Implemented an option -u to keep unfeasible routes; this is useful
+    for giving more data to front-end interfaces.
+  * Fixed a number of minor bugs in the front-end interface.
+  * Fixed incorrect handling of interfaces with multiple link-local
+    addresses (thanks to Matthieu Boutier).
+
+27 July 2011: babeld 1.1.2:
+
+  * Changed the strategy used to tweak an installed route in a way that
+    should avoid packet loss (thanks to Dave Taht).
+  * Fixed the handling of duplicate interface definitions in the config
+    file (thanks to Matthieu Boutier).
+
+16 May 2011: babeld 1.1.1:
+
+  * Fixed two bugs in the message parser that could cause IPv4 updates to
+    get lost.
+  * Fixed a bug in the monitoring interface that could cause route ids
+    to change (thanks to Gabriel Kerneis).
+  * INCOMPATIBLE CHANGE: the default wired hello interval is now 4 seconds.
+  * Ported to Bionic libc.
+
+30 January 2011: babeld 1.1.0:
+
+  * INCOMPATIBLE CHANGE: the UDP port number and multicast group have
+    been changed to be the ones allocated by IANA.
+  * Initial port to OpenBSD, by Vincent Gross.
+
+1 October 2010: babeld 1.0.2:
+
+  * Worked around a gcc bug that would cause assertion failures on MIPS.
+
+2 May 2010: babeld 1.0.1:
+
+  * Fixed a bug that could cause input filters to be ignored.
+
+22 April 2010: babeld 1.0:
+
+  * Minor portability fixes.
+
+8 February 2010: babeld 0.98:
+
+  * Implement the ability to prefer Babel routes to external routes
+    according to the kernel priority (-A).
+  * Implement the ability to redistribute "boot" routes when the protocol
+    is explicitly specified on the "redistribute" line.
+  * Allow trailing whitespace in config file.
+
+5 November 2009: babeld 0.97:
+
+  * INCOMPATIBLE CHANGE: rename babel.{conf,log} to babeld.*.
+  * Use getopt for parsing command-line options.
+
+11 August 2009: babeld 0.96
+
+  * Renamed babel to babeld.
+  * Routes are now automatically flushed when an interface goes down or an
+    IPv4 address changes, which avoids desynchronisation between Babel and
+    the kernel.
+
+21 April 2009: babel 0.95
+
+  * Fixed a bug that broke link-quality estimation, and could cause
+    severe instability when we had both good and marginal neighbours.
+  * We now send retractions after a redistributed route is retracted.
+  * Fixed a bug that could cause reliable messages (retractions and
+    router-id switches) to only be sent twice.
+  * We no longer obey a silent time at startup, instead sending a bunch of
+    retractions.  The silent time is inconvenient, but seldom useful.
+  * Updates for routes to self are now sent together with other updates
+    (they used to be sent more frequently).
+  * Fixes the configuration parser to interpret hello-interval as a number
+    of seconds, as specified in the documentation (it used to be interpreted
+    as a number of milliseconds).
+  * INCOMPATIBLE CHANGE: the update interval is now a per-interface value,
+    may be configured manually in the configuraton file, and defaults to
+    4 times the hello interval.  The -u flag is gone.
+
+10 April 2009: babel 0.94
+
+  * Fixed a bug introduced in 0.17 that caused recently retracted routes to
+    remain until the routing table entry was flushed.
+  * Implemented per-interface configuration of parameters such as link
+    cost, hello interval etc.  The command-line flags are now only used to
+    set defaults.
+
+15 March 2009: babel 0.93
+
+  * No longer update seqno periodically, rely on explicit seqno requests.
+
+21 January 2009: babel 0.92
+
+  * Fixed a bug that could cause a crash if an interface was repeatedly
+    brought down and then back up.
+  * Implemented some protection against time stepping when POSIX clocks are
+    not available.
+
+10 November 2008: babel 0.91
+
+  * Maintain buffered updates per-interface, which makes multi-interface
+    nodes significantly less noisy.
+  * Changed the strategy for dealing with unfeasible routes to be slightly
+    more generous while still avoiding loops.
+  * Fixed a bug that would cause multi-hop requests to be spuriously resent.
+  * Made a number of micro-optimisations throughout.
+
+23 October 2008: babel 0.90
+
+  * INCOMPATIBLE CHANGE: all new Babel version 2 protocol, which is both
+    more robust and less chatty than version 1.
+  * Tweaked the strategies for sending triggered updates and unfeasible
+    requests to be more conservative.
+  * Minor optimisations all over the place.
+  * Removed the protocol specification -- the version 2 spec is maintained
+    separately.
+
+18 October 2008: babel 0.17
+
+  * INCOMPATIBLE CHANGE: removed support for ``inherit'' in redistribution.
+  * INCOMPATIBLE CHANGE: a pidfile is now created by default.
+  * Increased the default seqno interval.
+  * Use a fixed kernel priority for routes installed by babel.
+
+29 September 2008: babel 0.16
+
+  * Tweaked cost computation to be slightly slower.
+  * Implemented a local interface for GUIs.
+  * INCOMPATIBLE CHANGE: the -X command-line option is no more.
+
+8 July 2008: babel 0.15
+
+  * Fixed a bug that could break link-quality estimation on yo-yo links.
+  * Protect against duplicate neighbour ids on the same interface.
+  * More tweaks to improve scaling with the number of kernel routes.
+  * Tweaked the default update interval.
+
+1 July 2008: babel 0.14
+
+  * Use POSIX clocks if available to protect against clock stepping.
+  * Made babel use available internal routes straight away when the
+    set of redistributed routes changes.
+  * Lifted the arbitrary limit on the number of kernel routes.
+  * Changed the routing metric used on wireless links to plain ETX.
+  * Bridges are now automatically detected and treated as potential
+    wireless interfaces.
+  * Reduced the default hello interval.
+
+24 May 2008: babel 0.13
+
+  * Removed all arbitrary limits (interfaces, neighbours, routes,
+    xroutes and sources).
+  * Fixed a bug that prevented expiration of stale sources.
+  * Updated the kernel interface to work with recent Linux kernels.
+  * More tweaks to the order in which updates are sent.
+
+7 April 2008: babel 0.12
+
+  * Retractions are now sent multiple times, which should speed up
+    convergence in presence of packet loss.
+  * Optimised the sending of updates to make them smaller.
+  * Don't forward requests multiple times; this should reduce the
+    noise due to requests with no increase in convergence time.
+  * Fixed a bug that could cause a crash when resending requests.
+  * Added some protection against clock stepping.
+
+29 March 2008: babel 0.11
+
+  * Implemented sub-second hello and update intervals.
+  * Fixed a bug that could prevent the best route from being selected
+    for extended periods of time.
+  * Implemented protection against out-of-date requests being sent and
+    forwarded when a node loses its sequence number.
+  * INCOMPATIBLE CHANGE: reduced the cost of wired networks down to 96
+    from 128.
+  * Tweaked the frequency at which a router's seqno increases, to make
+    it more likely that a feasible route will be available when needed.
+  * Implemented garbage collection of old sources.
+  * Implemented coalescing of unicast messages.
+  * Fixed a bug that could cause a crash when a link's MTU changes.
+  * Fixed a bug that could delay noticing that a network is no longer
+    idle when running Babel with the -i flag.
+  * Fixed a bug that could cause incorrect metrics to be advertised
+    when output filtering was used.
+  * Fixed a bug that could cause incorrect link costs to be computed when
+    a neighbour reduces its hello interval.
+  * Fixed some minor issues with the ordering of outgoing messages.
+
+11 March 2008: babel 0.10
+
+  * Implemented the ability to automatically export local addresses (see
+    the ``local'' keyword in redistribute specifications).  This should
+    avoid the need to explicitly specify -X on the command line
+    (Julien Cristau and Juliusz Chroboczek).
+  * INCOMPATIBLE CHANGE: local routes (local interface addresses) are
+    now exported by default.  Specify ``redistribute local deny'' to
+    avoid that.
+  * Babel will now automatically choose a router id if none is
+    specified on the command line.
+  * Automatically adapt to interfaces appearing or disappearing at runtime,
+    as is usually the case when running over tunnels or VPNs.
+  * Changed the link quality computation algorithm to not discard very
+    lossy links.
+  * Multi-hop requests will now be forwarded to an unfeasible successor
+    under some circumstances.
+  * Send multi-hop requests more aggressively.
+  * Send requests for a new seqno upon receiving an unfeasible update
+    if it's better than what we have.
+  * No longer consider the age of routes in route selection.
+  * Added ability to run as a daemon.
+
+14 February 2008: babel 0.9
+
+  * Implemented a proper configuration language to specify input and
+    output filters and redistribution policies.
+  * INCOMPATIBLE CHANGE: the flags -4, -x and -c are no longer supported.
+
+8 February 2008: babel 0.8
+
+  * Babel will now automatically check for interfaces' up/down status,
+    IPv4 address, and optionally for carrier sense.
+  * Implemented the -w option, which disables all optimisations for
+    wired interfaces.
+  * Implemented support for non-default routing tables.
+  * Fixed a bug that could spuriously remove IPv4 routes (thanks to
+    Julien Cristau).
+
+3 January 2008: babel 0.7
+
+  * Implemented support for IPv4.
+  * Fixed sending of unicast requests.
+  * Don't send poison when receiving a request for an unknown route.
+  * Basic filtering infrastructure.
+  * Removed support for broadcast IHU.
+  * Changed the behaviour of -d.
+
+16 October 2007: babel 0.6
+
+  * Implemented resending of unsatisfied requests, with exponential backoff.
+  * Fixed a potential crash in the request handling code.
+  * Send IHUs more aggressively.
+
+9 October 2007: babel 0.5
+
+  * Implemented forwarding of requests and replies.
+  * Fixed a bug that prevented requests from being parsed correctly.
+  * Fixed a bug that prevented IHU intervals from being sent.
+  * Respect reboot_time even after an id change.
+  * Deal with neighbours rebooting and losing their hello seqno when
+    computing link quality.
+
+23 September 2007: babel 0.4
+
+  * Fixed incorrect expiration of old sources.  This could prevent
+    convergence in some cases.
+
+16 September 2007: babel 0.3
+
+  * Fixes to Mac OS X support (Grégoire Henry).
+
+29 August 2007: babel 0.2
+
+  * Made jitter computation depend on how urgent a given message is.
+    This dramatically improves convergence speed, without increasing
+    network load.
+  * Fixed a bug that prevented neighbour associations from being
+    discarded at shutdown.
+
+22 August 2007: babel 0.1
+
+  * Initial public release.

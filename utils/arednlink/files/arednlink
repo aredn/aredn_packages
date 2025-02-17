@@ -1,0 +1,1061 @@
+#!/usr/bin/ucode
+/*
+ * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
+ * Copyright (C) 2025 Tim Wilkinson
+ * See Contributors file for additional contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Additional Terms:
+ *
+ * Additional use restrictions exist on the AREDN® trademark and logo.
+ * See AREDNLicense.txt for more info.
+ *
+ * Attributions to the AREDN® Project must be retained in the source code.
+ * If importing this code into a new or existing project attribution
+ * to the AREDN® project must be added to the source code.
+ *
+ * You must not misrepresent the origin of the material contained within.
+ *
+ * Modified versions must be modified to attribute to the original source
+ * and be marked in reasonable ways as differentiate it from the original
+ * version
+ */
+
+let DEBUG = false;
+
+const VERSION = "0.0.1";
+
+import * as fs from "fs";
+import * as socket from "socket";
+import * as uci from "uci";
+import * as babel from "aredn.babel";
+
+//
+// Events
+//
+const POLLIN                = socket.POLLIN;
+const POLLOUT               = socket.POLLOUT;
+const POLLRDHUP             = socket.POLLRDHUP;
+const POLLTIMER             = 0x10000;
+const NOINTERFACE           = 0x20000;
+const NEWADDRESS            = 0x40000;
+const CLOSECONN             = 0x80000;
+//
+// Commands
+//
+const CMD_VERSION           = ord('V');
+const CMD_UPDATE_HOSTS      = ord('H');
+const CMD_UPDATE_SERVICES   = ord('U');
+const CMD_SYNC              = ord('S');
+const CMD_KEEPALIVE         = ord('K');
+//
+// Poll timers
+//
+const NEIGHBORHOOD_POLL     = 60;
+const IDLE_POLL             = 60 * 60;
+const ROUTE_POLL            = 30;
+//
+// Connection keepalive
+const KEEPALIVE_POLL        = 20;
+const KEEPALIVE_LIMIT       = 3;
+//
+// Gray list timers
+//
+const GRAY_TIMEOUT          = NEIGHBORHOOD_POLL;
+const GRAY_BACKOFF          = 30;
+const GRAY_MAX_SCALE        = 15;
+//
+// TCP configuration
+//
+const CHANNEL_CONN_TIMEOUT  = 10;
+//
+// Communications
+//
+const AREDNLINK_PORT        = 9623;
+const AREDNLINK_MGR         = "/var/run/arednlink.sock";
+//
+// Resources
+//
+const resources = [
+    { name: "hosts",    dir: "/var/run/arednlink/hosts/",       cmd: CMD_UPDATE_HOSTS       },
+    { name: "services", dir: "/var/run/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
+];
+//
+// Default hop count for messages.
+//
+const HOP_DEFAULT           = 64;
+//
+// Set of all connected channels.
+//
+const channels = {};
+//
+// Set of known interfaces
+//
+let interfaces = {};
+//
+// Neighborhood monitor
+//
+let neighborhood = null;
+//
+// Current babel host routes
+//
+let hostroutes = {};
+//
+// Greylist of addresses in timeout
+//
+const graylist = {};
+//
+// Set of isolated interfaces
+//
+const isolated = {};
+//
+// Statistics
+//
+const statistics = {
+    count: {
+        neighbors: 0,
+        routes: 0
+    },
+    incoming: {
+        connection: 0,
+        sync: 0,
+        keepalive: 0,
+        version: 0,
+        hosts: 0,
+        services: 0,
+        invalidhop: 0
+    },
+    outgoing: {
+        connection: 0,
+        sync: 0,
+        keepalive: 0,
+        version: 0,
+        hosts: 0,
+        services: 0
+    },
+    forward: {
+        hosts: 0,
+        services: 0
+    },
+    error: {
+        connection: 0,
+        version: 0,
+        hop: 0,
+        command: 0,
+        resourceself: 0
+    }
+};
+//
+// Our IPv4 address, used for all messages we generate
+//
+const myipv4address = uci.cursor("/etc/config.mesh").get("setup", "globals", "wifi_ip");
+const myipv4iparr = iptoarr(myipv4address);
+
+let channelId = 1;
+let exiting = false;
+const poller = { fn: null, len: -1 };
+
+//
+// Compare two addresses and select the best/highest one.
+//
+function bestAddress(a, b) {
+    if (!a) {
+        return b;
+    }
+    if (!b) {
+        return a;
+    }
+    const aa = iptoarr(a);
+    const ab = iptoarr(b);
+    for (let i = 0; i < 16; i++) {
+        if (aa[i] < ab[i]) {
+            return b;
+        }
+        if (aa[i] > ab[i]) {
+            return a;
+        }
+    }
+    return a;
+}
+
+//
+// Make events human readable
+//
+function eventString(polling) {
+    if (!polling) {
+        return "-";
+    }
+    let s = "";
+    if (polling & POLLIN) {
+        s += "|IN";
+    }
+    if (polling & POLLOUT) {
+        s += "|OUT";
+    }
+    if (polling & POLLRDHUP) {
+        s += "|HUP";
+    }
+    if (polling & POLLTIMER) {
+        s += "|TIMER";
+    }
+    if (polling & NOINTERFACE) {
+        s += "|NOIF";
+    }
+    if (polling & NEWADDRESS) {
+        s += "|NEWADDR";
+    }
+    if (polling & CLOSECONN) {
+        s += "|CLOSE";
+    }
+    return substr(s, 1);
+}
+
+//
+// Determine if this interface is a valid next hop for the command/ip pair.
+//
+function validNextHop(channel, cmd, ipv4address) {
+    if (ipv4address && ipv4address !== myipv4address && (cmd === CMD_SYNC || hostroutes[ipv4address] === channel.interface)) {
+        return true;
+    }
+    return false;
+}
+
+//
+// Calculate time for timer
+//
+function when(timeout) {
+    return clock(true)[0] + timeout;
+}
+
+//
+// Build a message
+//
+function buildMessage(cmd, ipv4addr, hop, payload) {
+    DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
+    payload = payload ?? "";
+    const len =  8 + length(payload); // Length is the entire message including the length itself.
+    const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
+    if (!addr) {
+        DEBUG && print(`buildMessage: bad ip address ${ipv4addr}\n`);
+        return "";
+    }
+    return chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
+}
+
+//
+// Cache useful messages
+//
+const keepaliveMsg = buildMessage(CMD_KEEPALIVE, myipv4address, 1);
+
+//
+// Build a targetted sync message.
+//
+function buildTargettedSyncMessage(target) {
+    DEBUG && print("buildTargettedSyncMessage:");
+    let sync = "";
+    for (let ip in hostroutes) {
+        if (ip !== myipv4address && hostroutes[ip] === target) {
+            const addr = iptoarr(ip);
+            sync += chr(addr[0], addr[1], addr[2], addr[3]);
+            DEBUG && print(` ${ip}`);
+        }
+    }
+    DEBUG && print("\n");
+    return buildMessage(CMD_SYNC, myipv4address, 1, sync);
+}
+
+//
+// Send message to all (most) of our connected channels.
+//
+function sendMsgToAll(msg, from) {
+    let count = 0;
+    const fromiface = from?.interface;
+    for (let id in channels) {
+        const channel = channels[id];
+        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface])) {
+            channel.outgoing += msg;
+            channel.polling |= POLLOUT;
+            count++;
+        }
+    }
+    return count;
+}
+
+//
+// Setup our main socket for incoming connections, and the management socket.
+//
+const main = socket.create(socket.AF_INET6, socket.SOCK_STREAM);
+main.setopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+main.bind({ address: "::", port: AREDNLINK_PORT });                             
+main.listen();
+fs.unlink(AREDNLINK_MGR);
+const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM });
+
+//
+// Process incoming message locally.
+//
+function processMessage(cmd, hop, srcipv4, payload)
+{
+    DEBUG && print(`processMessage: cmd ${chr(cmd)} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
+    switch (cmd) {
+        case CMD_VERSION:
+            statistics.incoming.version++;
+            if (payload != VERSION) {
+                graylist[`${this.interface}/${this.address}`] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
+                this.process(CLOSECONN);
+                statistics.error.version++;
+            }
+            return false;
+        case CMD_KEEPALIVE:
+            statistics.incoming.keepalive++;
+            return false;
+        case CMD_SYNC:
+            // A sync request from a neighbor. Payload contains a list of addresses the neighbor is soliciting data for.
+            // Return false so the request is not forwarded (it should have a hop of 1);
+            statistics.incoming.sync++;
+            const len = length(payload);
+            for (let i = 0; i < len; i += 4) {
+                const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
+                DEBUG && print(`-- syncing ${ip}\n`);
+                for (let r = 0; r < length(resources); r++) {
+                    const res = resources[r];
+                    const data = fs.readfile(`${res.dir}${ip}`);
+                    if (data !== null) {
+                        DEBUG && print(`-- sending ${res.dir}${ip}\n`);
+                        statistics.outgoing[res.name]++;
+                        this.outgoing += buildMessage(res.cmd, ip, HOP_DEFAULT, data);
+                    }
+                }
+            }
+            if (length(this.outgoing)) {
+                this.polling |= POLLOUT;
+            }
+            return false;
+        default:
+            if (srcipv4 == myipv4address) {
+                statistics.error.resourceself++;
+                return false;
+            }
+            for (let r = 0; r < length(resources); r++) {
+                const res = resources[r];
+                if (cmd === res.cmd) {
+                    statistics.incoming[res.name]++;
+                    const path = `${res.dir}${srcipv4}`;
+                    const old = fs.readfile(path);
+                    if (old == payload) {
+                        return false;
+                    }
+                    fs.writefile(path, payload);
+                    return true;
+                }
+            }
+            statistics.error.command++;
+            return true;
+    }
+}
+
+//
+// Process incoming data from another node.
+//
+function processRequest() {
+    DEBUG && print(`processRequest channel ${this}\n`);
+    const data = this.connection.recv();
+    DEBUG && print(`--- data length ${length(data)}\n`);
+    if (!data || !length(data)) {
+        return false;
+    }
+    this.incoming += data;
+    const ilen = length(this.incoming);
+    DEBUG && print(`--- incoming length ${ilen}\n`);
+    // Process the incoming data
+    let i = 0;
+    while (i < ilen) {
+        // Make sure we have enough to read the length
+        if (i + 2 > ilen) {
+            break;
+        }
+        DEBUG && print(`--- header [ ${ord(this.incoming, i+0)}, ${ord(this.incoming, i+1)}, ${ord(this.incoming, i+2)}, ${ord(this.incoming, i+3)}, ${ord(this.incoming, i+4)}, ${ord(this.incoming, i+5)}, ${ord(this.incoming, i+6)}, ${ord(this.incoming, i+7)} ]\n`);
+        const len = 256 * ord(this.incoming, i) + ord(this.incoming, i + 1);
+        DEBUG && print(`--- msg length ${len}\n`);
+        // Then make sure we have enough to read the packet.
+        if (i + len > ilen) {
+            break;
+        }
+        const cmd = ord(this.incoming, i + 2);
+        const hop = ord(this.incoming, i + 3);
+        const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
+        const srcipv4str = arrtoip(srcipv4);
+        const validhop = validNextHop(this, cmd, srcipv4str);
+        if (!validhop) {
+            statistics.incoming.invalidhop++;
+        }
+        DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} validhop ${validhop} ${srcipv4src}\n`);
+        if (validhop) {
+            const payload = substr(this.incoming, i + 8, len - 8);
+            const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
+            if (forward) {
+                if (hop > 1) {
+                    // Build and forward message
+                    const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+                    for (let r = 0; r < length(resources); r++) {
+                        const res = resources[r];
+                        if (cmd === res.cmd) {
+                            statistics.forward[res.name]++;
+                            break;
+                        }
+                    }
+                }
+                else {
+                    statistics.error.hop++;
+                }
+            }
+        }
+        i += len;
+    }
+    if (i >= ilen) {
+        this.incoming = "";
+    }
+    else {
+        this.incoming = substr(this.incoming, i);
+    }
+    return true;
+}
+
+//
+// Process the current channel, potentially consuming or sending traffic on the socket
+// if the event says we can.
+// this: channel
+//
+function channelProcess(event) {
+    DEBUG && print(`channelProcess: id ${this.id} event ${eventString(event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
+    switch (this.state) {
+        case "IDLE":
+        {
+            switch (event) {
+                case NEWADDRESS:
+                    if (bestAddress(this.myaddress, this.address) === this.myaddress) {
+                        this.timer = when(IDLE_POLL);
+                    }
+                    else {
+                        this.state = "NEW";
+                        this.timer = 0;
+                    }
+                    break;
+                case NOINTERFACE:
+                case CLOSECONN:
+                    this.state = "EXIT";
+                    this.timer = 0;
+                    break;
+                case POLLTIMER:
+                default:
+                    this.timer = when(IDLE_POLL);
+                    break;
+            }
+            break;
+        }
+        case "NEW":
+        {
+            switch (event) {
+                case POLLTIMER:
+                    statistics.outgoing.connection++;
+                    DEBUG && print(`Connecting to ${this.address} on ${this.interface}\n`);
+                    this.connection = socket.connect({ interface: this.interface, address: this.address, port: AREDNLINK_PORT }, null, null, CHANNEL_CONN_TIMEOUT * 1000);
+                    DEBUG && print(`Connection: ${this.connection}\n`);
+                    if (!this.connection) {
+                        // Failed to connect
+                        // Timeout address to graylist
+                        statistics.error.connection++;
+                        const key = `${this.interface}/${this.address}`;
+                        const g = graylist[key];
+                        if (g) {
+                            g.scale = min(g.scale * 1.5, GRAY_MAX_SCALE);
+                            g.timer = when(GRAY_TIMEOUT + GRAY_BACKOFF * g.scale);
+                        }
+                        else {
+                            graylist[key] = { timer: when(GRAY_TIMEOUT), scale: 1 };
+                        }
+                        this.state = "EXIT";
+                        this.timer = 0;
+                    }
+                    else {
+                        // No longer gray (in case were were)
+                        delete graylist[`${this.interface}/${this.address}`];
+                        this.state = "CONNECTED";
+                        this.polling = POLLIN|POLLOUT|POLLRDHUP;
+                        this.keepalive = 0;
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
+                        this.incoming = "";
+                        statistics.outgoing.version++;
+                        statistics.outgoing.sync++;
+                        this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+                    }
+                    break;
+                case NEWADDRESS:
+                case NOINTERFACE:
+                case CLOSECONN:
+                default:
+                    this.state = "EXIT";
+                    this.timer = 0;
+                    break;
+            }
+            break;
+        }
+        case "CONNECTED":
+        {
+            switch (event) {
+                case POLLIN:
+                case POLLRDHUP|POLLIN:
+                    if (!call(processRequest, this) && (event & POLLRDHUP)) {
+                        this.polling &= ~POLLIN;
+                    }
+                    this.keepalive = 0;
+                    this.timer = this.keepalivetime;
+                    break;
+                case POLLOUT:
+                case POLLIN|POLLOUT:
+                    const sent = this.connection.send(this.outgoing);
+                    if (sent == length(this.outgoing)) {
+                        this.outgoing = "";
+                        this.polling &= ~POLLOUT;
+                    }
+                    else if (send !== null) {
+                        this.outgoing = substr(this.outgoing, sent);
+                    }
+                    this.keepalivetime = when(KEEPALIVE_POLL);
+                    this.timer = this.keepalivetime;
+                    break;
+                case POLLRDHUP:
+                case POLLRDHUP|POLLOUT:
+                case POLLRDHUP|POLLIN|POLLOUT:
+                    if (this.connection) {
+                        this.connection.close();
+                        this.connection = null;
+                    }
+                    this.polling = 0;
+                    this.incoming = "";
+                    this.outgoing = "";
+                    this.address = null;
+                    this.state = "IDLE";
+                    // Force neighbor update
+                    neighborhood.timer = 0;
+                    this.timer = 0;
+                    break;
+                case POLLTIMER:
+                    this.keepalive++;
+                    if (this.keepalive < KEEPALIVE_LIMIT) {
+                        statistics.outgoing.keepalive++;
+                        this.outgoing += keepaliveMsg;
+                        this.polling |= POLLOUT;
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
+                        break;
+                    }
+                    // Fall through
+                case NEWADDRESS:
+                case NOINTERFACE:
+                case CLOSECONN:
+                default:
+                    this.polling = 0;
+                    this.state = "EXIT";
+                    this.timer = 0;
+                    break;
+            }
+            break;
+        }
+        case "INCOMING":
+        {
+            statistics.incoming.connection++;
+            this.incoming = "";
+            statistics.outgoing.version++;
+            statistics.outgoing.sync++;
+            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+            this.state = "CONNECTED_INCOMING";
+            this.keepalive = 0;
+            this.keepalivetime = when(KEEPALIVE_POLL);
+            this.polling = POLLIN|POLLOUT|POLLRDHUP;
+            // Fall through
+        }
+        case "CONNECTED_INCOMING":
+        {
+            switch (event) {
+                case POLLIN:
+                case POLLRDHUP|POLLIN:
+                    if (!call(processRequest, this) && (event & POLLRDHUP)) {
+                        this.polling &= ~POLLIN;
+                    }
+                    this.keepalive = 0;
+                    this.timer = this.keepalivetime;
+                    break;
+                case POLLOUT:
+                case POLLIN|POLLOUT:
+                    const sent = this.connection.send(this.outgoing);
+                    if (sent == length(this.outgoing)) {
+                        this.outgoing = "";
+                        this.polling &= ~POLLOUT;
+                    }
+                    else if (send !== null) {
+                        this.outgoing = substr(this.outgoing, sent);
+                    }
+                    this.keepalivetime = when(KEEPALIVE_POLL);
+                    this.timer = this.keepalivetime;
+                    break;
+                case POLLTIMER:
+                    this.keepalive++;
+                    if (this.keepalive < KEEPALIVE_LIMIT) {
+                        statistics.outgoing.keepalive++;
+                        this.outgoing += keepaliveMsg;
+                        this.polling |= POLLOUT;
+                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.timer = this.keepalivetime;
+                        break;
+                    }
+                    // Fall through
+                case POLLRDHUP:
+                case POLLRDHUP|POLLOUT:
+                case POLLRDHUP|POLLIN|POLLOUT:
+                    // Force neighbor update
+                    neighborhood.timer = 0;
+                    // Fall through
+                case NEWADDRESS:
+                case CLOSECONN:
+                case NOINTERFACE:
+                default:
+                    this.state = "EXIT";
+                    this.polling = 0;
+                    this.timer = 0;
+                    break;
+            }
+            break;
+        }
+        case "EXIT":
+        default:
+        {
+            this.state = "CLOSED";
+            if (this.connection) {
+                this.connection.close();
+                this.connection = null;
+            }
+            delete channels[this.id];
+            const iface = interfaces[this.interface];
+            if (iface.channel === this) {
+                iface.channel = null;
+            }
+            break;
+        }
+    }
+}
+
+//
+// Create a new channel to manage the socket. The channel may be for an incoming
+// comnnection, or for one we're initiating.
+//
+function createChannel(initialstate, connection, polling, timer, process) {
+    DEBUG && print(`createChannel: state ${initialstate} connection ${connection} polling ${eventString(polling)} timer ${timer}\n`);
+    const channel = {
+        id: channelId++,
+        state: initialstate,
+        connection: connection,
+        polling: polling,
+        timer: timer
+    };
+    if (!process) {
+        process = channelProcess;
+    }
+    channel.process = (event) => call(process, channel, null, event),
+    channels[channel.id] = channel;
+    return channel;
+}
+
+//
+// Commands
+//
+function commandProcess(cmd) {
+    const cv = split(trim(cmd), " ", 2);
+    cv[1] = trim(cv[1]);
+    switch (cv[0]) {
+        case "upload":
+        {
+            const tf = split(cv[1], " ", 2);
+            const type = tf[0];
+            const data = fs.readfile(trim(tf[1]));
+            if (data === null) {
+                return "bad file";
+            }
+            for (let r = 0; r < length(resources); r++) {
+                const res = resources[r];
+                if (res.name === type) {
+                    const path = `${res.dir}${myipv4address}`;
+                    const old = fs.readfile(path);
+                    if (old == data) {
+                        return "ok nochange";
+                    }
+                    fs.writefile(path, data);
+                    const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
+                    statistics.outgoing[res.name] += count;
+                    return old ? "ok updated" : "ok new";
+                }
+            }
+            return "bad name";
+        }
+        case "dump":
+        {
+            const now = when(0);
+            let r = "";
+            for (let i in interfaces) {
+                r += `interface ${i}${interfaces[i].best == interfaces[i].address ? " best" : ""}\n`;
+            }
+            for (let i in isolated) {
+                r += `isolated ${i}\n`;
+            }
+            for (let id in channels) {
+                const c = channels[id];
+                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
+            }
+            for (let k in statistics) {
+                r += `statistics ${k}`;
+                const stat = statistics[k];
+                for (let j in stat) {
+                    r += ` ${j} ${stat[j]}`;
+                }
+                r += "\n";
+            }
+            return r + "ok";
+        }
+        case "isolate":
+            if (length(cv[1])) {
+                isolated[cv[1]] = true;
+                return "ok";
+            }
+            else {
+                return "bad";
+            }
+        case "quit":
+            return "ok quitting";
+        case "debug":
+            DEBUG = cv[1] === "on" ? true : false;
+            return "ok";
+        case "":
+            return null;
+        default:
+            return "bad command";
+    }
+}
+
+//
+// Process manager commands.
+// this: channel
+//
+function managerProcess(event) {
+    switch (this.state) {
+        case "INCOMING":
+            this.connection.send(`AREDNLink ${VERSION}\n`);
+            this.state = "READING";
+            this.polling &= ~POLLOUT;
+            // Fall through
+        case "READING":
+        default:
+        {
+            let close = false;
+            if (event & POLLIN) {
+                const d = this.connection.recv();
+                if (d === "" && (event & POLLRDHUP)) {
+                    close = true;
+                }
+                const cmds = split(d, "\n");
+                for (let i = 0; i < length(cmds) && this.state != "CLOSED"; i++) {
+                    const r = commandProcess(cmds[i]);
+                    if (r) {
+                        this.connection.send(`${r}\n`);
+                        if (r === "ok quitting") {
+                            close = true;
+                        }
+                    }
+                }
+            }
+            else if (event & POLLRDHUP) {
+                close = true;
+            }
+            if (close) {
+                this.state = "CLOSED";
+                this.polling = 0;
+                this.connection.close();
+                delete channels[this.id];
+            }
+            break;
+        }
+    }
+}
+
+//
+// Monitor the neighborhood
+//
+function neighborhoodProcess(event) {
+    DEBUG && print("neighborhoodProcess\n");
+    const ifaces = babel.getInterfaces() || [];
+    const oldinterfaces = interfaces;
+    interfaces = {};
+    for (let i = 0; i < length(ifaces); i++) {
+        const iface = ifaces[i];
+        const name = iface.interface;
+        if (name === "br-nomesh") {
+            // Ignore interfaces which cannot have neighbors
+        }
+        else if (oldinterfaces[name]) {
+            interfaces[name] = oldinterfaces[name];
+            interfaces[name].best = iface.ipv6address;
+            delete oldinterfaces[name];
+        }
+        else {
+            // Found new interface
+            interfaces[name] = { address: iface.ipv6address, best: iface.ipv6address, channel: null };
+        }
+    }
+    for (let name in oldinterfaces) {
+        const iface = oldinterfaces[name];
+        if (iface.channel) {
+            iface.channel.timer = null;
+            iface.channel.process(NOINTERFACE);
+        }
+        // Remove any graylist entries when the interface disappears
+        for (let key in graylist) {
+            if (index(key, name) === 0) {
+                delete graylist[key];
+            }
+        }
+    }
+
+    // Get list of neighbors we might connect to. Only get those neighbors we
+    // have routes to as we ignore traffic from anything unroutable anyway.
+    const neighbors = babel.getRoutableNeighbors() || [];
+    statistics.count.neighbors = length(neighbors);
+    const now = when(0);
+    for (let i = 0; i < length(neighbors); i++) {
+        const n = neighbors[i];
+        const gray = graylist[`${n.interface}/${n.ipv6address}`];
+        if (!gray || gray.timer < now) {
+            interfaces[n.interface].best = bestAddress(interfaces[n.interface].best, n.ipv6address);
+        }
+    }
+    for (let name in interfaces) {
+        const iface = interfaces[name];
+        if (iface.best === iface.address) {
+            // I have become the best, so disconnect. This will happen when a previous best
+            // neighbor is no longer routable (even if they're still online).
+            if (iface.channel && iface.channel.state === "CONNECTED") {
+                iface.channel.process(CLOSECONN);
+            }
+        }
+        else {
+            if (!iface.channel) {
+                const channel = createChannel("IDLE", null, 0, 0, null);
+                channel.interface = name;
+                channel.myaddress = iface.address;
+                iface.channel = channel;
+            }
+            if (iface.channel.state === "IDLE") {
+                iface.channel.address = iface.best;
+                iface.channel.process(NEWADDRESS);
+            }
+        }
+    }
+
+    this.timer = when(NEIGHBORHOOD_POLL);
+}
+
+//
+// Monitor Babel route changes.
+//
+function routeProcess(event) {
+    DEBUG && print("routeProcess\n");
+    const broutes = babel.getHostRoutes();
+
+    statistics.count.routes = length(broutes);
+
+    const oldr = hostroutes;
+    const newr = {};
+    hostroutes = {};
+    for (let i = length(broutes) - 1; i >= 0; i--) {
+        const route = broutes[i];
+        const dst = route.dst;
+        const iface = route.oif;
+        hostroutes[dst] = iface;
+        if (oldr[dst] === iface) {
+            delete oldr[dst];
+        }
+        else {
+            if (oldr[dst]) {
+                delete oldr[dst];
+            }
+            // Build the sync message payloads as we go
+            const addr = iptoarr(dst);
+            if (!newr[iface]) {
+                newr[iface] = "";
+            }
+            newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
+        }
+    }
+
+    DEBUG && printf(`--- current ${hostroutes}\n--- old ${oldr}\n--- new ${newr}\n`);
+
+    // Remove any data we no longer need
+    for (let ip in oldr) {
+        for (let r = 0; r < length(resources); r++) {
+            fs.unlink(`${resources[r].dir}${ip}`);
+        }
+    }
+
+    // Sync our neighbors for information about the new routes
+    for (let id in channels) {
+        const channel = channels[id];
+        const sync = newr[channel.interface];
+        if (sync && (channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING")) {
+            channel.outgoing += buildMessage(CMD_SYNC, myipv4address, 1, sync);
+            channel.polling |= POLLOUT;
+        }
+    }
+
+    this.timer = when(ROUTE_POLL);
+}
+
+//
+// Our main socket process handles incoming requests, accepts them
+// then creates a channel to manage them.
+//
+function mainProcess(event) {
+    if (event & POLLIN) {
+        const address = {};
+        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null, null);
+        channel.interface = address.interface;
+        channel.address = address.address;
+    }
+}
+
+//
+// Our mgr socket profcess handles incoming manage requests, accepts them
+// then creates a channel to handle the incoming manager calls.
+//
+function mgrProcess(event) {
+    if (event & POLLIN) {
+        createChannel("INCOMING", mgr.accept(), POLLIN|POLLOUT|POLLRDHUP, null, managerProcess);
+    }
+}
+
+//
+// Work out what to poll and poll it.
+// NOTE: Because socket.poll takes a list of arguments and not an array, and because there
+// is no fn.apply(...) method, we use 'loadstring' to build our own. We keep it around and
+// only rebuild it when the argument count changes. Maybe I'm missing an easier way to do this?
+//
+function pollWorkers() {
+    const workers = [];
+    let timeout = 24 * 60 * 60; // 1 day
+    const now = when(0);
+    for (let id in channels) {
+        const channel = channels[id];
+        if (channel.timer !== null) {
+            timeout = min(timeout, channel.timer - now);
+        }
+        if (channel.connection && channel.polling) {
+            push(workers, [ channel.connection, channel.polling, channel ]);
+        }
+        else if (channel.timer === null) {
+            print(`ERROR: Worker blocked without timer or active socket: ${channel}\n`);
+        }
+    }
+    if (length(workers) !== poller.len) {
+        poller.len = length(workers);
+        let p = "import * as socket from 'socket';return function(t,w){ return socket.poll(t";
+        for (let count = 0; count < poller.len; count++) {
+            p += `,w[${count}]`;
+        }
+        p += ");}";
+        poller.fn = loadstring(p, { raw_mode: true })();
+    }
+    timeout = max(0, timeout);
+    DEBUG && printf(`POLL timeout ${timeout} workers ${workers}\n`);
+    return poller.fn(1000 * timeout, workers) || [];
+}
+
+//
+// Signals
+//
+signal("SIGINT", _ => exiting = true);
+signal("SIGTERM", _ => exiting = true);
+
+//
+// Create resource directories and empty them.
+//
+for (let r = 0; r < length(resources); r++) {
+    system(`/bin/mkdir -p ${resources[r].dir}`);
+    system(`/bin/rm -f ${resources[r].dir}*`);
+}
+
+//
+// Start connecting
+//
+createChannel("MAIN", main, POLLIN, null, mainProcess);
+createChannel("MGR", mgr, POLLIN, null, mgrProcess);
+createChannel("ROUTES", null, 0, 0, routeProcess);
+neighborhood = createChannel("NEIGHBORHOOD", null, 0, when(10), neighborhoodProcess);
+
+//
+// Command line
+//
+for (let i = 0; i < length(ARGV); i++) {
+    if (ARGV[i] === "-C") {
+        commandProcess(ARGV[i + 1]);
+        i++;
+    }
+    else {
+        print("Bad command line argument: " + ARGV[i]);
+    }
+}
+
+//
+// Run until exit
+//
+while (!exiting) {
+    // Poll for any sockets which we can dispatch
+    const events = pollWorkers();
+    DEBUG && printf("Dispatching %s\n", events);
+    for (let i = 0; i < length(events); i++) {
+        const event = events[i];
+        if (event[1]) {
+            event[2].timer = null;
+            event[2].process(event[1]);
+        }
+    }
+    // Check for expired timers
+    const now = when(0);
+    for (let id in channels) {
+        const channel = channels[id];
+        if (channel.timer !== null && channel.timer <= now) {
+            channel.timer = null;
+            channel.process(POLLTIMER);
+        }
+    }
+}
+
+DEBUG && print("Exiting\n");
+//
+// Tidy up connections on the way out
+//
+main.close();
+for (let id in channels) {
+    if (channels[id].connection) {
+        channels[id].connection.close();
+    }
+}
+mgr.close();

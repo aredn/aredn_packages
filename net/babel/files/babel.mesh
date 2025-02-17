@@ -1,0 +1,16 @@
+config wireless 'wireless'
+        option rxcost '256'
+        option unicast 'true'
+
+config wired 'wired'
+        option rxcost '96'
+        option split_horizon 'true'
+
+config tunnel 'tunnel'
+        option rxcost '206'
+        option rxscale '50'
+        option max_rtt_penalty '150'
+
+config xlink 'xlink'
+        option rxcost '150'
+        option rxscale '50'
