@@ -92,6 +92,13 @@ const resources = [
     { name: "services", dir: "/var/run/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
 ];
 //
+// Signals
+//
+const signals = {
+    hosts: null,
+    services: null
+};
+//
 // Default hop count for messages.
 //
 const HOP_DEFAULT           = 64;
@@ -219,6 +226,17 @@ function eventString(polling) {
         s += "|CLOSE";
     }
     return substr(s, 1);
+}
+
+//
+// Run a signal script (if it exists).
+//
+function runSignal(name) {
+    const script = signals[name];
+    if (!script) {
+        return null;
+    }
+    return system(script, 5000) < 0 ? false : true;
 }
 
 //
@@ -357,6 +375,7 @@ function processMessage(cmd, hop, srcipv4, payload)
                         return false;
                     }
                     fs.writefile(path, payload);
+                    runSignal(res.name);
                     return true;
                 }
             }
@@ -704,10 +723,25 @@ function commandProcess(cmd) {
                     fs.writefile(path, data);
                     const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
                     statistics.outgoing[res.name] += count;
+                    runSignal(res.name);
                     return old ? "ok updated" : "ok new";
                 }
             }
             return "bad name";
+        }
+        case "signal":
+        {
+            const tf = split(cv[1], " ", 2);
+            const type = tf[0];
+            const script = trim(tf[1]);
+            if (type in signals) {
+                signals[type] = null;
+                if (length(script)) {
+                    signals[type] = script;
+                }
+                return "ok";
+            }
+            return "bad signal";
         }
         case "dump":
         {
