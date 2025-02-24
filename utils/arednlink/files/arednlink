@@ -944,10 +944,17 @@ function routeProcess(event) {
     DEBUG && printf(`--- current ${hostroutes}\n--- old ${oldr}\n--- new ${newr}\n`);
 
     // Remove any data we no longer need
+    const sigs = {};
     for (let ip in oldr) {
         for (let r = 0; r < length(resources); r++) {
-            fs.unlink(`${resources[r].dir}${ip}`);
+            if (fs.unlink(`${resources[r].dir}${ip}`)) {
+                sigs[resources[r].name] = true;
+            }
         }
+    }
+    // Call any signals we need to
+    for (let name in sigs) {
+        runSignal(name);
     }
 
     // Sync our neighbors for information about the new routes
