@@ -668,7 +668,7 @@ function channelProcess(event) {
             }
             delete channels[this.id];
             const iface = interfaces[this.interface];
-            if (iface.channel === this) {
+            if (iface && iface.channel === this) {
                 iface.channel = null;
             }
             break;
