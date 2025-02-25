@@ -37,6 +37,9 @@ build_active() {
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
                 echo "redistribute local if ${i} deny" >> ${C}
                 ;;
+            tun*)
+                echo "redistribute local if ${i} deny" >> ${C}
+                ;;
             *)
                 xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
                 if [ "${xlink}" != "" ]; then
