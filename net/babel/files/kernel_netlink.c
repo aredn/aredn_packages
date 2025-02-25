@@ -65,6 +65,10 @@ THE SOFTWARE.
 #define MAX_INTERFACES 1024
 #endif
 
+#ifndef NETLINK_BUF_SIZE
+#define NETLINK_BUF_SIZE (8192 * 8)
+#endif
+
 #define GET_PLEN(p, v4) (v4) ? (p) + 96 : (p)
 #define COPY_ADDR(d, rta, v4)                                           \
     do {                                                                \
@@ -412,7 +416,7 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
     int len;
     int done = 0;
 
-    struct nlmsghdr buf[8192/sizeof(struct nlmsghdr)];
+    struct nlmsghdr buf[NETLINK_BUF_SIZE/sizeof(struct nlmsghdr)];
 
     memset(&nladdr, 0, sizeof(nladdr));
     nladdr.nl_family = AF_NETLINK;
