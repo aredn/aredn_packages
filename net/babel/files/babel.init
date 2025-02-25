@@ -18,7 +18,7 @@ build_active() {
             case $i in
             br-nomesh)
                 ;;
-            wifi*)
+            wlan*)
                 echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} link-quality true" >> ${C}
                 echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
