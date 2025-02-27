@@ -873,9 +873,10 @@ function neighborhoodProcess(event) {
     // Get list of neighbors we might connect to. Only get those neighbors we
     // have routes to as we ignore traffic from anything unroutable anyway.
     const neighbors = babel.getRoutableNeighbors() || [];
-    statistics.count.neighbors = length(neighbors);
+    const nlength = length(neighbors);
+    statistics.count.neighbors = nlength;
     const now = when(0);
-    for (let i = 0; i < length(neighbors); i++) {
+    for (let i = 0; i < nlength; i++) {
         const n = neighbors[i];
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
@@ -905,6 +906,9 @@ function neighborhoodProcess(event) {
         }
     }
 
+    // Run GC now as this has all been very memory expensive
+    gc("collect");
+
     this.timer = when(NEIGHBORHOOD_POLL);
 }
 
@@ -926,11 +930,11 @@ function routeProcess(event) {
         const iface = route.oif;
         hostroutes[dst] = iface;
         if (oldr[dst] === iface) {
-            delete oldr[dst];
+            oldr[dst] = null;
         }
         else {
             if (oldr[dst]) {
-                delete oldr[dst];
+                oldr[dst] = null;
             }
             // Build the sync message payloads as we go
             const addr = iptoarr(dst);
@@ -941,14 +945,14 @@ function routeProcess(event) {
         }
     }
 
-    DEBUG && printf(`--- current ${hostroutes}\n--- old ${oldr}\n--- new ${newr}\n`);
-
     // Remove any data we no longer need
     const sigs = {};
     for (let ip in oldr) {
-        for (let r = 0; r < length(resources); r++) {
-            if (fs.unlink(`${resources[r].dir}${ip}`)) {
-                sigs[resources[r].name] = true;
+        if (oldr[ip]) {
+            for (let r = 0; r < length(resources); r++) {
+                if (fs.unlink(`${resources[r].dir}${ip}`)) {
+                    sigs[resources[r].name] = true;
+                }
             }
         }
     }
@@ -966,6 +970,9 @@ function routeProcess(event) {
             channel.polling |= POLLOUT;
         }
     }
+
+    // Run GC now as this has all been very memory expensive
+    gc("collect");
 
     this.timer = when(ROUTE_POLL);
 }
