@@ -443,7 +443,8 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
             else if (errno == ENOBUFS) {
                 /* Automatically bump the received buffer if it's too small */
                 int rcvsize = 0;
-                int rc = getsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(rcvsize));
+                socklen_t rcvlen = sizeof(rcvsize);
+                int rc = getsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, &rcvlen);
                 if (rc < 0) {
                     perror("netlink_read: failed to read SO_RCVBUF");
                 }
