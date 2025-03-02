@@ -450,7 +450,11 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
                 }
                 else {
                     rcvsize += 512 * 1024;
-                    int rc = setsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(rcvsize));
+#ifdef SO_RCVBUFFORCE
+                    rc = setsockopt(nl->sock, SOL_SOCKET, SO_RCVBUFFORCE, &rcvsize, sizeof(rcvsize));
+#else
+                    rc = setsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(rcvsize));
+#endif
                     if (rc < 0) {
                         perror("netlink_read: failed to set SO_RCVBUF");
                     }
