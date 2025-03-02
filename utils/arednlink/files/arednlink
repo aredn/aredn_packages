@@ -849,7 +849,7 @@ function neighborhoodProcess(event) {
         else if (oldinterfaces[name]) {
             interfaces[name] = oldinterfaces[name];
             interfaces[name].best = iface.ipv6address;
-            delete oldinterfaces[name];
+            oldinterfaces[name] = null;
         }
         else {
             // Found new interface
@@ -858,7 +858,7 @@ function neighborhoodProcess(event) {
     }
     for (let name in oldinterfaces) {
         const iface = oldinterfaces[name];
-        if (iface.channel) {
+        if (iface && iface.channel) {
             iface.channel.timer = null;
             iface.channel.process(NOINTERFACE);
         }
@@ -880,7 +880,11 @@ function neighborhoodProcess(event) {
         const n = neighbors[i];
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
-            interfaces[n.interface].best = bestAddress(interfaces[n.interface].best, n.ipv6address);
+            const iface = interfaces[n.interface];
+            // It's possible to find a neighbor before we find the interface associated with it, so just ignore those this time
+            if (iface) {
+                iface.best = bestAddress(iface.best, n.ipv6address);
+            }
         }
     }
     for (let name in interfaces) {
@@ -1094,6 +1098,7 @@ while (!exiting) {
             channel.process(POLLTIMER);
         }
     }
+    DEBUG && printf("GC count %d\n", gc("count"));
 }
 
 DEBUG && print("Exiting\n");
