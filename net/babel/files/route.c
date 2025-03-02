@@ -495,6 +495,7 @@ install_route(struct babel_route *route)
                       NULL, 0, 0);
     if(rc < 0 && errno != EEXIST) {
         perror("kernel_route(ADD)");
+        fprintf(stderr, "install_route(%s from %s)\n", format_prefix(route->src->prefix, route->src->plen), format_prefix(route->src->src_prefix, route->src->src_plen));
         return;
     }
 
