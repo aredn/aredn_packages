@@ -100,8 +100,13 @@ build_active() {
     echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
 }
 
+cleanup() {
+    rm -f /var/run/babel.sock /var/run/babeld.pid
+}
+
 start_service() {
     build_active
+    cleanup
     procd_open_instance babel
     procd_set_param command /usr/sbin/babeld -c /etc/babel.conf -c ${C}
     procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
