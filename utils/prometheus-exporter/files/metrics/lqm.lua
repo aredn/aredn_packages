@@ -42,8 +42,6 @@ if f then
     f:close()
 
     local props = {
-        "avg_snr",
-        "blocked",
         "distance",
         "exposed",
         "hidden",
@@ -63,7 +61,9 @@ if f then
         "rx_bitrate",
         "tx_bitrate",
         "tx_quality",
-        "user_allow"
+        "user_blocks",
+        "babel_route_count",
+        "babel_metric"
     }
     
     for _, key in ipairs(props)
