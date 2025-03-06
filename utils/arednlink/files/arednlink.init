@@ -9,7 +9,7 @@ start_service() {
     if [ "$(uci get aredn.@supernode[0].enable)" = "1" ]; then
         isolate="isolate br-dtdlink"
     fi
-    procd_set_param command /usr/local/bin/arednlink -C 'upload hosts /etc/arednlink/hosts' -C 'upload services /etc/arednlink/services' -C 'signal hosts /usr/local/bin/name-change' -C "${isolate}"
+    procd_set_param command /usr/local/bin/arednlink -C 'upload hosts /etc/arednlink/hosts' -C 'upload services /etc/arednlink/services' -C "${isolate}"
     procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
     procd_set_param stdout 1
     procd_set_param stderr 1
