@@ -116,6 +116,10 @@ start_service() {
     procd_close_instance
 }
 
+stop_service() {
+    kill -1 $(cat /var/run/babeld.pid)
+}
+
 reload_service() {
     stop
     start
