@@ -56,6 +56,7 @@ if f then
         "ping_quality",
         "ping_success_time",
         "quality",
+        "snr",
         "rev_snr",
         "routable",
         "rx_bitrate",
