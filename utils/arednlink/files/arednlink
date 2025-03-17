@@ -301,7 +301,7 @@ function sendMsgToAll(msg, from) {
     const fromiface = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
-        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface])) {
+        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface] || !from)) {
             channel.outgoing += msg;
             channel.polling |= POLLOUT;
             count++;
