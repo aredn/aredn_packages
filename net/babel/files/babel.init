@@ -66,18 +66,28 @@ build_active() {
         me="$(uci -c /etc/config.mesh get setup.globals.wifi_ip)"
         echo "import-table 21" >> ${C}
         echo "redistribute ip 10.0.0.0/8 allow" >> ${C}
-        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
-        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+        if [ -f /etc/44net.conf ]; then
+            while read line; do
+                echo "redistribute ip ${line} allow" >> ${C}
+            done < /etc/44net.conf
+        fi
         echo "redistribute ip ${me}/32 eq 32 allow" >> ${C}
         echo "out ip ${me}/32 eq 32 allow" >> ${C}
         echo "out ip 10.0.0.0/8 eq 8 allow" >> ${C}
-        echo "out ip 44.0.0.0/9 eq 9 allow" >> ${C}
-        echo "out ip 44.128.0.0/10 eq 10 allow" >> ${C}
+        if [ -f /etc/44net.conf ]; then
+            while read line; do
+                prefix=$(/bin/ipcalc.sh ${line}|grep PREFIX|cut -d= -f2)
+                echo "out ip ${line} eq ${prefix} allow" >> ${C}
+            done < /etc/44net.conf
+        fi
         echo "out if br-dtdlink deny" >> ${C}
     else
         echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
-        echo "redistribute ip 44.0.0.0/9 allow" >> ${C}
-        echo "redistribute ip 44.128.0.0/10 allow" >> ${C}
+        if [ -f /etc/44net.conf ]; then
+            while read line; do
+                echo "redistribute ip ${line} allow" >> ${C}
+            done < /etc/44net.conf
+        fi
     fi
     if [ "$gw" = "1" ]; then
         echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
@@ -91,12 +101,20 @@ build_active() {
     echo "redistribute local if br-lan deny" >> ${C}
     if [ "$sn" = "1" ]; then
         echo "install ip 10.0.0.0/8 eq 8 deny" >> ${C}
-        echo "install ip 44.0.0.0/9 eq 9 deny" >> ${C}
-        echo "install ip 44.128.0.0/10 eq 10 deny" >> ${C}
+        if [ -f /etc/44net.conf ]; then
+            while read line; do
+                prefix=$(/bin/ipcalc.sh ${line}|grep PREFIX|cut -d= -f2)
+                echo "install ip ${line} eq ${prefix} deny" >> ${C}
+            done < /etc/44net.conf
+        fi
     else
         echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
-        echo "install ip 44.0.0.0/9 eq 9 allow table 21" >> ${C}
-        echo "install ip 44.128.0.0/10 eq 10 allow table 21" >> ${C}
+        if [ -f /etc/44net.conf ]; then
+            while read line; do
+                prefix=$(/bin/ipcalc.sh ${line}|grep PREFIX|cut -d= -f2)
+                echo "install ip ${line} eq ${prefix} allow table 21" >> ${C}
+            done < /etc/44net.conf
+        fi
     fi
     echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
 }
