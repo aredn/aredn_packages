@@ -65,10 +65,10 @@ build_active() {
     if [ "$sn" = "1" ]; then
         me="$(uci -c /etc/config.mesh get setup.globals.wifi_ip)"
         echo "import-table 21" >> ${C}
-        echo "redistribute ip 10.0.0.0/8 allow" >> ${C}
+        echo "redistribute ip 10.0.0.0/8 proto 3 allow" >> ${C}
         if [ -f /etc/44net.conf ]; then
             while read line; do
-                echo "redistribute ip ${line} allow" >> ${C}
+                echo "redistribute ip ${line} proto 3 allow" >> ${C}
             done < /etc/44net.conf
         fi
         echo "redistribute ip ${me}/32 eq 32 allow" >> ${C}
