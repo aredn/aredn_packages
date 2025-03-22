@@ -35,6 +35,7 @@ build_active() {
                     cost=$(expr $cost + $scale \* $weight)
                 fi
                 echo "interface ${i} type tunnel" >> ${C}
+                echo "interface ${i} link-quality true" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}

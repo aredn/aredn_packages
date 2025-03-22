@@ -34,6 +34,7 @@ __END__
             fi
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type tunnel
+interface ${DEVICE} link-quality true
 interface ${DEVICE} rxcost ${cost}
 interface ${DEVICE} enable-timestamps true
 interface ${DEVICE} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)
