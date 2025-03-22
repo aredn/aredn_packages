@@ -38,10 +38,10 @@ build_active() {
                 echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
-                echo "redistribute local if ${i} deny" >> ${C}
+                echo "redistribute anyproto if ${i} deny" >> ${C}
                 ;;
             tun*)
-                echo "redistribute local if ${i} deny" >> ${C}
+                echo "redistribute anyproto if ${i} deny" >> ${C}
                 ;;
             *)
                 xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
@@ -55,7 +55,7 @@ build_active() {
                     echo "interface ${i} type auto" >> ${C}
                     echo "interface ${i} link-quality true" >> ${C}
                     echo "interface ${i} rxcost ${cost}" >> ${C}
-                    echo "redistribute local if ${i} deny" >> ${C}
+                    echo "redistribute anyproto if ${i} deny" >> ${C}
                 fi
                 ;;
             esac
@@ -67,19 +67,16 @@ build_active() {
     gw="$(uci get aredn.@wan[0].olsrd_gw)"
 
     # Never redistribute our WAN address
-    echo "redistribute local if br-wan deny" >> ${C}
+    echo "redistribute anyproto if br-wan deny" >> ${C}
 
     if [ "$sn" = "1" ]; then
         # Supernode redistribute a number of default routes; the default 10.X route
-        # as well as a set of 44.X routes. Note that we need 'proto 3' here otherwise
-        # these 'boot' routes wont match the rules. I *think* this is because they
-        # come from table 21 and are installed there as part of the boot process. It is
-        # *not* the same as 'local'.
+        # as well as a set of 44.X routes.
         echo "import-table 21" >> ${C}
-        echo "redistribute ip 10.0.0.0/8 proto 3 allow" >> ${C}
+        echo "redistribute anyproto ip 10.0.0.0/8 allow" >> ${C}
         if [ -f /etc/44net.conf ]; then
             while read line; do
-                echo "redistribute ip ${line} proto 3 allow" >> ${C}
+                echo "redistribute anyproto ip ${line} allow" >> ${C}
             done < /etc/44net.conf
         fi
         # Supernodes do not redistribute everything on their dtdlink, so we only
@@ -95,23 +92,28 @@ build_active() {
         echo "out if br-dtdlink deny" >> ${C}
     else
         # Redistribute any locally originating 10.X and 44.X routes.
-        echo "redistribute ip 10.0.0.0/8 ge 24 allow" >> ${C}
-        echo "redistribute ip 44.0.0.0/8 ge 24 allow" >> ${C}
+        echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
+        echo "redistribute anyproto ip 44.0.0.0/8 ge 24 allow" >> ${C}
     fi
     # If we allow it, let our default route be redistributed so others on
     # the mesh can use it.
     if [ "$gw" = "1" ]; then
-        echo "redistribute ip 0.0.0.0/0 eq 0 allow" >> ${C}
+        echo "redistribute anyproto ip 0.0.0.0/0 eq 0 allow" >> ${C}
     fi
     # Dont redistribute tunnel endpoint addresses.
     if [ "$sn" = "1" ]; then
-        echo "redistribute ip 172.30.0.0/16 eq 32 deny" >> ${C}
+        echo "redistribute anyproto ip 172.30.0.0/16 eq 32 deny" >> ${C}
     else
-        echo "redistribute ip 172.31.0.0/16 eq 32 deny" >> ${C}
+        echo "redistribute anyproto ip 172.31.0.0/16 eq 32 deny" >> ${C}
     fi
+    # Never redistribute any xlink addresses
+    uci -q show network | grep network.xlink.*.ipaddr= | while read xlink; do
+        ip=$(echo ${xlink} | sed "s/^.*='\(.*\)'/\1/")
+        echo "redistribute anyproto ip ${ip} deny" >> ${C}
+    done
     # Dont redistribute the LAN. The lan routes could be NAT addresses
     # and we dont want to redistribute them, rather relying on earlier 10.X rules.
-    echo "redistribute local if br-lan deny" >> ${C}
+    echo "redistribute anyproto if br-lan deny" >> ${C}
 
     # Control where we install incoming routes. If we dont specify a
     # table, and we dont deny, routes are installed in the table 20 (default)
