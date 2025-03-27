@@ -23,7 +23,6 @@ build_active() {
                 ;;
             wlan*)
                 echo "interface ${i} type wireless" >> ${C}
-                echo "interface ${i} link-quality true" >> ${C}
                 echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
                 echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
                 ;;
@@ -35,7 +34,6 @@ build_active() {
                     cost=$(expr $cost + $scale \* $weight)
                 fi
                 echo "interface ${i} type tunnel" >> ${C}
-                echo "interface ${i} link-quality true" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
@@ -54,7 +52,6 @@ build_active() {
                         cost=$(expr $cost + $scale \* $weight)
                     fi
                     echo "interface ${i} type auto" >> ${C}
-                    echo "interface ${i} link-quality true" >> ${C}
                     echo "interface ${i} rxcost ${cost}" >> ${C}
                     echo "redistribute anyproto if ${i} deny" >> ${C}
                 fi

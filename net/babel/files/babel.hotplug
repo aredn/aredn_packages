@@ -14,7 +14,6 @@ __END__
             if [ "${DEVICE}" != "br-nomesh" ]; then
                 socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
-interface ${DEVICE} link-quality true
 interface ${DEVICE} rxcost $(uci get babel.wireless.rxcost)
 interface ${DEVICE} unicast $(uci get babel.wireless.unicast)
 __END__
@@ -34,7 +33,6 @@ __END__
             fi
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type tunnel
-interface ${DEVICE} link-quality true
 interface ${DEVICE} rxcost ${cost}
 interface ${DEVICE} enable-timestamps true
 interface ${DEVICE} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)
@@ -48,7 +46,6 @@ __END__
             fi
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type auto
-interface ${DEVICE} link-quality true
 interface ${DEVICE} rxcost ${cost}
 __END__
         fi
