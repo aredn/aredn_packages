@@ -7,7 +7,16 @@ STOP=20
 C=/var/etc/babel-active.conf
 
 build_active() {
+    # Defaults
     echo "router-id $(uci -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
+    echo "smoothing-half-life $(uci get babel.default.smoothing_half_life)" >> ${C}
+    echo "default rxcost $(uci get babel.default.rxcost)" >> ${C}
+    echo "default hello-interval $(uci get babel.default.hello_interval)" >> ${C}
+    echo "default update-interval $(uci get babel.default.update_interval)" >> ${C}
+    echo "default rtt-decay $(uci get babel.default.rtt_decay)" >> ${C}
+    echo "default rtt-min $(uci get babel.default.rtt_min)" >> ${C}
+    echo "default rtt-max $(uci get babel.default.rtt_max)" >> ${C}
+
     # Always dtdlink so Babel is happy to have one interface
     echo "interface br-dtdlink type wired" >> ${C}
     echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
