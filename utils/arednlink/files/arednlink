@@ -54,6 +54,8 @@ const CLOSECONN             = 0x80000;
 //
 // Commands
 //
+const CMD_FWD_START         = ord('A');
+const CMD_FWD_END           = ord('M');
 const CMD_VERSION           = ord('V');
 const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
@@ -380,7 +382,12 @@ function processMessage(cmd, hop, srcipv4, payload)
                 }
             }
             statistics.error.command++;
-            return true;
+            // Unknown commands in this range are forwarded.
+            if (cmd >= CMD_FWD_START && cmd <= CMD_FWD_END) {
+                return true;
+            }
+            // Otherwise they are not.
+            return false;
     }
 }
 
