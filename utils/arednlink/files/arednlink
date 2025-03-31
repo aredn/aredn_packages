@@ -121,6 +121,10 @@ let neighborhood = null;
 //
 let hostroutes = {};
 //
+// Set of IP addesses traffic received on the wrong interface.
+//
+const wrongaddriface = {};
+//
 // Greylist of addresses in timeout
 //
 const graylist = {};
@@ -245,8 +249,14 @@ function runSignal(name) {
 // Determine if this interface is a valid next hop for the command/ip pair.
 //
 function validNextHop(channel, cmd, ipv4address) {
-    if (ipv4address && ipv4address !== myipv4address && (cmd === CMD_SYNC || hostroutes[ipv4address] === channel.interface)) {
-        return true;
+    if (ipv4address && ipv4address !== myipv4address) {
+        if (cmd === CMD_SYNC) {
+            return true;
+        }
+        if (hostroutes[ipv4address] === channel.interface) {
+            return true;
+        }
+        wrongaddriface[ipv4address] = true;
     }
     return false;
 }
@@ -944,15 +954,28 @@ function routeProcess(event) {
             oldr[dst] = null;
         }
         else {
-            if (oldr[dst]) {
+            let dosync = false;
+            // Sync if this is a new route
+            if (!oldr[dst]) {
+                dosync = true;
+            }
+            // Also sync if this is an old route but on a new intertface, and we're
+            // previously received traffic from this new interface for this route.
+            else {
                 oldr[dst] = null;
+                if (wrongaddriface[dst]) {
+                    delete wrongaddriface[dst];
+                    dosync = true;
+                }
             }
-            // Build the sync message payloads as we go
-            const addr = iptoarr(dst);
-            if (!newr[iface]) {
-                newr[iface] = "";
+            if (dosync) {
+                // Build the sync message payloads as we go
+                const addr = iptoarr(dst);
+                if (!newr[iface]) {
+                    newr[iface] = "";
+                }
+                newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
             }
-            newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
         }
     }
 
