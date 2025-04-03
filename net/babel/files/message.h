@@ -35,11 +35,6 @@ THE SOFTWARE.
 #define MESSAGE_REQUEST 9
 #define MESSAGE_MH_REQUEST 10
 
-#define MESSAGE_MAC 16
-#define MESSAGE_PC 17
-#define MESSAGE_CHALLENGE_REQUEST 18
-#define MESSAGE_CHALLENGE_REPLY 19
-
 /* Protocol extension through sub-TLVs. */
 #define SUBTLV_PAD1 0
 #define SUBTLV_PADN 1
