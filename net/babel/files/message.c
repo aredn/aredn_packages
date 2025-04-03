@@ -887,10 +887,6 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                    format_eui64(message + 8), seqno);
             handle_request(neigh, prefix, plen, src_prefix, src_plen,
                            message[6], seqno, message + 8);
-        } else if(type == MESSAGE_PC ||
-                  type == MESSAGE_CHALLENGE_REQUEST ||
-                  type == MESSAGE_CHALLENGE_REPLY) {
-            /* We're dealing with these in preparse_packet. */
         } else {
             debugf("Received unknown packet type %d from %s on %s.\n",
                    type, format_address(from), ifp->name);
