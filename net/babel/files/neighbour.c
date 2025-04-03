@@ -122,6 +122,8 @@ find_neighbour(const unsigned char *address, struct interface *ifp)
     neigh->buf.sin6.sin6_scope_id = ifp->ifindex;
     neigh->next = neighs;
     neighs = neigh;
+    /* Trigger an update on the interface when we get a new neighbor. We use the hello interval. */
+    set_timeout(&ifp->update_timeout, ifp->hello_interval);
     local_notify_neighbour(neigh, LOCAL_ADD);
     return neigh;
 }
