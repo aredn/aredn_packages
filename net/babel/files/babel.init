@@ -36,11 +36,9 @@ build_active() {
                 echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
                 ;;
             wg*)
-                cost=$(uci -q get babel.tunnel.rxcost)
-                scale=$(uci -q get babel.tunnel.rxscale)
-                weight=$(uci -q get network.${i}.weight)
-                if [ "$weight" != "" ]; then
-                    cost=$(expr $cost + $scale \* $weight)
+                cost=$(uci -q get network.${i}.cost)
+                if [ "$cost" = "" ]; then
+                    cost=$(uci -q get babel.tunnel.rxcost)
                 fi
                 echo "interface ${i} type tunnel" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
@@ -54,11 +52,9 @@ build_active() {
             *)
                 xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
                 if [ "${xlink}" != "" ]; then
-                    cost=$(uci -q get babel.xlink.rxcost)
-                    scale=$(uci -q get babel.xlink.rxscale)
-                    weight=$(uci -q get network.${xlink}.weight)
-                    if [ "$weight" != "" ]; then
-                        cost=$(expr $cost + $scale \* $weight)
+                    cost=$(uci -q get network.${xlink}.cost)
+                    if [ "$cost" = "" ]; then
+                        cost=$(uci -q get babel.xlink.rxcost)
                     fi
                     echo "interface ${i} type auto" >> ${C}
                     echo "interface ${i} rxcost ${cost}" >> ${C}

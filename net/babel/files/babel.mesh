@@ -17,9 +17,7 @@ config wired 'wired'
 
 config tunnel 'tunnel'
         option rxcost '206'
-        option rxscale '100'
         option max_rtt_penalty '150'
 
 config xlink 'xlink'
         option rxcost '150'
-        option rxscale '50'
