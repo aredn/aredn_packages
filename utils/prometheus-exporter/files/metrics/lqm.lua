@@ -43,18 +43,17 @@ if f then
 
     local props = {
         "distance",
-        "exposed",
-        "hidden",
-        "tx",
+        "tx_packets",
         "tx_retries",
         "tx_fail",
-        "avg_tx",
+        "avg_tx_packets",
         "avg_tx_retries",
         "avg_tx_fail",
         "lat",
         "lon",
         "ping_quality",
         "ping_success_time",
+        "lq",
         "quality",
         "snr",
         "rev_snr",
@@ -64,7 +63,9 @@ if f then
         "tx_quality",
         "user_blocks",
         "babel_route_count",
-        "babel_metric"
+        "babel_metric",
+        "rxcost",
+        "txcost"
     }
     
     for _, key in ipairs(props)
