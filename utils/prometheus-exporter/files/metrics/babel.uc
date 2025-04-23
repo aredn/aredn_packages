@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -32,47 +31,37 @@
  * version
  */
 
-import * as fs from "fs";
-import * as log form "log";
-import * as zlib from "zlib";
-import * as uci from "uci";
-import * as configuration from "aredn.configuration";
-import * as hardware from "aredn.hardware";
-import * as radios from "aredn.radios";
-
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
-
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
-}
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
-
--- Find, sort then generate the metrics to be returned
-local metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.lua$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
+const f = fs.popen("/usr/sbin/babel-dump")
+if (f) {
+    let interfaces = 0;
+    let neighbors = 0; 
+    let routes = 0;
+    let xroutes = 0;
+    for (let line = f.read("line"); length(line); line = f.read("line")) {
+        if (match(line, /interface/)) {
+            interfaces++;
+        }
+        else if (match(line, /neighbour/)) {
+            neighbors++;
+        }
+        else if (match(line, /xroute/)) {
+            xroutes++;
+        }
+        else if (match(line, /route/)) {
+            routes++;
         }
     }
+    f.close();
+    print("# HELP node_babel_interface_total\n");
+    print("# HELP node_babel_interface_total counter\n");
+    print("# HELP node_babel_neighbor_total\n");
+    print("# HELP node_babel_neighbor_total counter\n");
+    print("# HELP node_babel_routes_total\n");
+    print("# HELP node_babel_routes_total counter\n");
+    print("# HELP node_babel_xroutes_total\n");
+    print("# HELP node_babel_xroutes_total counter\n");
+    print("node_babel_interface_total ", interfaces, "\n");
+    print("node_babel_neighbor_total ", neighbors, "\n");
+    print("node_babel_xroute_total ", xroutes, "\n");
+    print("node_babel_route_total ", routes, "\n");
 }
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(metrics[i]);
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
-}
-
-// Output all the metrics
-print(gzip ? zlib.deflate(output) : output);
-
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");
