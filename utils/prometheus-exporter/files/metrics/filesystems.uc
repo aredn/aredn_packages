@@ -31,22 +31,28 @@
  * version
  */
 
+import * as fs from "fs";
+
 const f = fs.popen("/bin/df -T");
 if (f) {
-	for (let line = f.read("line"); length(line); line = f.read("line")) {
-		// filesytem type size used available used% mount
-		const m = match(line, /^([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)/);
-		if (m) {
-			const dev = m[1];
-			const mp = m[7];
-			const fstype = m[2];
-			print('# HELP node_filesystem_avail_bytes Filesystem space available in bytes.\n');
-			print('# TYPE node_filesystem_avail_bytes gauge\n');
-			print(`node_filesystem_avail_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[5]}\n`);
-			print('# HELP node_filesystem_size_bytes Filesystem size in bytes.\n');
-			print('# TYPE node_filesystem_size_bytes gauge\n');
-			print(`node_filesystem_size_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[3]}\n`);
-		}
-	}
-	f.close();
+    const done = {};
+    for (let line = f.read("line"); length(line); line = f.read("line")) {
+        // filesytem type size used available used% mount
+        const m = match(line, /^([^ \t]+)[ \t]+([^ \t]+)[ \t]+(\d+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t\n]+)/);
+        if (m) {
+            const dev = m[1];
+            const mp = m[7];
+            const fstype = m[2];
+            if (!done[mp]) {
+                done[mp] = true;
+                print('# HELP node_filesystem_avail_bytes Filesystem space available in bytes.\n');
+                print('# TYPE node_filesystem_avail_bytes gauge\n');
+                print(`node_filesystem_avail_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[5]}\n`);
+                print('# HELP node_filesystem_size_bytes Filesystem size in bytes.\n');
+                print('# TYPE node_filesystem_size_bytes gauge\n');
+                print(`node_filesystem_size_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[3]}\n`);
+            }
+        }
+    }
+    f.close();
 }

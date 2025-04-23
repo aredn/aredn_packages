@@ -31,21 +31,23 @@
  * version
  */
 
+import * as fs from "fs";
+
 const f = fs.popen("/usr/local/bin/arednlink-dump");
 if (f) {
     for (let line = f.read("line"); length(line); line = f.read("line")) {
-		const m = match(trim(line), /^statistics ([^ \t]+) (.+)$/);
+        const m = match(trim(line), /^statistics ([^ \t]+) (.+)$/);
         if (m) {
-			const kind = m[1];
-			const pair = split(m[2], " ");
-			for (let i = 0; i < length(pairs); i += 2) {
-				const k = pairs[i];
-				const v = pairs[i + 1];
+            const kind = m[1];
+            const pairs = split(m[2], " ");
+            for (let i = 0; i < length(pairs); i += 2) {
+                const k = pairs[i];
+                const v = pairs[i + 1];
                 print(`# HELP node_arednlink_${k}_${kind}_total\n`);
                 print(`# TYPE node_arednlink_${k}_${kind}_total counter\n`);
                 print(`node_arednlink_${k}_${kind}_total ${v}\n`);
-			}
-		}
-	}
+            }
+        }
+    }
     f.close();
 }

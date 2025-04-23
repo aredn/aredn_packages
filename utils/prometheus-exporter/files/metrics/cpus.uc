@@ -31,9 +31,10 @@
  * version
  */
 
-function extract_and_print_single_metric_from_string(line, match_pattern, name, type, description)
-{
-    const m = match(line, regexp(match_pattern));
+import * as fs from "fs";
+
+function extract_and_print_single_metric_from_string(line, match_pattern, name, type, description) {
+    const m = match(line, match_pattern);
     if (m) {
         if (description) {
             print(`# HELP ${name} ${description}\n`);
@@ -60,25 +61,26 @@ if (f) {
         // cpunr, user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice
         const m = match(line, /^cpu(\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+)/);
         if (m) {
+            const cpunr = m[1];
             print("# HELP node_cpu Seconds the cpus spent in each mode.\n");
             print("# TYPE node_cpu counter\n");
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="guest"} ${guest / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="guest_nice"} ${guest_nice / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="idle"} ${idle / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="iowait"} ${iowait / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="irq"} ${irq / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="nice"} ${nice / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="softirq"} ${softirq / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="steal"} ${steal / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="system"} ${system / 100}\n`);
-            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="user"} ${user / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="guest"} ${m[10] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="guest_nice"} ${m[11] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="idle"} ${m[5] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="iowait"} ${m[6] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="irq"} ${m[7] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="nice"} ${m[3] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="softirq"} ${m[8] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="steal"} ${m[9] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="system"} ${m[4] / 100}\n`);
+            print(`node_cpu_seconds_total{cpu="${cpunr}",mode="user"} ${m[2] / 100}\n`);
         }
-        extract_and_print_single_metric_from_string(line, "btime (%d+)", "node_boot_time_seconds", "counter", "Node boot time, in unixtime.");
-        extract_and_print_single_metric_from_string(line, "ctxt (%d+)", "node_context_switches_total", "counter", "Total number of context switches.");
-        extract_and_print_single_metric_from_string(line, "intr (%d+)", "node_intr_total", "counter", "Total number of interrupts serviced.");
-        extract_and_print_single_metric_from_string(line, "processes (%d+)", "node_forks_total", "counter");
-        extract_and_print_single_metric_from_string(line, "procs_running  (%d+)", "node_procs_running", "gauge");
-        extract_and_print_single_metric_from_string(line, "procs_blocked (%d+)", "node_procs_blocked", "gauge");
+        extract_and_print_single_metric_from_string(line, /btime (\d+)/, "node_boot_time_seconds", "counter", "Node boot time, in unixtime.");
+        extract_and_print_single_metric_from_string(line, /ctxt (\d+)/, "node_context_switches_total", "counter", "Total number of context switches.");
+        extract_and_print_single_metric_from_string(line, /intr (\d+)/, "node_intr_total", "counter", "Total number of interrupts serviced.");
+        extract_and_print_single_metric_from_string(line, /processes (\d+)/, "node_forks_total", "counter");
+        extract_and_print_single_metric_from_string(line, /procs_running  (\d+)/, "node_procs_running", "gauge");
+        extract_and_print_single_metric_from_string(line, /procs_blocked (\d+)/, "node_procs_blocked", "gauge");
     }
     f.close();
 }

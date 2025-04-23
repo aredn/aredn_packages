@@ -31,9 +31,10 @@
  * version
  */
 
+import * as fs from "fs";
+
 const path = "/sys/class/net/";
-function read_val(p, d)
-{
+function read_val(p, d) {
     const val = fs.readfile(`${path}${p}`);
     if (val !== null) {
         return trim(val);
@@ -42,49 +43,49 @@ function read_val(p, d)
 }
 
 const props = [
-    [ "address_assign_type", "addr_assign_type" ],
-    [ "carrier", "carrier" ],
-    [ "carrier_changes_total", "carrier_changes" ],
-    [ "carrier_down_changes_total", "carrier_down_count" ],
-    [ "carrier_up_changes_total", "carrier_up_count" ],
-    [ "device_id", "/dev_id" ],
-    [ "dormant", "dormant" ],
-    [ "flags", "/flags" ],
-    [ "iface_id", "ifindex" ],
-    [ "iface_link", "iflink" ],
-    [ "iface_link_mode", "link_mode" ],
-    [ "info", function(dev) {
+    ["address_assign_type", "addr_assign_type"],
+    ["carrier", "carrier"],
+    ["carrier_changes_total", "carrier_changes"],
+    ["carrier_down_changes_total", "carrier_down_count"],
+    ["carrier_up_changes_total", "carrier_up_count"],
+    ["device_id", "/dev_id"],
+    ["dormant", "dormant"],
+    ["flags", "/flags"],
+    ["iface_id", "ifindex"],
+    ["iface_link", "iflink"],
+    ["iface_link_mode", "link_mode"],
+    ["info", function (dev) {
         const address = read_val(`${dev}/address`, "");
         const broadcast = read_val(`${dev}/broadcast`, "");
         const duplex = read_val(`${dev}/duplex`, "");
         const ifalias = read_val(`${dev}/ifalias`, "");
         const operstate = read_val(`${dev}/operstate`);
         return `node_network_info{address="${address}",broadcast="${broadcast}",device="${dev}",duplex="${duplex}",ifalias="${ifalias}",operstate="${operstate}"} 1`;
-    } ],
-    [ "mtu_bytes", "mtu" ],
-    [ "name_assign_type", "name_assign_type" ],
-    [ "netdev_group", "netdev_group" ],
-    [ "protocol_type", "type" ],
-    [ "receive_bytes_total", "statistics/rx_bytes" ],
-    [ "receive_compressed_total", "statistics/rx_compressed" ],
-    [ "receive_drop_total", "statistics/rx_dropped" ],
-    [ "receive_errors_total", "statistics/rx_errors" ],
-    [ "receive_fifo_errors_total", "statistics/rx_fifo_errors" ],
-    [ "receive_frame_errors_total", "statistics/rx_frame_errors" ],
-    [ "receive_multicast_total", "statistics/multicast" ],
-    [ "receive_packets_total", "statistics/rx_packets" ],
-    [ "speed_bytes", "speed" ],
-    [ "transmit_bytes_total", "statistics/tx_bytes" ],
-    [ "transmit_carrier_errors_total", "statistics/tx_carrier_errors" ],
-    [ "transmit_collision_errors_total", "statistics/collisions" ],
-    [ "transmit_compressed_total", "statistics/tx_compressed" ],
-    [ "transmit_drop_total", "statistics/tx_dropped" ],
-    [ "transmit_errors_total", "statistics/tx_errors" ],
-    [ "transmit_fifo_errors_total", "statistics/tx_fifo_errors" ],
-    [ "transmit_packets_total", "statistics/tx_packets" ],
-    [ "up", function(dev) {
+    }],
+    ["mtu_bytes", "mtu"],
+    ["name_assign_type", "name_assign_type"],
+    ["netdev_group", "netdev_group"],
+    ["protocol_type", "type"],
+    ["receive_bytes_total", "statistics/rx_bytes"],
+    ["receive_compressed_total", "statistics/rx_compressed"],
+    ["receive_drop_total", "statistics/rx_dropped"],
+    ["receive_errors_total", "statistics/rx_errors"],
+    ["receive_fifo_errors_total", "statistics/rx_fifo_errors"],
+    ["receive_frame_errors_total", "statistics/rx_frame_errors"],
+    ["receive_multicast_total", "statistics/multicast"],
+    ["receive_packets_total", "statistics/rx_packets"],
+    ["speed_bytes", "speed"],
+    ["transmit_bytes_total", "statistics/tx_bytes"],
+    ["transmit_carrier_errors_total", "statistics/tx_carrier_errors"],
+    ["transmit_collision_errors_total", "statistics/collisions"],
+    ["transmit_compressed_total", "statistics/tx_compressed"],
+    ["transmit_drop_total", "statistics/tx_dropped"],
+    ["transmit_errors_total", "statistics/tx_errors"],
+    ["transmit_fifo_errors_total", "statistics/tx_fifo_errors"],
+    ["transmit_packets_total", "statistics/tx_packets"],
+    ["up", function (dev) {
         return `node_network_up{device="${dev}"} ${read_val(dev + "/operstate") == "up" ? 1 : 0}`;
-    } ]
+    }]
 ];
 
 for (let p = 0; p < length(props); p++) {
@@ -94,9 +95,12 @@ for (let p = 0; p < length(props); p++) {
     const d = fs.opendir(path);
     if (d) {
         for (let dev = d.read(); dev; dev = d.read()) {
+            if (dev == "." || dev == "..") {
+                continue;
+            }
             if (type(keys[1]) == "string") {
                 const val = read_val(`${dev}/${keys[1]}`);
-                if (type(val) == "int" || type(val) == "double") {
+                if (val !== null) {
                     print(`node_network_${keys[0]}{device="${dev}"} ${val}\n`);
                 }
             }

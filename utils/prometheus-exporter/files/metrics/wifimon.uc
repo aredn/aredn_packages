@@ -31,6 +31,8 @@
  * version
  */
 
+import * as fs from "fs";
+
 if (!fs.access("/tmp/wireless_monitor.info")) {
     return;
 }

@@ -31,26 +31,40 @@
  * version
  */
 
+import * as fs from "fs";
+import * as uci from "uci";
+import * as radios from "aredn.radios";
+import * as hardware from "aredn.hardware";
+import * as configuration from "aredn.configuration";
 
 const c = uci.cursor();
 
-function tonumber(v)
-{
+function tonumber(v) {
 	if (v == "" || v == null) {
 		return null;
 	}
 	return 1 * v;
 }
 
+function capture(cmd) {
+	const p = fs.popen(cmd);
+	if (p) {
+		const v = p.read("all");
+		p.close();
+		return trim(v);
+	}
+	return null;
+}
+
 print('# HELP node_aredn_info Labeled AREDN node information.\n');
 print('# TYPE node_aredn_info gauge\n');
 
-print(`node_aredn_info{board_id="${hardware.getBoardId()}",description="${configuration.getSettingAsString("description_node", '')}",firmware_version="${onfiguration.getFirmwareVersion()}",gridsquare="${c.get("aredn", "@location[0]", "gridsquare")}",lat="${tonumber(c.get("aredn", "@location[0]", "lat"))}",lon="${tonumber(c.get("aredn", "@location[0]", "lon"))}",model="${capture("/usr/local/bin/get_model")}",node="${configuration.getName()}"} 1\n`);
+print(`node_aredn_info{board_id="${hardware.getBoardId()}",description="${configuration.getSettingAsString("description_node", '')}",firmware_version="${configuration.getFirmwareVersion()}",gridsquare="${c.get("aredn", "@location[0]", "gridsquare")}",lat="${tonumber(c.get("aredn", "@location[0]", "lat"))}",lon="${tonumber(c.get("aredn", "@location[0]", "lon"))}",model="${capture("/usr/local/bin/get_model")}",node="${configuration.getName()}"} 1\n`);
 
 print('# HELP node_aredn_meshrf Labeled AREDN node mesh RF information.\n');
 print('# TYPE node_aredn_meshrf gauge\n');
 
-(function(){
+(function () {
 	const config = radios.getConfiguration();
 	for (let i = 0; i < length(config); i++) {
 		const cfg = config[i];
@@ -61,10 +75,10 @@ print('# TYPE node_aredn_meshrf gauge\n');
 			case radios.RADIO_MESH:
 				rfmode = "adhoc";
 				ssid = `${mode.ssid}-v3-${mode.bandwidth}`;
-				// Fall throught ...
+			// Fall throught ...
 			case radios.RADIO_MESHSTA:
 				rfmode = rfmode || "sta";
-				// Fall throught ...
+			// Fall throught ...
 			case radios.RADIO_MESHPTP:
 			case radios.RADIO_MESHPTMP:
 				rfmode = rfmode || "ap";
@@ -80,4 +94,4 @@ print('# TYPE node_aredn_meshrf gauge\n');
 
 print('# HELP node_uname_info Minimal Labeled system information as provided by the uname system call.\n');
 print('# TYPE node_uname_info gauge\n');
-print(`node_uname_info{nodename="${info.getNodeName() || ''}"} 1\n`);
+print(`node_uname_info{nodename="${configuration.getName() || ''}"} 1\n`);

@@ -31,6 +31,8 @@
  * version
  */
 
+import * as fs from "fs";
+
 const lqm = json(fs.readfile("/tmp/lqm.info"));
 
 const props = [
@@ -66,7 +68,7 @@ for (let i = 0; i < length(props); i++) {
     print(`# TYPE node_lqm_tracker_${key}${match(key, /_total$'/) ? ' counter' : ' gauge'}\n`);
     for (let mac in lqm.trackers) {
         const tracker = lqm.trackers[mac];
-    
+
         if (tracker.lastseen >= lqm.now) {
             const ip = tracker.ip || "";
             const hostname = tracker.hostname || ip;

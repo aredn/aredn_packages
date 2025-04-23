@@ -31,16 +31,18 @@
  * version
  */
 
-const f = fs.open("//proc/meminfo");
+import * as fs from "fs";
+
+const f = fs.open("/proc/meminfo");
 if (f) {
     for (let line = f.read("line"); length(line); line = f.read("line")) {
-		const m = match(trim(line), /^([^ \t]+):[ \t]+(\d+) kB$/);
-		if (m) {
-			const key = replace(m[1], /[()]/, "");
-			const size = int(m[2]) * 1024;
-			print(`# HELP node_memory_${key}_bytes Memory information field ${key}_bytes.\n`);
-			print(`# TYPE node_memory_${key}_bytes gauge\n`);
-			print(`node_memory_${key}_bytes ${size}\n`);
-		}
-	}
+        const m = match(trim(line), /^([^ \t]+):[ \t]+(\d+) kB$/);
+        if (m) {
+            const key = replace(m[1], /[()]/, "");
+            const size = int(m[2]) * 1024;
+            print(`# HELP node_memory_${key}_bytes Memory information field ${key}_bytes.\n`);
+            print(`# TYPE node_memory_${key}_bytes gauge\n`);
+            print(`node_memory_${key}_bytes ${size}\n`);
+        }
+    }
 }

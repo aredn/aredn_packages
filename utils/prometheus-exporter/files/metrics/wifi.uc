@@ -32,6 +32,11 @@
  */
 
 import * as nl80211 from "nl80211";
+import * as hardware from "aredn.hardware";
+
+if (hardware.getRadioCount() == 0) {
+    return;
+}
  
 const wlans = [ "wlan0", "wlan1" ];
 

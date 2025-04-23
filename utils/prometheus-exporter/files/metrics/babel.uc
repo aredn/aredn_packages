@@ -31,10 +31,12 @@
  * version
  */
 
-const f = fs.popen("/usr/sbin/babel-dump")
+import * as fs from "fs";
+
+const f = fs.popen("/usr/sbin/babel-dump");
 if (f) {
     let interfaces = 0;
-    let neighbors = 0; 
+    let neighbors = 0;
     let routes = 0;
     let xroutes = 0;
     for (let line = f.read("line"); length(line); line = f.read("line")) {

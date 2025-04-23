@@ -33,12 +33,8 @@
  */
 
 import * as fs from "fs";
-import * as log form "log";
+import * as log from "log";
 import * as zlib from "zlib";
-import * as uci from "uci";
-import * as configuration from "aredn.configuration";
-import * as hardware from "aredn.hardware";
-import * as radios from "aredn.radios";
 
 const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
 
@@ -50,12 +46,12 @@ if (gzip) {
 print("Access-Control-Allow-Origin: *\r\n");
 print("\r\n");
 
--- Find, sort then generate the metrics to be returned
-local metrics = [];
+// Find, sort then generate the metrics to be returned
+const metrics = [];
 const d = fs.opendir("/usr/local/bin/metrics");
 if (d) {
     for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.lua$/)) {
+        if (match(file, /\.uc$/)) {
             push(metrics, `/usr/local/bin/metrics/${file}`);
         }
     }
@@ -64,7 +60,7 @@ sort(metrics);
 let output = "";
 for (let i = 0; i < length(metrics); i++) {
     try {
-        output += render(metrics[i]);
+        output += render(loadfile(metrics[i], { raw_mode: true }));
     }
     catch (e) {
         log.syslog(log.LOG_ERR, e);
