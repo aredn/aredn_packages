@@ -68,7 +68,7 @@ for (let i = 0; i < length(metrics); i++) {
 }
 
 // Output all the metrics
-print(gzip ? zlib.deflate(output) : output);
+print(gzip ? zlib.deflate(output, true) : output);
 
 // Write a file so we know when this was last done
 fs.writefile("/tmp/metrics-ran", "");
