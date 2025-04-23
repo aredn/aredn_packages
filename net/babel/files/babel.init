@@ -73,6 +73,15 @@ build_active() {
     sn="$(uci get aredn.@supernode[0].enable)"
     gw="$(uci get aredn.@wan[0].olsrd_gw)"
 
+    # If we allow it, let our default route be redistributed so others on
+    # the mesh can use it.
+    if [ "$gw" = "1" ]; then
+        echo "redistribute anyproto ip 0.0.0.0/0 eq 0 allow" >> ${C}
+    fi
+    # Never redistribute our WAN address.
+    # Make sure we do this after we allow redistribution of a default route if that's enabled.
+    echo "redistribute anyproto if br-wan deny" >> ${C}
+
     if [ "$sn" = "1" ]; then
         # Supernode redistribute a number of default routes; the default 10.X route
         # as well as a set of 44.X routes.
@@ -105,11 +114,7 @@ build_active() {
         echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
         echo "redistribute anyproto ip 44.0.0.0/8 ge 24 allow" >> ${C}
     fi
-    # If we allow it, let our default route be redistributed so others on
-    # the mesh can use it.
-    if [ "$gw" = "1" ]; then
-        echo "redistribute anyproto ip 0.0.0.0/0 eq 0 allow" >> ${C}
-    fi
+
     # Dont redistribute tunnel endpoint addresses.
     if [ "$sn" = "1" ]; then
         echo "redistribute anyproto ip 172.30.0.0/16 eq 32 deny" >> ${C}
@@ -122,9 +127,6 @@ build_active() {
         echo "redistribute anyproto ip ${ip} deny" >> ${C}
     done
 
-    # Never redistribute our WAN address.
-    # Make sure we do this after we allow redistribution of a default route if that's enabled.
-    echo "redistribute anyproto if br-wan deny" >> ${C}
     # Dont redistribute the LAN. The lan routes could be NAT addresses
     # and we dont want to redistribute them, rather relying on earlier 10.X rules.
     echo "redistribute anyproto if br-lan deny" >> ${C}
