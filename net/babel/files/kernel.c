@@ -43,7 +43,7 @@ gettime(struct timeval *tv)
     int rc;
     static time_t offset = 0, previous = 0;
 
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 && defined(CLOCK_MONOTONIC)
+//#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 && defined(CLOCK_MONOTONIC)
     static int have_posix_clocks = -1;
 
     if(UNLIKELY(have_posix_clocks < 0)) {
@@ -66,7 +66,7 @@ gettime(struct timeval *tv)
         tv->tv_usec = ts.tv_nsec / 1000;
         return rc;
     }
-#endif
+//#endif
 
     rc = gettimeofday(tv, NULL);
     if(rc < 0)
