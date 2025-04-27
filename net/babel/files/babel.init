@@ -20,6 +20,7 @@ build_active() {
     # Always dtdlink so Babel is happy to have one interface
     echo "interface br-dtdlink type wired" >> ${C}
     echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
+    echo "interface br-dtdlink unicast $(uci get babel.wired.unicast)" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
     # Configure each of the interfaces which are already up as we wont (usually) be dynamically
     # told about them later. If we are informed again later, it's harmless.
