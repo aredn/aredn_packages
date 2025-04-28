@@ -1,7 +1,7 @@
 config default 'default'
         option rxcost '96'
         option hello_interval '10'
-        option update_interval '300'
+        option update_interval '120'
         option smoothing_half_life 10
         option rtt_decay '42'
         option rtt_min '10'
