@@ -1005,7 +1005,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                         (struct sockaddr*)&buf->sin6,
                         sizeof(buf->sin6), probe);
         if(rc < 0)
-            debugf("send: %s\n", strerror(errno));
+            do_debugf(0, "send: %s\n", strerror(errno));
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
     buf->len = 0;
