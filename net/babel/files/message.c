@@ -1772,12 +1772,9 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
     /* If we already have unicast data buffered for this peer, piggyback
        the IHU.  Only do that if RFC 6126 compatibility is disabled, since
        doing that might require sending an unscheduled unicast Hello. */
-    //unicast = !!(ifp->flags & IF_UNICAST) ||
-    //    (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
-    // Force these to be unicast.
-    // The sending code doesnt set the AE_WILDCARD flag but the reception code looks
-    // for it, so it's not clear how multicast version of this can work as is.
-    unicast = 1;
+    unicast = !!(ifp->flags & IF_UNICAST) ||
+        (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
+
 
     if(!!(ifp->flags & IF_TIMESTAMPS) != 0 && neigh->hello_send_us &&
        /* Checks whether the RTT data is not too old to be sent. */
