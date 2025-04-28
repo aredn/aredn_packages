@@ -56,6 +56,7 @@ find_neighbour_nocreate(const unsigned char *address, struct interface *ifp)
 static void
 flush_neighbour(struct neighbour *neigh)
 {
+    do_debugf(0, "Flushing neighbor %s\n", format_address(neigh->address));
     flush_neighbour_routes(neigh);
     flush_resends(neigh);
 
@@ -83,7 +84,7 @@ find_neighbour(const unsigned char *address, struct interface *ifp)
     if(neigh)
         return neigh;
 
-    debugf("Creating neighbour %s on %s.\n",
+    do_debugf(0, "Creating neighbour %s on %s.\n",
            format_address(address), ifp->name);
 
     buf = malloc(ifp->buf.size);
@@ -207,9 +208,9 @@ reset_txcost(struct neighbour *neigh)
     if(delay >= 180000 || (neigh->hello.reach & 0xFFF0) == 0 ||
        (neigh->ihu_interval > 0 &&
         delay >= neigh->ihu_interval * 10 * 10)) {
-        //neigh->txcost = INFINITY;
+        neigh->txcost = INFINITY;
         neigh->ihu_time = now;
-        do_debugf(0, "Supressing resetting txcost to INFINITY\n");
+        do_debugf(0, "Resetting txcost to INFINITY: delay %u reach %u ihu_interval %u\n", delay, (unsigned)neigh->hello.reach, (unsigned)neigh->ihu_interval);
         return 1;
     }
 
