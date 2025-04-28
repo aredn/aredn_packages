@@ -210,7 +210,7 @@ reset_txcost(struct neighbour *neigh)
         delay >= neigh->ihu_interval * 10 * 10)) {
         neigh->txcost = INFINITY;
         neigh->ihu_time = now;
-        do_debugf(0, "Resetting txcost to INFINITY: delay %u reach %u ihu_interval %u\n", delay, (unsigned)neigh->hello.reach, (unsigned)neigh->ihu_interval);
+        do_debugf(0, "Resetting txcost to INFINITY: address %s delay %u reach %u ihu_interval %u\n", format_address(neigh->address), delay, (unsigned)neigh->hello.reach, (unsigned)neigh->ihu_interval);
         return 1;
     }
 

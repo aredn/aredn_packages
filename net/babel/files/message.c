@@ -565,7 +565,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             int rc;
             if(len < 6) goto fail;
             if(!known_ae(message[2])) {
-                debugf("Received IHU with unknown AE %d. Ignoring.\n",
+                do_debugf(0, "Received IHU with unknown AE %d. Ignoring.\n",
                        message[2]);
                 goto done;
             }
@@ -593,6 +593,10 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 if(interval > 0)
                     /* Multiply by 3/2 to allow neighbours to expire. */
                     schedule_neighbours_check(interval * 45, 0);
+            }
+            else {
+                do_debugf(0, "Ignoring IHU with unknown AE %d address %s.\n",
+                    message[2], format_address(address));
             }
         } else if(type == MESSAGE_ROUTER_ID) {
             int rc;
