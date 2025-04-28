@@ -594,10 +594,6 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                     /* Multiply by 3/2 to allow neighbours to expire. */
                     schedule_neighbours_check(interval * 45, 0);
             }
-            else {
-                do_debugf(0, "Ignoring IHU with unknown AE %d address %s.\n",
-                    message[2], format_address(address));
-            }
         } else if(type == MESSAGE_ROUTER_ID) {
             int rc;
             if(len < 10) {
@@ -1776,9 +1772,11 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
     /* If we already have unicast data buffered for this peer, piggyback
        the IHU.  Only do that if RFC 6126 compatibility is disabled, since
        doing that might require sending an unscheduled unicast Hello. */
-    unicast = !!(ifp->flags & IF_UNICAST) ||
-        (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
-
+    //unicast = !!(ifp->flags & IF_UNICAST) ||
+    //    (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
+    // Always unicast because these packets are directed at a specific neighbor and
+    // multicasting them is just pointlessly annoying everyone and forcing them to be ignored.
+    unicast = 1;
 
     if(!!(ifp->flags & IF_TIMESTAMPS) != 0 && neigh->hello_send_us &&
        /* Checks whether the RTT data is not too old to be sent. */
