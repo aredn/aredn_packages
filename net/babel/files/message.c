@@ -1015,6 +1015,13 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                 do_debugf(0, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
+            struct interface *ifp;
+            FOR_ALL_INTERFACES(ifp) {
+                if (if_up(ifp)) {
+                    interface_updown(ifp, 0);
+                    interface_updown(ifp, 1);
+                }
+            }
         }
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
