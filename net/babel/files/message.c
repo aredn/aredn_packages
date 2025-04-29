@@ -24,6 +24,7 @@ THE SOFTWARE.
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1006,6 +1007,15 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                         sizeof(buf->sin6), probe);
         if(rc < 0)
             do_debugf(0, "send: %s\n", strerror(errno));
+        if(rc < 0 && errno == EAGAIN) {
+            close(protocol_socket);
+            sleep(1);
+            protocol_socket = babel_socket(protocol_port);
+            if(protocol_socket < 0) {
+                do_debugf(0, "FATAL: Couldn't create new link local socket\n");
+                exit(1);
+            }
+        }
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
     buf->len = 0;
@@ -1774,8 +1784,10 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
        doing that might require sending an unscheduled unicast Hello. */
     //unicast = !!(ifp->flags & IF_UNICAST) ||
     //    (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
+
     // Always unicast because these packets are directed at a specific neighbor and
-    // multicasting them is just pointlessly annoying everyone and forcing them to be ignored.
+    // multicasting them is just pointlessly annoying everyone and forcing them to be
+    // mostly ignored.
     unicast = 1;
 
     if(!!(ifp->flags & IF_TIMESTAMPS) != 0 && neigh->hello_send_us &&
