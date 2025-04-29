@@ -566,7 +566,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             int rc;
             if(len < 6) goto fail;
             if(!known_ae(message[2])) {
-                do_debugf(0, "Received IHU with unknown AE %d. Ignoring.\n",
+                debugf("Received IHU with unknown AE %d. Ignoring.\n",
                        message[2]);
                 goto done;
             }
@@ -1006,20 +1006,32 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                         (struct sockaddr*)&buf->sin6,
                         sizeof(buf->sin6), probe);
         if(rc < 0)
-            do_debugf(0, "send: %s\n", strerror(errno));
+            debugf("send: %s\n", strerror(errno));
+        // If the socket stops working (the send buffer fills up and doesnt empty) then
+        // all we can do is close it and reopen a new one.
         if(rc < 0 && errno == EAGAIN) {
             close(protocol_socket);
             sleep(1);
+            // Create a new socket
             protocol_socket = babel_socket(protocol_port);
             if(protocol_socket < 0) {
-                do_debugf(0, "FATAL: Couldn't create new link local socket\n");
+                // Let's hope this doesn't happen.
+                fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
+            // Add all up interfaces to the multicast group
             struct interface *ifp;
             FOR_ALL_INTERFACES(ifp) {
                 if (if_up(ifp)) {
-                    interface_updown(ifp, 0);
-                    interface_updown(ifp, 1);
+                    struct ipv6_mreq mreq;
+                    memset(&mreq, 0, sizeof(mreq));
+                    memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
+                    mreq.ipv6mr_interface = ifp->ifindex;
+                    int rc2 = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+                                    (char*)&mreq, sizeof(mreq));
+                    if(rc2 < 0) {
+                        perror("setsockopt(IPV6_JOIN_GROUP)");
+                    }
                 }
             }
         }
