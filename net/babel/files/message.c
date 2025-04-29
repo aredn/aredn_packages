@@ -24,6 +24,7 @@ THE SOFTWARE.
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1006,6 +1007,34 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                         sizeof(buf->sin6), probe);
         if(rc < 0)
             debugf("send: %s\n", strerror(errno));
+        // If the socket stops working (the send buffer fills up and doesnt empty) then
+        // all we can do is close it and reopen a new one.
+        if(rc < 0 && errno == EAGAIN) {
+            close(protocol_socket);
+            sleep(1);
+            // Create a new socket
+            protocol_socket = babel_socket(protocol_port);
+            if(protocol_socket < 0) {
+                // Let's hope this doesn't happen.
+                fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
+                exit(1);
+            }
+            // Add all up interfaces to the multicast group
+            struct interface *ifp;
+            FOR_ALL_INTERFACES(ifp) {
+                if (if_up(ifp)) {
+                    struct ipv6_mreq mreq;
+                    memset(&mreq, 0, sizeof(mreq));
+                    memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
+                    mreq.ipv6mr_interface = ifp->ifindex;
+                    int rc2 = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+                                    (char*)&mreq, sizeof(mreq));
+                    if(rc2 < 0) {
+                        perror("setsockopt(IPV6_JOIN_GROUP)");
+                    }
+                }
+            }
+        }
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
     buf->len = 0;
@@ -1772,9 +1801,11 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
     /* If we already have unicast data buffered for this peer, piggyback
        the IHU.  Only do that if RFC 6126 compatibility is disabled, since
        doing that might require sending an unscheduled unicast Hello. */
-    unicast = !!(ifp->flags & IF_UNICAST) ||
-        (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
+    //unicast = !!(ifp->flags & IF_UNICAST) ||
+    //    (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
 
+    // Always unicast; otherwise we just multicast traffic which is mostly dropped.
+    unicast = 1;
 
     if(!!(ifp->flags & IF_TIMESTAMPS) != 0 && neigh->hello_send_us &&
        /* Checks whether the RTT data is not too old to be sent. */
