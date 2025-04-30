@@ -1267,6 +1267,8 @@ filter_match(struct filter *f, const unsigned char *id,
             return -12;
     }
     if(f->ifname) {
+        if(!f->ifindex)
+            f->ifindex = if_nametoindex(f->ifname);
         if(!f->ifindex)         /* no such interface */
             return -13;
         if(!ifindex || f->ifindex != ifindex)
