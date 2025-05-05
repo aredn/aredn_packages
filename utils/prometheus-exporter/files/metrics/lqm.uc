@@ -37,9 +37,9 @@ const lqm = json(fs.readfile("/tmp/lqm.info"));
 
 const props = [
     "distance",
-    "tx_packets",
-    "tx_retries",
-    "tx_fail",
+    "tx_packets_total",
+    "tx_retries_total",
+    "tx_fail_total",
     "avg_tx_packets",
     "avg_tx_retries",
     "avg_tx_fail",
@@ -50,6 +50,7 @@ const props = [
     "lq",
     "quality",
     "snr",
+    "mode",
     "rev_snr",
     "routable",
     "rx_bitrate",
@@ -64,8 +65,9 @@ const props = [
 
 for (let i = 0; i < length(props); i++) {
     const key = props[i];
+    const tkey = replace(key, /_total$/, "");
     print(`# HELP node_lqm_tracker_${key}\n`);
-    print(`# TYPE node_lqm_tracker_${key}${match(key, /_total$'/) ? ' counter' : ' gauge'}\n`);
+    print(`# TYPE node_lqm_tracker_${key}${key != tkey ? ' counter' : ' gauge'}\n`);
     for (let mac in lqm.trackers) {
         const tracker = lqm.trackers[mac];
 
@@ -73,7 +75,7 @@ for (let i = 0; i < length(props); i++) {
             const ip = tracker.ip || "";
             const hostname = tracker.hostname || ip;
             const ltype = tracker.type || "unknown";
-            let val = tracker[key];
+            let val = tracker[tkey];
             if (val != null) {
                 if (type(val) == "bool") {
                     val = val ? 1 : 0;
