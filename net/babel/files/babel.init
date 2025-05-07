@@ -123,9 +123,15 @@ build_active() {
         ip=$(echo ${xlink} | sed "s/^.*='\(.*\)'/\1/")
         echo "redistribute anyproto ip ${ip} deny" >> ${C}
     done
+
     # Dont redistribute the LAN. The lan routes could be NAT addresses
     # and we dont want to redistribute them, rather relying on earlier 10.X rules.
     echo "redistribute anyproto if br-lan deny" >> ${C}
+    # Finally, make sure nothing else is accidentally redistributed.
+    # Note that if the br-wan interface is assigned an address from dhcp during boot, this address
+    # get's redistributed without this rule in place. Not sure the the br-wan rule doesn't take care
+    # of it, as it does when it's not assigned during bootup.
+    echo "redistribute deny" >> ${C}
 
     # Control where we install incoming routes. If we dont specify a
     # table, and we dont deny, routes are installed in the table 20 (default)
