@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -33,42 +32,56 @@
  */
 
 import * as fs from "fs";
-import * as log from "log";
-import * as zlib from "zlib";
 
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
+const lqm = json(fs.readfile("/tmp/lqm.info"));
 
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
-}
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
+const props = [
+    "distance",
+    "tx_packets_total",
+    "tx_retries_total",
+    "tx_fail_total",
+    "avg_tx_packets",
+    "avg_tx_retries",
+    "avg_tx_fail",
+    "lat",
+    "lon",
+    "ping_quality",
+    "ping_success_time",
+    "lq",
+    "quality",
+    "snr",
+    "mode",
+    "rev_snr",
+    "routable",
+    "rx_bitrate",
+    "tx_bitrate",
+    "tx_quality",
+    "user_blocks",
+    "babel_route_count",
+    "babel_metric",
+    "rxcost",
+    "txcost"
+];
 
-// Find, sort then generate the metrics to be returned
-const metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.uc$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
+for (let i = 0; i < length(props); i++) {
+    const key = props[i];
+    const tkey = replace(key, /_total$/, "");
+    print(`# HELP node_lqm_tracker_${key}\n`);
+    print(`# TYPE node_lqm_tracker_${key}${key != tkey ? ' counter' : ' gauge'}\n`);
+    for (let mac in lqm.trackers) {
+        const tracker = lqm.trackers[mac];
+
+        if (tracker.lastseen >= lqm.now) {
+            const ip = tracker.ip || "";
+            const hostname = tracker.hostname || ip;
+            const ltype = tracker.type || "unknown";
+            let val = tracker[tkey];
+            if (val != null) {
+                if (type(val) == "bool") {
+                    val = val ? 1 : 0;
+                }
+                print(`node_lqm_tracker_${key}{type="${ltype}",hostname="${hostname}",ip="${ip}",mac="${mac}"} ${val}\n`);
+            }
         }
     }
 }
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(loadfile(metrics[i], { raw_mode: true }));
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
-}
-
-// Output all the metrics
-print(gzip ? zlib.deflate(output, true) : output);
-
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");

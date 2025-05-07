@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -33,42 +32,32 @@
  */
 
 import * as fs from "fs";
-import * as log from "log";
-import * as zlib from "zlib";
 
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
-
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
+if (!fs.access("/tmp/wireless_monitor.info")) {
+    return;
 }
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
+const info = json(fs.readfile("/tmp/wireless_monitor.info"));
 
-// Find, sort then generate the metrics to be returned
-const metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.uc$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
-        }
-    }
-}
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(loadfile(metrics[i], { raw_mode: true }));
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
+print('# HELP node_wifimon_action\n');
+print('# TYPE node_wifimon_action gauge\n');
+for (let k in info.action_state) {
+    print(`node_wifimon_action{action="${k}"} ${info.action_state[k] ? 1 : 0}\n`);
 }
 
-// Output all the metrics
-print(gzip ? zlib.deflate(output, true) : output);
+print('# HELP node_wifimon_stations\n');
+print('# TYPE node_wifimon_stations gauge\n');
+print('node_wifimon_stations ', length(info.unresponsive.stations), '\n');
 
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");
+print('# HELP node_wifimon_unresponsive_station\n');
+print('# TYPE node_wifimon_unresponsive_station gauge\n');
+let c = 0;
+for (let ip in info.unresponsive.stations) {
+    const v = info.unresponsive.stations[ip];
+    if (v >= 1) {
+        c++;
+    }
+    print(`node_wifimon_unresponsive_station{remote_ip="${ip}"} ${v}\n`);
+}
+print('# HELP node_wifimon_unresponsive_stations\n');
+print('# TYPE node_wifimon_unresponsive_stations gauge\n');
+print(`node_wifimon_unresponsive_stations ${c}\n`);

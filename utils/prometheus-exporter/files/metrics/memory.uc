@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -33,42 +32,17 @@
  */
 
 import * as fs from "fs";
-import * as log from "log";
-import * as zlib from "zlib";
 
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
-
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
-}
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
-
-// Find, sort then generate the metrics to be returned
-const metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.uc$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
+const f = fs.open("/proc/meminfo");
+if (f) {
+    for (let line = f.read("line"); length(line); line = f.read("line")) {
+        const m = match(trim(line), /^([^ \t]+):[ \t]+(\d+) kB$/);
+        if (m) {
+            const key = replace(m[1], /[()]/, "");
+            const size = int(m[2]) * 1024;
+            print(`# HELP node_memory_${key}_bytes Memory information field ${key}_bytes.\n`);
+            print(`# TYPE node_memory_${key}_bytes gauge\n`);
+            print(`node_memory_${key}_bytes ${size}\n`);
         }
     }
 }
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(loadfile(metrics[i], { raw_mode: true }));
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
-}
-
-// Output all the metrics
-print(gzip ? zlib.deflate(output, true) : output);
-
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");

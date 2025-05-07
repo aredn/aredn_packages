@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -33,42 +32,27 @@
  */
 
 import * as fs from "fs";
-import * as log from "log";
-import * as zlib from "zlib";
 
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
-
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
-}
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
-
-// Find, sort then generate the metrics to be returned
-const metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.uc$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
+const f = fs.popen("/bin/df -T");
+if (f) {
+    const done = {};
+    for (let line = f.read("line"); length(line); line = f.read("line")) {
+        // filesytem type size used available used% mount
+        const m = match(line, /^([^ \t]+)[ \t]+([^ \t]+)[ \t]+(\d+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t\n]+)/);
+        if (m) {
+            const dev = m[1];
+            const mp = m[7];
+            const fstype = m[2];
+            if (!done[mp]) {
+                done[mp] = true;
+                print('# HELP node_filesystem_avail_bytes Filesystem space available in bytes.\n');
+                print('# TYPE node_filesystem_avail_bytes gauge\n');
+                print(`node_filesystem_avail_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[5]}\n`);
+                print('# HELP node_filesystem_size_bytes Filesystem size in bytes.\n');
+                print('# TYPE node_filesystem_size_bytes gauge\n');
+                print(`node_filesystem_size_bytes{device="${dev}",fstype="${fstype}",mountpoint="${mp}"} ${1024 * m[3]}\n`);
+            }
         }
     }
+    f.close();
 }
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(loadfile(metrics[i], { raw_mode: true }));
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
-}
-
-// Output all the metrics
-print(gzip ? zlib.deflate(output, true) : output);
-
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");

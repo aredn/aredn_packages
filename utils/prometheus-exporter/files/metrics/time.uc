@@ -1,4 +1,3 @@
-#!/usr/bin/ucode
 /*
  * Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
  * Copyright (C) 2023-2025 Tim Wilkinson
@@ -32,43 +31,6 @@
  * version
  */
 
-import * as fs from "fs";
-import * as log from "log";
-import * as zlib from "zlib";
-
-const gzip = !!match(getenv("HTTP_ACCEPT_ENCODING") || "", /gzip/);
-
-print("Content-type: text/plain; version=0.0.4\r\n");
-print("Cache-Control: no-store\r\n");
-if (gzip) {
-    print("Content-Encoding: gzip\r\n");
-}
-print("Access-Control-Allow-Origin: *\r\n");
-print("\r\n");
-
-// Find, sort then generate the metrics to be returned
-const metrics = [];
-const d = fs.opendir("/usr/local/bin/metrics");
-if (d) {
-    for (let file = d.read(); file; file = d.read()) {
-        if (match(file, /\.uc$/)) {
-            push(metrics, `/usr/local/bin/metrics/${file}`);
-        }
-    }
-}
-sort(metrics);
-let output = "";
-for (let i = 0; i < length(metrics); i++) {
-    try {
-        output += render(loadfile(metrics[i], { raw_mode: true }));
-    }
-    catch (e) {
-        log.syslog(log.LOG_ERR, e);
-    }
-}
-
-// Output all the metrics
-print(gzip ? zlib.deflate(output, true) : output);
-
-// Write a file so we know when this was last done
-fs.writefile("/tmp/metrics-ran", "");
+print("# HELP node_time_seconds System time in seconds since epoch (1970).\n");
+print("# TYPE node_time_seconds gauge\n");
+print("node_time_seconds ", clock()[0], "\n");

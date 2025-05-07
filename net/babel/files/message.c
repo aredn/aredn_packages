@@ -1804,7 +1804,9 @@ send_ihu(struct neighbour *neigh, struct interface *ifp)
     //unicast = !!(ifp->flags & IF_UNICAST) ||
     //    (neigh->buf.len > 0 && !(ifp->flags & IF_RFC6126));
 
-    // Always unicast; otherwise we just multicast traffic which is mostly dropped.
+    // Always unicast because these packets are directed at a specific neighbor and
+    // multicasting them is just pointlessly annoying everyone and forcing them to be
+    // mostly ignored.
     unicast = 1;
 
     if(!!(ifp->flags & IF_TIMESTAMPS) != 0 && neigh->hello_send_us &&
