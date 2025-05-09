@@ -74,7 +74,7 @@ print('# TYPE node_aredn_meshrf gauge\n');
 		switch (mode.mode) {
 			case radios.RADIO_MESH:
 				rfmode = "adhoc";
-				ssid = `${mode.ssid}-v3-${mode.bandwidth}`;
+				ssid = `${mode.ssid}-${mode.bandwidth}-v3`;
 			// Fall throught ...
 			case radios.RADIO_MESHSTA:
 				rfmode = rfmode || "sta";
@@ -82,8 +82,8 @@ print('# TYPE node_aredn_meshrf gauge\n');
 			case radios.RADIO_MESHPTP:
 			case radios.RADIO_MESHPTMP:
 				rfmode = rfmode || "ap";
-				ssid = ssid || `${mode.ssid}-v3-${mode.channel}-${mode.bandwidth}`;
-				print(`node_aredn_meshrf{channel="${mode.channel}",chanbw="${mode.bandwidth}",device="${config[i].iface}",frequency="${hardware.getChannelFrequency(config[i].iface, mode.channel)}",ssid="${ssid}"} 1\n`);
+				ssid = ssid || `${mode.ssid}-${mode.channel}-${mode.bandwidth}-v3`;
+				print(`node_aredn_meshrf{channel="${mode.channel}",mode="${rfmode}",chanbw="${mode.bandwidth}",device="${config[i].iface}",frequency="${hardware.getChannelFrequency(config[i].iface, mode.channel)}",ssid="${ssid}"} 1\n`);
 				return;
 			default:
 				break;
