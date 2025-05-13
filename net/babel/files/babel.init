@@ -22,48 +22,45 @@ build_active() {
     echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
     echo "interface br-dtdlink unicast $(uci get babel.wired.unicast)" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
-    # Configure each of the interfaces which are already up as we wont (usually) be dynamically
+    # Configure each of the interfaces which are already have as we wont (usually) be dynamically
     # told about them later. If we are informed again later, it's harmless.
     for p in /sys/class/net/*
     do
-        if [ "$(cat ${p}/operstate)" != "down" ]; then
-            i=$(basename $p)
-            case $i in
-            br-nomesh)
-                ;;
-            wlan*)
-                echo "interface ${i} type wireless" >> ${C}
-                echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
-                echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
-                ;;
-            wg*)
-                cost=$(uci -q get network.${i}.cost)
+        i=$(basename $p)
+        case $i in
+        br-*|lo|tunl0|eth*|br0.2|br0.3)
+            ;;
+        wlan*)
+            echo "interface ${i} type wireless" >> ${C}
+            echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
+            echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
+            ;;
+        wg*)
+            cost=$(uci -q get network.${i}.cost)
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.tunnel.rxcost)
+            fi
+            echo "interface ${i} type tunnel" >> ${C}
+            echo "interface ${i} rxcost ${cost}" >> ${C}
+            echo "interface ${i} enable-timestamps true" >> ${C}
+            echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
+            echo "redistribute anyproto if ${i} deny" >> ${C}
+            ;;
+        br0.*)
+            xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
+            if [ "${xlink}" != "" ]; then
+                cost=$(uci -q get network.${xlink}.cost)
                 if [ "$cost" = "" ]; then
-                    cost=$(uci -q get babel.tunnel.rxcost)
+                    cost=$(uci -q get babel.xlink.rxcost)
                 fi
-                echo "interface ${i} type tunnel" >> ${C}
+                echo "interface ${i} type auto" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
-                echo "interface ${i} enable-timestamps true" >> ${C}
-                echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
                 echo "redistribute anyproto if ${i} deny" >> ${C}
-                ;;
-            tun*)
-                echo "redistribute anyproto if ${i} deny" >> ${C}
-                ;;
-            *)
-                xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
-                if [ "${xlink}" != "" ]; then
-                    cost=$(uci -q get network.${xlink}.cost)
-                    if [ "$cost" = "" ]; then
-                        cost=$(uci -q get babel.xlink.rxcost)
-                    fi
-                    echo "interface ${i} type auto" >> ${C}
-                    echo "interface ${i} rxcost ${cost}" >> ${C}
-                    echo "redistribute anyproto if ${i} deny" >> ${C}
-                fi
-                ;;
-            esac
-        fi
+            fi
+            ;;
+        *)
+            ;;
+        esac
     done
 
     # Limit what we redistribute
