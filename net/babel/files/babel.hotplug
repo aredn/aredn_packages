@@ -18,13 +18,6 @@ interface ${DEVICE} rxcost $(uci get babel.wireless.rxcost)
 interface ${DEVICE} unicast $(uci get babel.wireless.unicast)
 __END__
             fi
-        elif [ "${INTERFACE}" == "dtdlink" ] ; then
-            socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
-interface ${DEVICE} type wired
-interface ${DEVICE} rxcost $(uci get babel.wired.rxcost)
-interface ${DEVICE} unicast $(uci get babel.wired.unicast)
-interface ${DEVICE} split-horizon $(uci get babel.wired.split_horizon)
-__END__
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
             cost=$(uci -q get network.${INTERFACE}.cost)
             if [ "$cost" = "" ]; then

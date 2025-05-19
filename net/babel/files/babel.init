@@ -21,7 +21,7 @@ build_active() {
     echo "interface br-dtdlink type wired" >> ${C}
     echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
-    # Configure each of the interfaces which are already up as we wont (usually) be dynamically
+    # Configure each of the interfaces which are already have as we wont (usually) be dynamically
     # told about them later. If we are informed again later, it's harmless.
     for p in /sys/class/net/*
     do
@@ -57,12 +57,10 @@ build_active() {
             if [ "${xlink}" != "" ]; then
                 cost=$(uci -q get network.${xlink}.cost)
                 if [ "$cost" = "" ]; then
-                    cost=$(uci -q get babel.tunnel.rxcost)
+                    cost=$(uci -q get babel.xlink.rxcost)
                 fi
-                echo "interface ${i} type tunnel" >> ${C}
+                echo "interface ${i} type auto" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
-                echo "interface ${i} enable-timestamps true" >> ${C}
-                echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
                 echo "redistribute anyproto if ${i} deny" >> ${C}
             fi
             ;;
