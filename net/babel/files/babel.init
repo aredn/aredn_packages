@@ -31,9 +31,16 @@ build_active() {
             br-nomesh)
                 ;;
             wlan*)
-                echo "interface ${i} type wireless" >> ${C}
-                echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
-                echo "interface ${i} unicast $(uci get babel.wireless.unicast)" >> ${C}
+                radio=$(echo ${i} | sed s/wlan/radio/)
+                case "$(uci -q -c /etc/config.mesh get setup.globals.${radio}_mode)" in
+                    lan|wan|off)
+                        echo "redistribute anyproto if ${i} deny" >> ${C}
+                        ;;
+                    *)
+                        echo "interface ${i} type wireless" >> ${C}
+                        echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
+                        ;;
+                esac
                 ;;
             wg*)
                 cost=$(uci -q get babel.tunnel.rxcost)
