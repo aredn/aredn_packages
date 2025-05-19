@@ -9,12 +9,10 @@ config default 'default'
 
 config wireless 'wireless'
         option rxcost '256'
-        option unicast 'true'
 
 config wired 'wired'
         option rxcost '96'
         option split_horizon 'true'
-        option unicast 'false'
 
 config tunnel 'tunnel'
         option rxcost '206'
