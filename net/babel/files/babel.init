@@ -13,6 +13,7 @@ build_active() {
     echo "default rxcost $(uci get babel.default.rxcost)" >> ${C}
     echo "default hello-interval $(uci get babel.default.hello_interval)" >> ${C}
     echo "default update-interval $(uci get babel.default.update_interval)" >> ${C}
+    echo "default enable-timestamps $(uci get babel.default.rtt_enable)" >> ${C}
     echo "default rtt-decay $(uci get babel.default.rtt_decay)" >> ${C}
     echo "default rtt-min $(uci get babel.default.rtt_min)" >> ${C}
     echo "default rtt-max $(uci get babel.default.rtt_max)" >> ${C}
