@@ -3,12 +3,13 @@ config default 'default'
         option hello_interval '10'
         option update_interval '120'
         option smoothing_half_life '10'
-        option rtt_enable 'true'
         option rtt_decay '42'
         option rtt_min '10'
         option rtt_max '120'
+        option max_rtt_penalty '150'
 
 config wireless 'wireless'
+        option rtt_enable 'true'
         option rxcost '256'
 
 config wired 'wired'
@@ -17,7 +18,7 @@ config wired 'wired'
 
 config tunnel 'tunnel'
         option rxcost '206'
-        option max_rtt_penalty '150'
 
 config xlink 'xlink'
+        option rtt_enable 'true'
         option rxcost '150'

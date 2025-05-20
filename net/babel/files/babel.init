@@ -8,19 +8,19 @@ C=/var/etc/babel-active.conf
 
 build_active() {
     # Defaults
-    echo "router-id $(uci -c /etc/local/uci get hsmmmesh.settings.wifimac)" > ${C}
-    echo "smoothing-half-life $(uci get babel.default.smoothing_half_life)" >> ${C}
-    echo "default rxcost $(uci get babel.default.rxcost)" >> ${C}
-    echo "default hello-interval $(uci get babel.default.hello_interval)" >> ${C}
-    echo "default update-interval $(uci get babel.default.update_interval)" >> ${C}
-    echo "default enable-timestamps $(uci get babel.default.rtt_enable)" >> ${C}
-    echo "default rtt-decay $(uci get babel.default.rtt_decay)" >> ${C}
-    echo "default rtt-min $(uci get babel.default.rtt_min)" >> ${C}
-    echo "default rtt-max $(uci get babel.default.rtt_max)" >> ${C}
+    echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
+    echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
+    echo "default rxcost $(uci -q get babel.default.rxcost)" >> ${C}
+    echo "default hello-interval $(uci -q get babel.default.hello_interval)" >> ${C}
+    echo "default update-interval $(uci -q get babel.default.update_interval)" >> ${C}
+    echo "default rtt-decay $(uci -q get babel.default.rtt_decay)" >> ${C}
+    echo "default rtt-min $(uci -q get babel.default.rtt_min)" >> ${C}
+    echo "default rtt-max $(uci -q get babel.default.rtt_max)" >> ${C}
+    echo "default max-rtt-penalty $(uci -q get babel.default.max_rtt_penalty)" >> ${C}
 
     # Always dtdlink so Babel is happy to have one interface
     echo "interface br-dtdlink type wired" >> ${C}
-    echo "interface br-dtdlink rxcost $(uci get babel.wired.rxcost)" >> ${C}
+    echo "interface br-dtdlink rxcost $(uci -q get babel.wired.rxcost)" >> ${C}
     echo "interface br-dtdlink split-horizon true" >> ${C}
     # Configure each of the interfaces which are already have as we wont (usually) be dynamically
     # told about them later. If we are informed again later, it's harmless.
@@ -38,7 +38,8 @@ build_active() {
                     ;;
                 *)
                     echo "interface ${i} type wireless" >> ${C}
-                    echo "interface ${i} rxcost $(uci get babel.wireless.rxcost)" >> ${C}
+                    echo "interface ${i} rxcost $(uci -q get babel.wireless.rxcost)" >> ${C}
+                    echo "interface ${i} enable-timestamps $(uci -q get babel.wireless.rtt_enable)" >> ${C}
                     ;;
             esac
             ;;
@@ -50,7 +51,6 @@ build_active() {
             echo "interface ${i} type tunnel" >> ${C}
             echo "interface ${i} rxcost ${cost}" >> ${C}
             echo "interface ${i} enable-timestamps true" >> ${C}
-            echo "interface ${i} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)" >> ${C}
             echo "redistribute anyproto if ${i} deny" >> ${C}
             ;;
         br0.*)
@@ -62,6 +62,7 @@ build_active() {
                 fi
                 echo "interface ${i} type auto" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
+                echo "interface ${i} enable-timestamps $(uci -q get babel.xlink.rtt_enable)" >> ${C}
                 echo "redistribute anyproto if ${i} deny" >> ${C}
             fi
             ;;
@@ -71,8 +72,8 @@ build_active() {
     done
 
     # Limit what we redistribute
-    sn="$(uci get aredn.@supernode[0].enable)"
-    gw="$(uci get aredn.@wan[0].olsrd_gw)"
+    sn="$(uci -q get aredn.@supernode[0].enable)"
+    gw="$(uci -q get aredn.@wan[0].olsrd_gw)"
 
     # If we allow it, let our default route be redistributed so others on
     # the mesh can use it.
