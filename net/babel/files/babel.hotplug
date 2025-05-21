@@ -14,8 +14,8 @@ __END__
             if [ "${DEVICE}" != "br-nomesh" ]; then
                 socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
-interface ${DEVICE} rxcost $(uci get babel.wireless.rxcost)
-interface ${DEVICE} unicast $(uci get babel.wireless.unicast)
+interface ${DEVICE} rxcost $(uci -q get babel.wireless.rxcost)
+interface ${DEVICE} enable-timestamps $(uci -q get babel.wireless.rtt_enable)"
 __END__
             fi
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
@@ -26,8 +26,7 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type tunnel
 interface ${DEVICE} rxcost ${cost}
-interface ${DEVICE} enable-timestamps true
-interface ${DEVICE} max-rtt-penalty $(uci get babel.tunnel.max_rtt_penalty)
+interface ${DEVICE} enable-timestamps $(uci -q get babel.tunnel.rtt_enable)
 __END__
         elif [ "${INTERFACE:0:5}" = "xlink" ]; then
             cost=$(uci -q get network.${INTERFACE}.cost)
@@ -37,6 +36,7 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type auto
 interface ${DEVICE} rxcost ${cost}
+interface ${DEVICE} enable-timestamps $(uci -q get babel.xlink.rtt_enable)"
 __END__
         fi
         ;;

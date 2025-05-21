@@ -50,7 +50,7 @@ build_active() {
             fi
             echo "interface ${i} type tunnel" >> ${C}
             echo "interface ${i} rxcost ${cost}" >> ${C}
-            echo "interface ${i} enable-timestamps true" >> ${C}
+            echo "interface ${i} enable-timestamps $(uci -q get babel.tunnel.rtt_enable)" >> ${C}
             echo "redistribute anyproto if ${i} deny" >> ${C}
             ;;
         br0.*)
@@ -60,7 +60,7 @@ build_active() {
                 if [ "$cost" = "" ]; then
                     cost=$(uci -q get babel.xlink.rxcost)
                 fi
-                echo "interface ${i} type auto" >> ${C}
+                echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
                 echo "interface ${i} enable-timestamps $(uci -q get babel.xlink.rtt_enable)" >> ${C}
                 echo "redistribute anyproto if ${i} deny" >> ${C}

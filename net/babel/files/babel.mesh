@@ -5,8 +5,8 @@ config default 'default'
         option smoothing_half_life '10'
         option rtt_decay '42'
         option rtt_min '10'
-        option rtt_max '120'
-        option max_rtt_penalty '150'
+        option rtt_max '1000'
+        option max_rtt_penalty '2000'
 
 config wireless 'wireless'
         option rtt_enable 'true'
@@ -17,6 +17,7 @@ config wired 'wired'
         option split_horizon 'true'
 
 config tunnel 'tunnel'
+        option rtt_enable 'true'
         option rxcost '206'
 
 config xlink 'xlink'
