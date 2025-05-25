@@ -42,6 +42,19 @@ function read_val(p, d) {
     return d;
 }
 
+const ll = {};
+const f = fs.open("/proc/net/if_inet6");
+if (f) {
+    for (let line = f.read("line"); length(line); line = f.read("line")) {
+        const m = match(trim(line), /^([^ ]+).* ([^ ]+)$/);
+        if (m) {
+            const a = match(m[1], /^................(..)(..)(..)....(..)(..)(..)$/);
+            ll[m[2]] = `${sprintf("%02x", hex(a[1])^2)}:${a[2]}:${a[3]}:${a[4]}:${a[5]}:${a[6]}`;
+        }
+    }
+    f.close();
+}
+
 const props = [
     ["address_assign_type", "addr_assign_type"],
     ["carrier", "carrier"],
@@ -55,7 +68,7 @@ const props = [
     ["iface_link", "iflink"],
     ["iface_link_mode", "link_mode"],
     ["info", function (dev) {
-        const address = read_val(`${dev}/address`, "");
+        const address = read_val(`${dev}/address`, "") || ll[dev];
         const broadcast = read_val(`${dev}/broadcast`, "");
         const duplex = read_val(`${dev}/duplex`, "");
         const ifalias = read_val(`${dev}/ifalias`, "");
