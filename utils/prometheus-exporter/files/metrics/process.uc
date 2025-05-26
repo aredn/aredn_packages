@@ -53,8 +53,8 @@ const props = {
 };
 
 for (let p in props) {
-    print(`# HELP node_network_${p}\n`);
-    print(`# TYPE node_network_${p} gauge\n`);
+    print(`# HELP node_process_${p}\n`);
+    print(`# TYPE node_process_${p} gauge\n`);
 }
 const d = fs.opendir("/proc");
 if (d) {
