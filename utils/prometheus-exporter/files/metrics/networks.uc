@@ -124,5 +124,6 @@ for (let p = 0; p < length(props); p++) {
                 }
             }
         }
+        d.close();
     }
 }
