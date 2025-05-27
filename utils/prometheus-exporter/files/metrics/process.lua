@@ -69,7 +69,7 @@ do
                     local k, v = line:match("^([^:]+):[ \t]+([^ \t]+)")
                     if k and props[k] then
                         if k == "Name" then
-                            print('node_process_' .. props[k] .. '{pid="' .. proc .. '"} ' .. v)
+                            print('node_process_' .. props[k] .. '{pid="' .. proc .. '",name="' .. v .. '"} 1')
                         else
                             print('node_process_' .. props[k] .. '{pid="' .. proc .. '"} ' .. (1024 * v))
                         end
