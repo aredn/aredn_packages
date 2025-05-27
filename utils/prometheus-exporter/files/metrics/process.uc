@@ -69,7 +69,7 @@ if (d) {
                     const m = match(trim(line), /^([^:]+):[ \t]+([^ \t]+)/);
                     if (m && props[m[1]]) {
                         if (m[1] === "Name") {
-                            print(`node_process_${props[m[1]]}{pid="${proc}"} ${m[2]}\n`);
+                            print(`node_process_${props[m[1]]}{pid="${proc}",name="${m[2]}"} 1\n`);
                         }
                         else {
                             print(`node_process_${props[m[1]]}{pid="${proc}"} ${1024 * m[2]}\n`);
