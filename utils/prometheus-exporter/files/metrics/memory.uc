@@ -38,7 +38,7 @@ if (f) {
     for (let line = f.read("line"); length(line); line = f.read("line")) {
         const m = match(trim(line), /^([^ \t]+):[ \t]+(\d+) kB$/);
         if (m) {
-            const key = replace(m[1], /[()]/, "");
+            const key = replace(m[1], /[()]/g, "");
             const size = int(m[2]) * 1024;
             print(`# HELP node_memory_${key}_bytes Memory information field ${key}_bytes.\n`);
             print(`# TYPE node_memory_${key}_bytes gauge\n`);
