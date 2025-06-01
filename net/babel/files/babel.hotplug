@@ -34,7 +34,7 @@ __END__
                 cost=$(uci -q get babel.xlink.rxcost)
             fi
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
-interface ${DEVICE} type auto
+interface ${DEVICE} type wireless
 interface ${DEVICE} rxcost ${cost}
 interface ${DEVICE} enable-timestamps $(uci -q get babel.xlink.rtt_enable)"
 __END__
