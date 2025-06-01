@@ -34,12 +34,19 @@
 import * as fs from "fs";
 
 const path = "/sys/class/net/";
-function read_val(p, d) {
+function read_val_string(p, d) {
     const val = fs.readfile(`${path}${p}`);
     if (val !== null) {
         return trim(val);
     }
     return d;
+}
+function read_val_num(p, d) {
+    const val = read_val_string(p, d);
+    if (val !== null) {
+        return 1 * val;
+    }
+    return val;
 }
 
 const ll = {};
@@ -67,11 +74,11 @@ const props = [
     ["iface_link", "iflink"],
     ["iface_link_mode", "link_mode"],
     ["info", function (dev) {
-        const address = read_val(`${dev}/address`, "") || ll[dev];
-        const broadcast = read_val(`${dev}/broadcast`, "");
-        const duplex = read_val(`${dev}/duplex`, "");
-        const ifalias = read_val(`${dev}/ifalias`, "");
-        const operstate = read_val(`${dev}/operstate`);
+        const address = read_val_string(`${dev}/address`, "") || ll[dev];
+        const broadcast = read_val_string(`${dev}/broadcast`, "");
+        const duplex = read_val_string(`${dev}/duplex`, "");
+        const ifalias = read_val_string(`${dev}/ifalias`, "");
+        const operstate = read_val_string(`${dev}/operstate`, "");
         return `node_network_info{address="${address}",broadcast="${broadcast}",device="${dev}",duplex="${duplex}",ifalias="${ifalias}",operstate="${operstate}"} 1`;
     }],
     ["mtu_bytes", "mtu"],
@@ -96,7 +103,7 @@ const props = [
     ["transmit_fifo_errors_total", "statistics/tx_fifo_errors"],
     ["transmit_packets_total", "statistics/tx_packets"],
     ["up", function (dev) {
-        return `node_network_up{device="${dev}"} ${read_val(dev + "/operstate") == "up" ? 1 : 0}`;
+        return `node_network_up{device="${dev}"} ${read_val_string(dev + "/operstate") == "up" ? 1 : 0}`;
     }]
 ];
 
@@ -111,7 +118,7 @@ for (let p = 0; p < length(props); p++) {
                 continue;
             }
             if (type(keys[1]) == "string") {
-                const val = read_val(`${dev}/${keys[1]}`);
+                const val = read_val_num(`${dev}/${keys[1]}`);
                 if (val !== null) {
                     print(`node_network_${keys[0]}{device="${dev}"} ${val}\n`);
                 }
