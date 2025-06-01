@@ -61,7 +61,6 @@ const props = [
     ["carrier_changes_total", "carrier_changes"],
     ["carrier_down_changes_total", "carrier_down_count"],
     ["carrier_up_changes_total", "carrier_up_count"],
-    ["device_id", "/dev_id"],
     ["dormant", "dormant"],
     ["flags", "/flags"],
     ["iface_id", "ifindex"],
