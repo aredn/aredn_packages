@@ -687,7 +687,8 @@ babel_main(char **interface_names, int num_interface_names)
                     if(rc < 0) {
                         if(errno == EINTR || errno == EAGAIN)
                             continue;
-                        perror("read(local_socket)");
+                        if(errno != EPIPE)
+                            perror("read(local_socket)");
                     }
                     local_socket_destroy(i);
                 }
