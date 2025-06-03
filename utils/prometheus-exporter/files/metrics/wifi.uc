@@ -41,19 +41,19 @@ if (hardware.getRadioCount() == 0) {
 const wlans = [ "wlan0", "wlan1" ];
 
 print(`# HELP node_wifi_station_receive_mcs\n`);
-print(`# TYPE node_wifi_station_receive_mcs guage\n`);
+print(`# TYPE node_wifi_station_receive_mcs gauge\n`);
 print(`# HELP node_wifi_station_receive_packets_total\n`);
 print(`# TYPE node_wifi_station_receive_packets_total counter\n`);
 print(`# HELP node_wifi_station_receive_rate_bits_per_second\n`);
-print(`# TYPE node_wifi_station_receive_rate_bits_per_second guage\n`);
+print(`# TYPE node_wifi_station_receive_rate_bits_per_second gauge\n`);
 print(`# HELP node_wifi_station_signal\n`);
-print(`# TYPE node_wifi_station_signal guage\n`);
+print(`# TYPE node_wifi_station_signal gauge\n`);
 print(`# HELP node_wifi_station_transmit_mcs\n`);
-print(`# TYPE node_wifi_station_transmit_mcs guage\n`);
+print(`# TYPE node_wifi_station_transmit_mcs gauge\n`);
 print(`# HELP node_wifi_station_transmit_packets_total\n`);
 print(`# TYPE node_wifi_station_transmit_packets_total counter\n`);
 print(`# HELP node_wifi_station_transmit_rate_bits_per_second\n`);
-print(`# TYPE node_wifi_station_transmit_rate_bits_per_second guage\n`);
+print(`# TYPE node_wifi_station_transmit_rate_bits_per_second gauge\n`);
 for (let w = 0; w < length(wlans); w++) {
     const stations = nl80211.request(nl80211.const.NL80211_CMD_GET_STATION, nl80211.const.NLM_F_DUMP, { dev: wlans[w] });
     for (let s = 0; s < length(stations); s++) {
