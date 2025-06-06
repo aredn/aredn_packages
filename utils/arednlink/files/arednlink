@@ -55,12 +55,14 @@ const CLOSECONN             = 0x80000;
 // Commands
 //
 const CMD_FWD_START         = ord('A');
-const CMD_FWD_END           = ord('M');
-const CMD_VERSION           = ord('V');
+const CMD_UPDATE_PUBLISH    = ord("B");
+const CMD_UPDATE_SUBSCRIBE  = ord("C");
 const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
-const CMD_SYNC              = ord('S');
+const CMD_FWD_END           = ord('M');
 const CMD_KEEPALIVE         = ord('K');
+const CMD_SYNC              = ord('S');
+const CMD_VERSION           = ord('V');
 //
 // Poll timers
 //
@@ -90,15 +92,19 @@ const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 // Resources
 //
 const resources = [
-    { name: "hosts",    dir: "/var/run/arednlink/hosts/",       cmd: CMD_UPDATE_HOSTS       },
-    { name: "services", dir: "/var/run/arednlink/services/",    cmd: CMD_UPDATE_SERVICES    }
+    { name: "hosts",     dir: "/var/run/arednlink/hosts/",      cmd: CMD_UPDATE_HOSTS       },
+    { name: "services",  dir: "/var/run/arednlink/services/",   cmd: CMD_UPDATE_SERVICES    },
+    { name: "publish",   dir: "/var/run/arednlink/publish/",    cmd: CMD_UPDATE_PUBLISH     },
+    { name: "subscribe", dir: "/var/run/arednlink/subscribe/",  cmd: CMD_UPDATE_SUBSCRIBE   }
 ];
 //
 // Signals
 //
 const signals = {
     hosts: null,
-    services: null
+    services: null,
+    publish: null,
+    subscribe: null
 };
 //
 // Default hop count for messages.
@@ -147,6 +153,8 @@ const statistics = {
         version: 0,
         hosts: 0,
         services: 0,
+        publish: 0,
+        subscribe: 0,
         invalidhop: 0
     },
     outgoing: {
@@ -155,11 +163,15 @@ const statistics = {
         keepalive: 0,
         version: 0,
         hosts: 0,
-        services: 0
+        services: 0,
+        publish: 0,
+        subscribe: 0
     },
     forward: {
         hosts: 0,
-        services: 0
+        services: 0,
+        publish: 0,
+        subscribe: 0
     },
     error: {
         connection: 0,
