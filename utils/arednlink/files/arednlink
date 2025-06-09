@@ -918,12 +918,9 @@ function neighborhoodProcess(event) {
     }
     for (let name in interfaces) {
         const iface = interfaces[name];
-        if (iface.best === iface.address) {
-            // I have become the best, so disconnect. This will happen when a previous best
-            // neighbor is no longer routable (even if they're still online).
-            if (iface.channel && iface.channel.state === "CONNECTED") {
-                iface.channel.process(CLOSECONN);
-            }
+        if (iface.channel && iface.channel.address != iface.best && iface.channel.state === "CONNECTED") {
+            // If my best changed and I'm connected to what was my previous best, we need to disconnect.
+            iface.channel.process(CLOSECONN);
         }
         else {
             if (!iface.channel) {
