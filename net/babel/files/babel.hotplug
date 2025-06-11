@@ -27,6 +27,7 @@ __END__
 interface ${DEVICE} type tunnel
 interface ${DEVICE} rxcost ${cost}
 interface ${DEVICE} enable-timestamps $(uci -q get babel.tunnel.rtt_enable)
+redistribute anyproto if ${DEVICE} deny
 __END__
         elif [ "${INTERFACE:0:5}" = "xlink" ]; then
             cost=$(uci -q get network.${INTERFACE}.cost)
@@ -36,7 +37,8 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
 interface ${DEVICE} rxcost ${cost}
-interface ${DEVICE} enable-timestamps $(uci -q get babel.xlink.rtt_enable)"
+interface ${DEVICE} enable-timestamps $(uci -q get babel.xlink.rtt_enable)
+redistribute anyproto if ${DEVICE} deny
 __END__
         fi
         ;;
