@@ -25,6 +25,7 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type tunnel
 interface ${DEVICE} rxcost ${cost}
+interface ${DEVICE} hello-interval $(uci -q get babel.tunnel.hello_interval)
 interface ${DEVICE} rtt-min $(uci -q get babel.tunnel.rtt_min)
 interface ${DEVICE} rtt-max $(uci -q get babel.tunnel.rtt_max)
 interface ${DEVICE} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)

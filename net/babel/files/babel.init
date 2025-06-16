@@ -49,6 +49,7 @@ build_active() {
             fi
             echo "interface ${i} type tunnel" >> ${C}
             echo "interface ${i} rxcost ${cost}" >> ${C}
+            echo "interface ${i} hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
             echo "interface ${i} rtt-min $(uci -q get babel.tunnel.rtt_min)" >> ${C}
             echo "interface ${i} rtt-max $(uci -q get babel.tunnel.rtt_max)" >> ${C}
             echo "interface ${i} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}

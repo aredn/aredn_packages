@@ -299,7 +299,7 @@ neighbour_rxcost(struct neighbour *neigh)
         int cost = neigh->ifp->cost;
         if (sreach < 0x8000) {
             cost = (0x8000 * cost) / (sreach + 1);
-            /* Penalize wireless interfaces extra for last packets */
+            /* Penalize wireless interfaces extra for lost packets */
             if ((neigh->ifp->flags & IF_WIRELESS) != 0) {
                 cost *= 2;
             }
