@@ -697,8 +697,8 @@ function channelProcess(event) {
             }
             delete channels[this.id];
             const iface = interfaces[this.interface];
-            if (iface && iface.channel === this) {
-                iface.channel = null;
+            if (iface && iface.channels[this.address]) {
+                delete iface.channels[this.address];
             }
             break;
         }
@@ -777,7 +777,7 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i}${interfaces[i].best == interfaces[i].address ? " best" : ""}\n`;
+                r += `interface ${i}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
@@ -877,19 +877,20 @@ function neighborhoodProcess(event) {
         }
         else if (oldinterfaces[name]) {
             interfaces[name] = oldinterfaces[name];
-            interfaces[name].best = iface.ipv6address;
             oldinterfaces[name] = null;
         }
         else {
             // Found new interface
-            interfaces[name] = { address: iface.ipv6address, best: iface.ipv6address, channel: null };
+            interfaces[name] = { address: iface.ipv6address, channels: {} };
         }
     }
     for (let name in oldinterfaces) {
         const iface = oldinterfaces[name];
-        if (iface && iface.channel) {
-            iface.channel.timer = null;
-            iface.channel.process(NOINTERFACE);
+        if (iface) {
+            for (let n in iface.channels) {
+                iface.channels[n].timer = null;
+                iface.channels[n].process(NOINTERFACE);
+            }
         }
         // Remove any graylist entries when the interface disappears
         for (let key in graylist) {
@@ -910,28 +911,14 @@ function neighborhoodProcess(event) {
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
             const iface = interfaces[n.interface];
-            // It's possible to find a neighbor before we find the interface associated with it, so just ignore those this time
-            if (iface) {
-                iface.best = bestAddress(iface.best, n.ipv6address);
-            }
-        }
-    }
-    for (let name in interfaces) {
-        const iface = interfaces[name];
-        if (iface.channel && iface.channel.address != iface.best && iface.channel.state === "CONNECTED") {
-            // If my best changed and I'm connected to what was my previous best, we need to disconnect.
-            iface.channel.process(CLOSECONN);
-        }
-        else {
-            if (!iface.channel) {
+            // For a valid interface, without a channel to the neighbor, and the neighnor is better than us, create a channel.
+            if (iface && !iface.channels[n.ipv6address] && bestAddress(iface.address, n.ipv6address) != iface.address) {
                 const channel = createChannel("IDLE", null, 0, 0, null);
-                channel.interface = name;
+                channel.interface = n.interface;
                 channel.myaddress = iface.address;
-                iface.channel = channel;
-            }
-            if (iface.channel.state === "IDLE") {
-                iface.channel.address = iface.best;
-                iface.channel.process(NEWADDRESS);
+                channel.address = n.ipv6address;
+                iface.channels[n.ipv6address] = channel;
+                channel.process(NEWADDRESS);
             }
         }
     }
