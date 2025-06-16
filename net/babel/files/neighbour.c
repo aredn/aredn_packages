@@ -296,7 +296,14 @@ neighbour_rxcost(struct neighbour *neigh)
             ((reach & 0x4000) >> 1) +
             (reach & 0x3FFF);
         /* 0 <= sreach <= 0x7FFF */
-        int cost = (0x8000 * neigh->ifp->cost) / (sreach + 1);
+        int cost = neigh->ifp->cost;
+        if (sreach < 0x8000) {
+            cost = (0x8000 * cost) / (sreach + 1);
+            /* Penalize wireless interfaces extra for last packets */
+            if ((neigh->ifp->flags & IF_WIRELESS) != 0) {
+                cost *= 2;
+            }
+        }
         /* cost >= interface->cost */
         if(delay >= 40000)
             cost = (cost * (delay - 20000) + 10000) / 20000;
