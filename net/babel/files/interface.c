@@ -374,6 +374,10 @@ interface_updown(struct interface *ifp, int up)
 
         if(IF_CONF(ifp, unicast) == CONFIG_YES)
             ifp->flags |= IF_UNICAST;
+        else if(IF_CONF(ifp, unicast) == CONFIG_NO)
+            ifp->flags &= ~IF_UNICAST;
+        else if(type == IF_TYPE_WIRELESS)
+            ifp->flags |= IF_UNICAST;
         if(IF_CONF(ifp, hello_interval) > 0)
             ifp->hello_interval = IF_CONF(ifp, hello_interval);
         else if(type == IF_TYPE_WIRELESS)
