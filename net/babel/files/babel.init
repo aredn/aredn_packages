@@ -72,6 +72,11 @@ build_active() {
         esac
     done
 
+    # Include custom rules
+    if [ -f /etc/aredn_include/babel-user.conf ]; then
+        cat /etc/aredn_include/babel-user.conf >> ${C}
+    fi
+
     # Limit what we redistribute
     sn="$(uci -q get aredn.@supernode[0].enable)"
     gw="$(uci -q get aredn.@wan[0].mesh_to_local_wan)"
