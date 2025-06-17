@@ -594,8 +594,7 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    this.address = null;
-                    this.state = "IDLE";
+                    this.state = "EXIT";
                     // Force neighbor update
                     neighborhood.timer = 0;
                     this.timer = 0;
@@ -777,7 +776,7 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i}\n`;
+                r += `interface ${i} channels ${length(interfaces[i].channels)}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
