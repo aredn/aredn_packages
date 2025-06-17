@@ -15,7 +15,6 @@ __END__
                 socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
 interface ${DEVICE} rxcost $(uci -q get babel.wireless.rxcost)
-interface ${DEVICE} enable-timestamps $(uci -q get babel.wireless.rtt_enable)"
 __END__
             fi
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
@@ -26,7 +25,10 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type tunnel
 interface ${DEVICE} rxcost ${cost}
-interface ${DEVICE} enable-timestamps $(uci -q get babel.tunnel.rtt_enable)
+interface ${DEVICE} hello-interval $(uci -q get babel.tunnel.hello_interval)
+interface ${DEVICE} rtt-min $(uci -q get babel.tunnel.rtt_min)
+interface ${DEVICE} rtt-max $(uci -q get babel.tunnel.rtt_max)
+interface ${DEVICE} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)
 redistribute anyproto if ${DEVICE} deny
 __END__
         elif [ "${INTERFACE:0:5}" = "xlink" ]; then
@@ -37,7 +39,6 @@ __END__
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 interface ${DEVICE} type wireless
 interface ${DEVICE} rxcost ${cost}
-interface ${DEVICE} enable-timestamps $(uci -q get babel.xlink.rtt_enable)
 redistribute anyproto if ${DEVICE} deny
 __END__
         fi

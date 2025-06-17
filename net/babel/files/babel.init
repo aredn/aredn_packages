@@ -39,7 +39,6 @@ build_active() {
                 *)
                     echo "interface ${i} type wireless" >> ${C}
                     echo "interface ${i} rxcost $(uci -q get babel.wireless.rxcost)" >> ${C}
-                    echo "interface ${i} enable-timestamps $(uci -q get babel.wireless.rtt_enable)" >> ${C}
                     ;;
             esac
             ;;
@@ -50,7 +49,10 @@ build_active() {
             fi
             echo "interface ${i} type tunnel" >> ${C}
             echo "interface ${i} rxcost ${cost}" >> ${C}
-            echo "interface ${i} enable-timestamps $(uci -q get babel.tunnel.rtt_enable)" >> ${C}
+            echo "interface ${i} hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
+            echo "interface ${i} rtt-min $(uci -q get babel.tunnel.rtt_min)" >> ${C}
+            echo "interface ${i} rtt-max $(uci -q get babel.tunnel.rtt_max)" >> ${C}
+            echo "interface ${i} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
             echo "redistribute anyproto if ${i} deny" >> ${C}
             ;;
         br0.*)
@@ -62,7 +64,6 @@ build_active() {
                 fi
                 echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} rxcost ${cost}" >> ${C}
-                echo "interface ${i} enable-timestamps $(uci -q get babel.xlink.rtt_enable)" >> ${C}
                 echo "redistribute anyproto if ${i} deny" >> ${C}
             fi
             ;;
