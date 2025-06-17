@@ -1016,32 +1016,24 @@ parse_config_line(int c, gnc_t gnc, void *closure,
         goto fail;
     } else if(strcmp(token, "in") == 0) {
         struct filter *filter;
-        if(config_finalised)
-            goto fail;
         c = parse_filter(c, gnc, closure, &filter);
         if(c < -1)
             goto fail;
         add_filter(filter, FILTER_TYPE_INPUT);
     } else if(strcmp(token, "out") == 0) {
         struct filter *filter;
-        if(config_finalised)
-            goto fail;
         c = parse_filter(c, gnc, closure, &filter);
         if(c < -1)
             goto fail;
         add_filter(filter, FILTER_TYPE_OUTPUT);
     } else if(strcmp(token, "redistribute") == 0) {
         struct filter *filter;
-        if(config_finalised)
-            goto fail;
         c = parse_filter(c, gnc, closure, &filter);
         if(c < -1)
             goto fail;
         add_filter(filter, FILTER_TYPE_REDISTRIBUTE);
     } else if(strcmp(token, "install") == 0) {
         struct filter *filter;
-        if(config_finalised)
-            goto fail;
         c = parse_filter(c, gnc, closure, &filter);
         if(c < -1)
             goto fail;
