@@ -45,7 +45,6 @@ struct neighbour {
     struct timeval echo_receive_time;
     unsigned int rtt;
     struct timeval rtt_time;
-    unsigned char pc_u[4], pc_m[4];
     int index_len; /* This is -1 when index is undefined */
     unsigned char index[32];
     struct interface *ifp;
