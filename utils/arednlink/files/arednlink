@@ -98,15 +98,6 @@ const resources = [
     { name: "subscribe", dir: "/var/run/arednlink/subscribe/",  cmd: CMD_UPDATE_SUBSCRIBE   }
 ];
 //
-// Signals
-//
-const signals = {
-    hosts: null,
-    services: null,
-    publish: null,
-    subscribe: null
-};
-//
 // Default hop count for messages.
 //
 const HOP_DEFAULT           = 64;
@@ -126,10 +117,6 @@ let neighborhood = null;
 // Current babel host routes
 //
 let hostroutes = {};
-//
-// Set of IP addesses traffic received on the wrong interface.
-//
-const wrongaddriface = {};
 //
 // Greylist of addresses in timeout
 //
@@ -178,7 +165,7 @@ const statistics = {
         version: 0,
         hop: 0,
         command: 0,
-        resourceself: 0
+        toself: 0
     }
 };
 //
@@ -244,33 +231,6 @@ function eventString(polling) {
         s += "|CLOSE";
     }
     return substr(s, 1);
-}
-
-//
-// Run a signal script (if it exists).
-//
-function runSignal(name) {
-    const script = signals[name];
-    if (!script) {
-        return null;
-    }
-    return system(script, 5000) < 0 ? false : true;
-}
-
-//
-// Determine if this interface is a valid next hop for the command/ip pair.
-//
-function validNextHop(channel, cmd, ipv4address) {
-    if (ipv4address && ipv4address !== myipv4address) {
-        if (cmd === CMD_SYNC) {
-            return true;
-        }
-        if (hostroutes[ipv4address] === channel.interface) {
-            return true;
-        }
-        wrongaddriface[ipv4address] = true;
-    }
-    return false;
 }
 
 //
@@ -350,6 +310,10 @@ const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK
 function processMessage(cmd, hop, srcipv4, payload)
 {
     DEBUG && print(`processMessage: cmd ${chr(cmd)} hop ${hop} ip ${srcipv4} payload ${payload}\n`);
+    if (srcipv4 === myipv4address) {
+        statistics.error.toself++;
+        return false;
+    }
     switch (cmd) {
         case CMD_VERSION:
             statistics.incoming.version++;
@@ -385,27 +349,29 @@ function processMessage(cmd, hop, srcipv4, payload)
             }
             return false;
         default:
-            if (srcipv4 == myipv4address) {
-                statistics.error.resourceself++;
-                return false;
-            }
+            const validif = hostroutes[srcipv4] === this.interface ? true : false;
             for (let r = 0; r < length(resources); r++) {
                 const res = resources[r];
                 if (cmd === res.cmd) {
-                    statistics.incoming[res.name]++;
                     const path = `${res.dir}${srcipv4}`;
                     const old = fs.readfile(path);
+                    // If the message is from an invalid host interface then we ignore it unless
+                    // we don't have any current resource, in which case we'll take it anyway.
+                    if (!validif && old !== null) {
+                        statistics.incoming.invalidhop++;
+                        return false;
+                    }
+                    statistics.incoming[res.name]++;
                     if (old == payload) {
                         return false;
                     }
                     fs.writefile(path, payload);
-                    runSignal(res.name);
                     return true;
                 }
             }
             statistics.error.command++;
             // Unknown commands in this range are forwarded.
-            if (cmd >= CMD_FWD_START && cmd <= CMD_FWD_END) {
+            if (validif && cmd >= CMD_FWD_START && cmd <= CMD_FWD_END) {
                 return true;
             }
             // Otherwise they are not.
@@ -444,29 +410,23 @@ function processRequest() {
         const hop = ord(this.incoming, i + 3);
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
         const srcipv4str = arrtoip(srcipv4);
-        const validhop = validNextHop(this, cmd, srcipv4str);
-        if (!validhop) {
-            statistics.incoming.invalidhop++;
-        }
-        DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} validhop ${validhop} ${srcipv4src}\n`);
-        if (validhop) {
-            const payload = substr(this.incoming, i + 8, len - 8);
-            const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
-            if (forward) {
-                if (hop > 1) {
-                    // Build and forward message
-                    const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
-                    for (let r = 0; r < length(resources); r++) {
-                        const res = resources[r];
-                        if (cmd === res.cmd) {
-                            statistics.forward[res.name]++;
-                            break;
-                        }
+        DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} ${srcipv4src}\n`);
+        const payload = substr(this.incoming, i + 8, len - 8);
+        const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
+        if (forward) {
+            if (hop > 1) {
+                // Build and forward message
+                const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+                for (let r = 0; r < length(resources); r++) {
+                    const res = resources[r];
+                    if (cmd === res.cmd) {
+                        statistics.forward[res.name]++;
+                        break;
                     }
                 }
-                else {
-                    statistics.error.hop++;
-                }
+            }
+            else {
+                statistics.error.hop++;
             }
         }
         i += len;
@@ -751,32 +711,17 @@ function commandProcess(cmd) {
                     fs.writefile(path, data);
                     const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
                     statistics.outgoing[res.name] += count;
-                    runSignal(res.name);
                     return old ? "ok updated" : "ok new";
                 }
             }
             return "bad name";
-        }
-        case "signal":
-        {
-            const tf = split(cv[1], " ", 2);
-            const type = tf[0];
-            const script = trim(tf[1]);
-            if (type in signals) {
-                signals[type] = null;
-                if (length(script)) {
-                    signals[type] = script;
-                }
-                return "ok";
-            }
-            return "bad signal";
         }
         case "dump":
         {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i} channels ${length(interfaces[i].channels)}\n`;
+                r += `interface ${i} chanout ${length(interfaces[i].channels)} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
@@ -945,33 +890,16 @@ function routeProcess(event) {
         const dst = route.dst;
         const iface = route.oif;
         hostroutes[dst] = iface;
-        if (oldr[dst] === iface) {
-            oldr[dst] = null;
+        if (oldr[dst] !== iface) {
+            // New route or an old route on an new interface
+            // Build the sync message payloads as we go
+            const addr = iptoarr(dst);
+            if (!newr[iface]) {
+                newr[iface] = "";
+            }
+            newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
         }
-        else {
-            let dosync = false;
-            // Sync if this is a new route
-            if (!oldr[dst]) {
-                dosync = true;
-            }
-            // Also sync if this is an old route but on a new intertface, and we're
-            // previously received traffic from this new interface for this route.
-            else {
-                oldr[dst] = null;
-                if (wrongaddriface[dst]) {
-                    delete wrongaddriface[dst];
-                    dosync = true;
-                }
-            }
-            if (dosync) {
-                // Build the sync message payloads as we go
-                const addr = iptoarr(dst);
-                if (!newr[iface]) {
-                    newr[iface] = "";
-                }
-                newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
-            }
-        }
+        oldr[dst] = null;
     }
 
     // Remove any data we no longer need
@@ -984,10 +912,6 @@ function routeProcess(event) {
                 }
             }
         }
-    }
-    // Call any signals we need to
-    for (let name in sigs) {
-        runSignal(name);
     }
 
     // Sync our neighbors for information about the new routes
