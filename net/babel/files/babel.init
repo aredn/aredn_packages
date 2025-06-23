@@ -78,8 +78,8 @@ build_active() {
     fi
 
     # Include user blocks
-    if [ -f /var/run/babel-deny.conf ]; then
-        cat /var/run/babel-deny.conf >> ${C}
+    if [ -f /etc/aredn_include/babel-deny.conf ]; then
+        cat /etc/aredn_include/babel-deny.conf >> ${C}
     fi
 
     # Limit what we redistribute
