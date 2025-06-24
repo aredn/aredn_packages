@@ -84,6 +84,10 @@ const GRAY_MAX_SCALE        = 15;
 //
 const CHANNEL_CONN_TIMEOUT  = 10;
 //
+// Time to keep data around before deleting it
+//
+const DELETE_TIMEOUT        = 600;
+//
 // Communications
 //
 const AREDNLINK_PORT        = 9623;
@@ -101,6 +105,10 @@ const resources = [
 // Default hop count for messages.
 //
 const HOP_DEFAULT           = 64;
+//
+// Maximim message size
+//
+const MAX_MESSAGE_SIZE      = 65535;
 //
 // Set of all connected channels.
 //
@@ -126,12 +134,17 @@ const graylist = {};
 //
 const isolated = {};
 //
+// List of hosts waiting to be removed
+//
+const pendingremove = {};
+//
 // Statistics
 //
 const statistics = {
     count: {
         neighbors: 0,
-        routes: 0
+        routes: 0,
+        remove: 0
     },
     incoming: {
         connection: 0,
@@ -203,6 +216,13 @@ function bestAddress(a, b) {
 }
 
 //
+// Is interface symmetric? Can everyone see everyone else?
+//
+function isNetworkSymmetric(iface) {
+    return index(iface.name, "wlan") === 0 ? false : true;
+}
+
+//
 // Make events human readable
 //
 function eventString(polling) {
@@ -248,10 +268,10 @@ function buildMessage(cmd, ipv4addr, hop, payload) {
     DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
     payload = payload ?? "";
     let len = 8 + length(payload); // Length is the entire message including the length itself.
-    if (len > 65535) {
+    if (len > MAX_MESSAGE_SIZE) {
         DEBUG && print(`buildMessage: truncating payload ${ipv4addr}, len = ${len}\n`);
-        len = 65535;
-        payload = slice(payload, 0, len - 8);
+        len = MAX_MESSAGE_SIZE;
+        payload = substr(payload, 0, len - 8);
     }
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
     if (!addr) {
@@ -734,7 +754,7 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i} chanout ${length(interfaces[i].channels)} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}\n`;
+                r += `interface ${i} chanout ${length(interfaces[i].channels)} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}${isNetworkSymmetric(interfaces[i]) ? " symmetric" + (!length(interfaces[i].channels) ? " best" : "") : ""}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
@@ -838,7 +858,7 @@ function neighborhoodProcess(event) {
         }
         else {
             // Found new interface
-            interfaces[name] = { address: iface.ipv6address, channels: {} };
+            interfaces[name] = { name: name, address: iface.ipv6address, channels: {} };
         }
     }
     for (let name in oldinterfaces) {
@@ -863,18 +883,50 @@ function neighborhoodProcess(event) {
     const nlength = length(neighbors);
     statistics.count.neighbors = nlength;
     const now = when(0);
+    const best = {};
     for (let i = 0; i < nlength; i++) {
         const n = neighbors[i];
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
             const iface = interfaces[n.interface];
-            // For a valid interface, without a channel to the neighbor, and the neighnor is better than us, create a channel.
-            if (iface && !iface.channels[n.ipv6address] && bestAddress(iface.address, n.ipv6address) != iface.address) {
+            if (iface) {
+                // For symmetric networks, we just need a connection to the best neighbor. We work out what that will
+                // be for use later.
+                if (isNetworkSymmetric(iface)) {
+                    best[n.interface] = bestAddress(best[n.interface] || iface.address, n.ipv6address);
+                }
+                else {
+                    // For a valid interface, without a channel to the neighbor, and the neighnor is better than us, create a channel.
+                    if (!iface.channels[n.ipv6address] && bestAddress(iface.address, n.ipv6address) != iface.address) {
+                        const channel = createChannel("IDLE", null, 0, 0, null);
+                        channel.interface = n.interface;
+                        channel.myaddress = iface.address;
+                        channel.address = n.ipv6address;
+                        iface.channels[n.ipv6address] = channel;
+                        channel.process(NEWADDRESS);
+                    }
+                }
+            }
+        }
+    }
+    // Look through the symmetric interfaces and make sure we're connected to the best node.
+    for (let ifname in best) {
+        const iface = interfaces[ifname];
+        const bestaddress = best[ifname];
+        if (!iface.channels[bestaddress]) {
+            // Make sure to disconnect from anything which isnt the current best.
+            for (let chan in iface.channels) {
+                if (iface.channels[chan].state === "CONNECTED") {
+                    iface.channels[chan].process(CLOSECONN);
+                }
+            }
+            // If we ourself are not the best, connect to it.
+            if (iface.address != bestaddress) {
                 const channel = createChannel("IDLE", null, 0, 0, null);
-                channel.interface = n.interface;
+                channel.interface = ifname;
                 channel.myaddress = iface.address;
-                channel.address = n.ipv6address;
-                iface.channels[n.ipv6address] = channel;
+                channel.address = bestaddress;
+                iface.channels[bestaddress] = channel;
                 channel.process(NEWADDRESS);
             }
         }
@@ -913,17 +965,28 @@ function routeProcess(event) {
             newr[iface] += chr(addr[0], addr[1], addr[2], addr[3]);
         }
         oldr[dst] = null;
+        delete pendingremove[dst];
     }
 
-    // Remove any data we no longer need
-    const sigs = {};
+    // Any data no longer need it marked for later deletion
     for (let ip in oldr) {
         if (oldr[ip]) {
+            pendingremove[ip] = when(DELETE_TIMEOUT);
+        }
+    }
+
+    // Remove any data which is too old
+    const now = when(0);
+    statistics.count.remove = 0;
+    for (let ip in pendingremove) {
+        if (pendingremove[ip] < now) {
             for (let r = 0; r < length(resources); r++) {
-                if (fs.unlink(`${resources[r].dir}${ip}`)) {
-                    sigs[resources[r].name] = true;
-                }
+                fs.unlink(`${resources[r].dir}${ip}`);
             }
+            delete pendingremove[ip];
+        }
+        else {
+            statistics.count.remove++;
         }
     }
 
