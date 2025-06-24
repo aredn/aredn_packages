@@ -142,7 +142,8 @@ const statistics = {
         services: 0,
         publish: 0,
         subscribe: 0,
-        invalidhop: 0
+        invalidhop: 0,
+        invalidhost: 0
     },
     outgoing: {
         connection: 0,
@@ -246,7 +247,12 @@ function when(timeout) {
 function buildMessage(cmd, ipv4addr, hop, payload) {
     DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
     payload = payload ?? "";
-    const len =  8 + length(payload); // Length is the entire message including the length itself.
+    let len = 8 + length(payload); // Length is the entire message including the length itself.
+    if (len > 65535) {
+        DEBUG && print(`buildMessage: truncating payload ${ipv4addr}, len = ${len}\n`);
+        len = 65535;
+        payload = slice(payload, 0, len - 8);
+    }
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
     if (!addr) {
         DEBUG && print(`buildMessage: bad ip address ${ipv4addr}\n`);
@@ -274,7 +280,7 @@ function buildTargettedSyncMessage(target) {
         }
     }
     DEBUG && print("\n");
-    return buildMessage(CMD_SYNC, myipv4address, 1, sync);
+    return length(sync) ? buildMessage(CMD_SYNC, myipv4address, 1, sync) : "";
 }
 
 //
@@ -331,7 +337,7 @@ function processMessage(cmd, hop, srcipv4, payload)
             // Return false so the request is not forwarded (it should have a hop of 1);
             statistics.incoming.sync++;
             const len = length(payload);
-            for (let i = 0; i < len; i += 4) {
+            for (let i = 0; i <= len - 4; i += 4) {
                 const ip = arrtoip([ord(payload, i), ord(payload, i+1), ord(payload, i+2), ord(payload, i+3)]);
                 DEBUG && print(`-- syncing ${ip}\n`);
                 for (let r = 0; r < length(resources); r++) {
@@ -354,7 +360,7 @@ function processMessage(cmd, hop, srcipv4, payload)
             // Under some circumstances (see below) we might accept a resource from an invalid interface,
             // it must still be from a valid host.
             if (!validhost) {
-                statistics.incoming.invalidhop++;
+                statistics.incoming.invalidhost++;
                 return false;
             }
             for (let r = 0; r < length(resources); r++) {
