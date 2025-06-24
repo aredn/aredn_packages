@@ -251,7 +251,7 @@ function buildMessage(cmd, ipv4addr, hop, payload) {
     if (len > 65535) {
         DEBUG && print(`buildMessage: truncating payload ${ipv4addr}, len = ${len}\n`);
         len = 65535;
-        payload = slice(payload, 0, len - 8);
+        payload = substr(payload, 0, len - 8);
     }
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
     if (!addr) {
