@@ -350,6 +350,13 @@ function processMessage(cmd, hop, srcipv4, payload)
             return false;
         default:
             const validif = hostroutes[srcipv4] === this.interface ? true : false;
+            const validhost = !!hostroutes[srcipv4];
+            // Under some circumstances (see below) we might accept a resource from an invalid interface,
+            // it must still be from a valid host.
+            if (!validhost) {
+                statistics.incoming.invalidhop++;
+                return false;
+            }
             for (let r = 0; r < length(resources); r++) {
                 const res = resources[r];
                 if (cmd === res.cmd) {
