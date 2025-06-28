@@ -38,6 +38,20 @@ package.path = package.path .. ";/usr/local/bin/?.lua"
 
 require("nixio")
 
+-- Patch to work around the EINTR bug with pipes and lines
+local lines = getmetatable(io.output()).lines
+getmetatable(io.output()).lines = function(self, ...)
+    local iter = lines(self, ...)
+    return function()
+        local ok, ret = pcall(iter)
+        if ok then
+            return ret
+        else
+            return nil
+        end
+    end
+end
+
 local gzip = (os.getenv("HTTP_ACCEPT_ENCODING") or ""):match("gzip")
 
 print "Content-type: text/plain; version=0.0.4\r"

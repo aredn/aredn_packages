@@ -36,11 +36,13 @@
 
 local f = io.popen("/usr/sbin/babel-dump")
 if f then
+    local lines = f:read("*a")
+    f:close()
     local interfaces = 0;
     local neighbors = 0; 
     local routes = 0;
     local xroutes = 0;
-    for line in f:lines()
+    for line in lines:gmatch("[^\r\n]+")
     do
         if line:match("interface") then
             interfaces = interfaces + 1

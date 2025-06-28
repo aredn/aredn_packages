@@ -36,7 +36,9 @@
 
 local f = io.popen("/usr/local/bin/arednlink-dump")
 if f then
-    for line in f:lines()
+    local lines = f:read("*a")
+    f:close()
+    for line in lines:gmatch("[^\r\n]+")
     do
         local kind, stats = line:match("^statistics (%S+) (.+)$")
         if kind then
@@ -48,5 +50,4 @@ if f then
             end
         end
     end
-    f:close()
 end
