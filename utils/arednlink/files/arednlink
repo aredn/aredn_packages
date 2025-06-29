@@ -200,6 +200,7 @@ const myipv4iparr = iptoarr(myipv4address);
 let channelId = 1;
 let exiting = false;
 const poller = { fn: null, len: -1 };
+const netmodes = {};
 
 //
 // Compare two addresses and select the best/highest one.
@@ -225,10 +226,23 @@ function bestAddress(a, b) {
 }
 
 //
-// Is interface symmetric? Can everyone see everyone else?
+// Is network symmetric? Does everyone have at least one neighbor in common?
 //
 function isNetworkSymmetric(iface) {
-    return index(iface.name, "wlan") === 0 ? false : true;
+    let mode = netmode[iface.name];
+    if (mode === null) {
+        mode = true;
+        if (index(iface.name, "wlan") === 0) {
+            uci.cursor().foreach("wireless", "wifi-iface", function(s)
+            {
+                if (s.ifname == iface.name && s.mode === "adhoc") {
+                    mode = false;
+                }
+            });
+        }
+        netmode[iface.name] = mode;
+    }
+    return mode;
 }
 
 //
@@ -711,6 +725,8 @@ function channelProcess(event) {
             this.keepalive = 0;
             this.keepalivetime = when(KEEPALIVE_POLL);
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
+            // No longer grey
+            delete graylist[`${this.interface}/${this.address}`];
             // Fall through
         }
         case "CONNECTED_INCOMING":
