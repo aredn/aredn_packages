@@ -34,13 +34,22 @@
 
 let DEBUG = false;
 
-const VERSION = "0.0.1";
-
 import * as fs from "fs";
 import * as socket from "socket";
 import * as uci from "uci";
 import * as babel from "aredn.babel";
 
+//
+// Supported versions
+//
+
+const VERSION_0_0_1 = "0.0.1";
+const VERSION_0_0_2 = "0.0.2";
+//
+// Supported features
+//
+const FEATURES_CRC          = 0x00000001;
+const FEATURES_ALL          = (FEATURES_CRC);
 //
 // Events
 //
@@ -54,12 +63,10 @@ const CLOSECONN             = 0x80000;
 //
 // Commands
 //
-const CMD_FWD_START         = ord('A');
 const CMD_UPDATE_PUBLISH    = ord("B");
 const CMD_UPDATE_SUBSCRIBE  = ord("C");
 const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
-const CMD_FWD_END           = ord('M');
 const CMD_KEEPALIVE         = ord('K');
 const CMD_SYNC              = ord('S');
 const CMD_VERSION           = ord('V');
@@ -156,7 +163,8 @@ const statistics = {
         publish: 0,
         subscribe: 0,
         invalidhop: 0,
-        invalidhost: 0
+        invalidhost: 0,
+        badcrc: 0
     },
     outgoing: {
         connection: 0,
@@ -179,7 +187,8 @@ const statistics = {
         version: 0,
         hop: 0,
         command: 0,
-        toself: 0
+        toself: 0,
+        keepalive: 0
     }
 };
 //
@@ -255,6 +264,20 @@ function eventString(polling) {
 }
 
 //
+// Make features human readable.
+//
+function featureString(features) {
+    if (features == 0) {
+        return "none";
+    }
+    let s = "";
+    if (features & FEATURES_CRC) {
+        s += "|CRC";
+    }
+    return substr(s, 1);
+}
+
+//
 // Calculate time for timer
 //
 function when(timeout) {
@@ -262,35 +285,51 @@ function when(timeout) {
 }
 
 //
+// Calculate CRC16
+//
+function crc16(data, start, end) {
+    let crc = 0;
+    for (let i = start; i < end; i++) {
+        let t = (crc >> 8) ^ ord(data, i);
+        t = t ^ t >> 4;
+        crc = (crc << 8) ^ (t << 12) ^ (t << 5) ^ t;
+        crc &= 0xFFFF;
+    }
+    return crc;
+}
+
+//
 // Build a message
 //
-function buildMessage(cmd, ipv4addr, hop, payload) {
+function buildMessage(channel, cmd, ipv4addr, hop, payload) {
     DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
     payload = payload ?? "";
-    let len = 8 + length(payload); // Length is the entire message including the length itself.
+    const overhead = 8 + (channel.features & FEATURES_CRC ? 2 : 0);
+    let len = overhead + length(payload); // Length is the entire message including the length itself.
     if (len > MAX_MESSAGE_SIZE) {
         DEBUG && print(`buildMessage: truncating payload ${ipv4addr}, len = ${len}\n`);
         len = MAX_MESSAGE_SIZE;
-        payload = substr(payload, 0, len - 8);
+        payload = substr(payload, 0, len - overhead);
     }
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
     if (!addr) {
         DEBUG && print(`buildMessage: bad ip address ${ipv4addr}\n`);
         return "";
     }
-    return chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
+    let msg = chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
+    if (channel.features & FEATURES_CRC) {
+        const chksum = crc16(msg, 0, length(msg));
+        msg += chr(chksum >> 8, chksum & 255);
+    }
+    return msg;
 }
-
-//
-// Cache useful messages
-//
-const keepaliveMsg = buildMessage(CMD_KEEPALIVE, myipv4address, 1);
 
 //
 // Build a targetted sync message.
 //
-function buildTargettedSyncMessage(target) {
+function buildTargettedSyncMessage(channel) {
     DEBUG && print("buildTargettedSyncMessage:");
+    const target = channel.interface;
     let sync = "";
     for (let ip in hostroutes) {
         if (ip !== myipv4address && hostroutes[ip] === target) {
@@ -300,19 +339,19 @@ function buildTargettedSyncMessage(target) {
         }
     }
     DEBUG && print("\n");
-    return length(sync) ? buildMessage(CMD_SYNC, myipv4address, 1, sync) : "";
+    return length(sync) ? buildMessage(channel, CMD_SYNC, myipv4address, 1, sync) : "";
 }
 
 //
 // Send message to all (most) of our connected channels.
 //
-function sendMsgToAll(msg, from) {
+function sendMsgToAll(cmd, ipv4addr, hop, payload, from) {
     let count = 0;
     const fromiface = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
         if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface] || !from)) {
-            channel.outgoing += msg;
+            channel.outgoing += buildMessage(channel, cmd, ipv4addr, hop, payload);
             channel.polling |= POLLOUT;
             count++;
         }
@@ -343,9 +382,40 @@ function processMessage(cmd, hop, srcipv4, payload)
     switch (cmd) {
         case CMD_VERSION:
             statistics.incoming.version++;
-            if (payload != VERSION) {
-                graylist[`${this.interface}/${this.address}`] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
-                this.process(CLOSECONN);
+            // v0.0.1: A very simply version sync system - they must match or the connection fails.
+            // Downgrade ourselves to v0.0.1 and act appropriately. If we initiated the connection already
+            // then the remote side will terminate because we sent it an invalid version number.
+            if (payload == VERSION_0_0_1) {
+                if (this.state == "CONNECTED_INCOMING") {
+                    this.version = VERSION_0_0_1;
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                    statistics.outgoing.sync++;
+                    this.outgoing += buildTargettedSyncMessage(this);
+                }
+            }
+            // v0.0.2: The initiator send the version number first together with a feature vector of 16 bits.
+            // The target sends back its own version and feature vector. Each end will use only the union of
+            // the features. Once each end has received the version information, the sync process can begin.
+            else if (substr(payload, 0, 5) == VERSION_0_0_2) {
+                this.downgradable = false;
+                this.features = ((ord(payload, 5) << 24) + (ord(payload, 6) << 16) + (ord(payload, 7) << 8) + ord(payload, 8)) & FEATURES_ALL;
+                if (this.state == "CONNECTED_INCOMING") {
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                }
+                statistics.outgoing.sync++;
+                this.outgoing += buildTargettedSyncMessage(this);
+            }
+            // v?.?.?: For unknown versions, v0.0.1 instances just disconnected forcing the other end
+            // to recover the connection by downgrading and reconnecting. From v0.0.2 onward the remote
+            // end just sends its version information instead, letting the initiator determine how to proceed.
+            else {
+                this.downgradable = false;
+                if (this.state == "CONNECTED_INCOMING") {
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                }
                 statistics.error.version++;
             }
             return false;
@@ -366,7 +436,7 @@ function processMessage(cmd, hop, srcipv4, payload)
                     if (data !== null) {
                         DEBUG && print(`-- sending ${res.dir}${ip}\n`);
                         statistics.outgoing[res.name]++;
-                        this.outgoing += buildMessage(res.cmd, ip, HOP_DEFAULT, data);
+                        this.outgoing += buildMessage(this, res.cmd, ip, HOP_DEFAULT, data);
                     }
                 }
             }
@@ -403,11 +473,6 @@ function processMessage(cmd, hop, srcipv4, payload)
                 }
             }
             statistics.error.command++;
-            // Unknown commands in this range are forwarded.
-            if (validif && cmd >= CMD_FWD_START && cmd <= CMD_FWD_END) {
-                return true;
-            }
-            // Otherwise they are not.
             return false;
     }
 }
@@ -444,12 +509,26 @@ function processRequest() {
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
         const srcipv4str = arrtoip(srcipv4);
         DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} ${srcipv4src}\n`);
-        const payload = substr(this.incoming, i + 8, len - 8);
+        let overhead = 8;
+        if (this.features & FEATURES_CRC) {
+            overhead += 2;
+            const chksum = crc16(this.incoming, i, i + len - 2);
+            const rchksum = 256 * ord(this.incoming, i + len - 2) + ord(this.incoming, i + len - 1);
+            if (chksum !== rchksum) {
+                DEBUG && print(`--- bad crc ${chksum} recv ${rchksum}\n`);
+                statistics.incoming.badcrc++;
+                // Bad CRCs are fatal as it suggests the stream is corrupted. Terminate it and let it restart.
+                this.process(CLOSECONN);
+                i = ilen;
+                break;
+            }
+        }
+        const payload = substr(this.incoming, i + 8, len - overhead);
         const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
         if (forward) {
             if (hop > 1) {
                 // Build and forward message
-                const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+                sendMsgToAll(cmd, srcipv4str, hop - 1, payload, this);
                 for (let r = 0; r < length(resources); r++) {
                     const res = resources[r];
                     if (cmd === res.cmd) {
@@ -538,9 +617,9 @@ function channelProcess(event) {
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         this.incoming = "";
+                        this.downgradable = this.version == VERSION_0_0_1 ? false : true;
                         statistics.outgoing.version++;
-                        statistics.outgoing.sync++;
-                        this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+                        this.outgoing = buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
                     }
                     break;
                 case NEWADDRESS:
@@ -587,7 +666,15 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    this.state = "EXIT";
+                    if (this.downgradable) {
+                        // Downgrade the version and try the connection again.
+                        this.downgradable = false;
+                        this.version = VERSION_0_0_1;
+                        this.state = "NEW";
+                    }
+                    else {
+                        this.state = "EXIT";
+                    }
                     // Force neighbor update
                     neighborhood.timer = 0;
                     this.timer = 0;
@@ -596,12 +683,13 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += keepaliveMsg;
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1);
                         this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
                     }
+                    statistics.errors.keepalive++;
                     // Fall through
                 case NEWADDRESS:
                 case NOINTERFACE:
@@ -618,9 +706,7 @@ function channelProcess(event) {
         {
             statistics.incoming.connection++;
             this.incoming = "";
-            statistics.outgoing.version++;
-            statistics.outgoing.sync++;
-            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+            this.outgoing = "";
             this.state = "CONNECTED_INCOMING";
             this.keepalive = 0;
             this.keepalivetime = when(KEEPALIVE_POLL);
@@ -655,12 +741,13 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += keepaliveMsg;
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1);
                         this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
                     }
+                    statistics.errors.keepalive++;
                     // Fall through
                 case POLLRDHUP:
                 case POLLRDHUP|POLLOUT:
@@ -708,7 +795,11 @@ function createChannel(initialstate, connection, polling, timer, process) {
         state: initialstate,
         connection: connection,
         polling: polling,
-        timer: timer
+        timer: timer,
+        version: VERSION_0_0_2 + chr(FEATURES_ALL >> 24, (FEATURES_ALL >> 16) & 255, (FEATURES_ALL >> 8) & 255, FEATURES_ALL & 255),
+        features: 0,
+        incoming: "",
+        outgoing: ""
     };
     if (!process) {
         process = channelProcess;
@@ -742,7 +833,7 @@ function commandProcess(cmd) {
                         return "ok nochange";
                     }
                     fs.writefile(path, data);
-                    const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
+                    const count = sendMsgToAll(res.cmd, myipv4address, HOP_DEFAULT, data, null);
                     statistics.outgoing[res.name] += count;
                     return old ? "ok updated" : "ok new";
                 }
@@ -761,7 +852,7 @@ function commandProcess(cmd) {
             }
             for (let id in channels) {
                 const c = channels[id];
-                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
+                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} v${c.version == VERSION_0_0_1 ? VERSION_0_0_1 : VERSION_0_0_2} features ${featureString(c.features)} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
             }
             for (let k in statistics) {
                 r += `statistics ${k}`;
@@ -800,7 +891,7 @@ function commandProcess(cmd) {
 function managerProcess(event) {
     switch (this.state) {
         case "INCOMING":
-            this.connection.send(`AREDNLink ${VERSION}\n`);
+            this.connection.send(`AREDNLink ${VERSION_0_0_2}\n`);
             this.state = "READING";
             this.polling &= ~POLLOUT;
             // Fall through
@@ -995,7 +1086,7 @@ function routeProcess(event) {
         const channel = channels[id];
         const sync = newr[channel.interface];
         if (sync && (channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING")) {
-            channel.outgoing += buildMessage(CMD_SYNC, myipv4address, 1, sync);
+            channel.outgoing += buildMessage(channel, CMD_SYNC, myipv4address, 1, sync);
             channel.polling |= POLLOUT;
         }
     }
@@ -1111,7 +1202,7 @@ while (!exiting) {
         const event = events[i];
         if (event[1]) {
             event[2].timer = null;
-            event[2].process(event[1]);
+            event[2].process(event[1] & (POLLIN|POLLOUT|POLLRDHUP));
         }
     }
     // Check for expired timers
