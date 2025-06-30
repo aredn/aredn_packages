@@ -1001,7 +1001,7 @@ function neighborhoodProcess(event) {
     const nlength = length(neighbors);
     statistics.count.neighbors = nlength;
     const now = when(0);
-    const best = {};
+    const ifgroups = {};
     // Sort the neighbors into groups based on their interfaces, and track which is the best one for each.
     for (let i = 0; i < nlength; i++) {
         const n = neighbors[i];
@@ -1009,26 +1009,26 @@ function neighborhoodProcess(event) {
         if (!gray || gray.timer < now) {
             const iface = interfaces[n.interface];
             if (iface) {
-                if (!best[n.interface]) {
-                    best[n.interface] = { b: iface.address, n: [] };
+                if (!ifgroups[n.interface]) {
+                    ifgroups[n.interface] = { b: iface.address, n: [] };
                 }
-                best[n.interface].b = bestAddress(best[n.interface].b, n.ipv6address);
-                push(best[n.interface].n, n.ipv6address);
+                ifgroups[n.interface].b = bestAddress(ifgroups[n.interface].b, n.ipv6address);
+                push(ifgroups[n.interface].n, n.ipv6address);
             }
         }
     }
     // For each interface we work out who we need to be connected to.
-    for (let ifname in best) {
+    for (let ifname in ifgroups) {
         const iface = interfaces[ifname];
         const myaddress = iface.address;
-        const bestaddress = best[ifname].b;
-        const neighaddresses = best[ifname].n;
+        const bestaddress = ifgroups[ifname].b;
+        const neighaddresses = ifgroups[ifname].n;
 
         // Always have a connection to the best address (unless that's me)
         if (bestaddress != myaddress && !findChannelByAddress(bestaddress)) {
             const channel = createChannel("IDLE", null, 0, 0, null);
             channel.interface = ifname;
-            channel.myaddress = iface.address;
+            channel.myaddress = myaddress;
             channel.address = bestaddress;
             channel.process(NEWADDRESS);
         }
@@ -1043,26 +1043,23 @@ function neighborhoodProcess(event) {
             }
         }
         else {
-            // If network is asymmetric ...
-            // If we're not the best, close any channel to a worse neighbor I created
-            if (bestaddress != myaddress) {
-                for (let id in channels) {
-                    const channel = channels[id];
-                    if (channel.interface == ifname && bestAddress(myaddress, channel.address) != channel.address && channel.state === "CONNECTED") {
-                        channel.process(CLOSECONN);
-                    }
-                }
-            }
-            // Else open a connection to every neighbor
-            else {
-                for (let i = 0; i < length(neighaddresses); i++) {
-                    const nipv6addr = neighaddresses[i];
-                    if (!findChannelByAddress(nipv6addr)) {
-                        const channel = createChannel("IDLE", null, 0, 0, null);
+            // If network is asymmetric, open a channel to every neighbor better than me and close any which are worse.
+            // This creates far too much network traffic, but because we can have hidden nodes, there's no good other options.
+            for (let i = 0; i < length(neighaddresses); i++) {
+                const nipv6addr = neighaddresses[i];
+                let channel = findChannelByAddress(nipv6addr);
+                if (bestAddress(myaddress, nipv6addr) == nipv6addr) {
+                    if (!channel) {
+                        channel = createChannel("IDLE", null, 0, 0, null);
                         channel.interface = ifname;
-                        channel.myaddress = iface.address;
+                        channel.myaddress = myaddress;
                         channel.address = nipv6addr;
                         channel.process(NEWADDRESS);
+                    }
+                }
+                else {
+                    if (channel && channel.state === "CONNECTED") {
+                        channel.process(CLOSECONN);
                     }
                 }
             }
@@ -1150,20 +1147,9 @@ function routeProcess(event) {
 function mainProcess(event) {
     if (event & POLLIN) {
         const address = {};
-        const connection = main.accept(address, socket.SOCK_NONBLOCK);
-        const echannel = findChannelByAddress(address.address);
-        if (echannel && echannel.state == "CONNECTED" && bestAddress(address.address, interfaces[address.interface].address) != address.addess) {
-            // We have an existing channel and we're the best address, so we'll keep that and close this.
-            connection.close();
-        }
-        else {
-            if (echannel) {
-                echannel.process(CLOSECONN);
-            }
-            const channel = createChannel("INCOMING", connection, POLLIN|POLLRDHUP, null, null);
-            channel.interface = address.interface;
-            channel.address = address.address;
-        }
+        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null, null);
+        channel.interface = address.interface;
+        channel.address = address.address;
     }
 }
 
