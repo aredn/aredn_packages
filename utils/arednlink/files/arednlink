@@ -229,7 +229,7 @@ function bestAddress(a, b) {
 // Is network symmetric? Does everyone have at least one neighbor in common?
 //
 function isNetworkSymmetric(iface) {
-    let mode = netmode[iface.name];
+    let mode = netmodes[iface.name];
     if (mode === null) {
         mode = true;
         if (index(iface.name, "wlan") === 0) {
@@ -240,9 +240,28 @@ function isNetworkSymmetric(iface) {
                 }
             });
         }
-        netmode[iface.name] = mode;
+        netmodes[iface.name] = mode;
     }
     return mode;
+}
+
+//
+// Find channel for the given address.
+//
+function findChannelByAddress(address) {
+    for (let id in channels) {
+        if (channels[id].address == address) {
+            return channels[id];
+        }
+    }
+    return null;
+}
+
+//
+// Is a channel connected?
+//
+function isChannelConnected(channel) {
+    return channel.state == "CONNECTED" || channel.state == "CONNECTED_INCOMING";
 }
 
 //
@@ -364,7 +383,7 @@ function sendMsgToAll(cmd, ipv4addr, hop, payload, from) {
     const fromiface = from?.interface;
     for (let id in channels) {
         const channel = channels[id];
-        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface] || !from)) {
+        if (isChannelConnected(channel) && channel !== from && (channel.interface === fromiface || !isolated[channel.interface] || !from)) {
             channel.outgoing += buildMessage(channel, cmd, ipv4addr, hop, payload);
             channel.polling |= POLLOUT;
             count++;
@@ -453,9 +472,6 @@ function processMessage(cmd, hop, srcipv4, payload)
                         this.outgoing += buildMessage(this, res.cmd, ip, HOP_DEFAULT, data);
                     }
                 }
-            }
-            if (length(this.outgoing)) {
-                this.polling |= POLLOUT;
             }
             return false;
         default:
@@ -578,13 +594,8 @@ function channelProcess(event) {
         {
             switch (event) {
                 case NEWADDRESS:
-                    if (bestAddress(this.myaddress, this.address) === this.myaddress) {
-                        this.timer = when(IDLE_POLL);
-                    }
-                    else {
-                        this.state = "NEW";
-                        this.timer = 0;
-                    }
+                    this.state = "NEW";
+                    this.timer = 0;
                     break;
                 case NOINTERFACE:
                 case CLOSECONN:
@@ -698,7 +709,6 @@ function channelProcess(event) {
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
                         this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1);
-                        this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
@@ -758,7 +768,6 @@ function channelProcess(event) {
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
                         this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1);
-                        this.polling |= POLLOUT;
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
@@ -791,12 +800,11 @@ function channelProcess(event) {
                 this.connection = null;
             }
             delete channels[this.id];
-            const iface = interfaces[this.interface];
-            if (iface && iface.channels[this.address]) {
-                delete iface.channels[this.address];
-            }
             break;
         }
+    }
+    if (length(this.outgoing)) {
+        this.polling |= POLLOUT;
     }
 }
 
@@ -861,7 +869,7 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i} chanout ${length(interfaces[i].channels)} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}${isNetworkSymmetric(interfaces[i]) ? " symmetric" + (!length(interfaces[i].channels) ? " best" : "") : ""}\n`;
+                r += `interface ${i} address ${interfaces[i].address} chanout ${length(filter(values(channels), c => c.state == "CONNECTED" && c.interface == i))} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}${isNetworkSymmetric(interfaces[i]) ? " symmetric" : ""}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
@@ -969,17 +977,20 @@ function neighborhoodProcess(event) {
         }
     }
     for (let name in oldinterfaces) {
-        const iface = oldinterfaces[name];
-        if (iface) {
-            for (let n in iface.channels) {
-                iface.channels[n].timer = null;
-                iface.channels[n].process(NOINTERFACE);
+        // Close any open channels on this interface
+        if (oldinterfaces[name]) {
+            for (let id in channels) {
+                const channel = channels[id];
+                if (channel.interface == name) {
+                    channel.timer = null;
+                    channel.process(NOINTERFACE);
+                }
             }
-        }
-        // Remove any graylist entries when the interface disappears
-        for (let key in graylist) {
-            if (index(key, name) === 0) {
-                delete graylist[key];
+            // Remove any graylist entries when the interface disappears
+            for (let key in graylist) {
+                if (index(key, name) === 0) {
+                    delete graylist[key];
+                }
             }
         }
     }
@@ -991,50 +1002,69 @@ function neighborhoodProcess(event) {
     statistics.count.neighbors = nlength;
     const now = when(0);
     const best = {};
+    // Sort the neighbors into groups based on their interfaces, and track which is the best one for each.
     for (let i = 0; i < nlength; i++) {
         const n = neighbors[i];
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
             const iface = interfaces[n.interface];
             if (iface) {
-                // For symmetric networks, we just need a connection to the best neighbor. We work out what that will
-                // be for use later.
-                if (isNetworkSymmetric(iface)) {
-                    best[n.interface] = bestAddress(best[n.interface] || iface.address, n.ipv6address);
+                if (!best[n.interface]) {
+                    best[n.interface] = { b: iface.address, n: [] };
                 }
-                else {
-                    // For a valid interface, without a channel to the neighbor, and the neighnor is better than us, create a channel.
-                    if (!iface.channels[n.ipv6address] && bestAddress(iface.address, n.ipv6address) != iface.address) {
-                        const channel = createChannel("IDLE", null, 0, 0, null);
-                        channel.interface = n.interface;
-                        channel.myaddress = iface.address;
-                        channel.address = n.ipv6address;
-                        iface.channels[n.ipv6address] = channel;
-                        channel.process(NEWADDRESS);
-                    }
-                }
+                best[n.interface].b = bestAddress(best[n.interface].b, n.ipv6address);
+                push(best[n.interface].n, n.ipv6address);
             }
         }
     }
-    // Look through the symmetric interfaces and make sure we're connected to the best node.
+    // For each interface we work out who we need to be connected to.
     for (let ifname in best) {
         const iface = interfaces[ifname];
-        const bestaddress = best[ifname];
-        if (!iface.channels[bestaddress]) {
-            // Make sure to disconnect from anything which isnt the current best.
-            for (let chan in iface.channels) {
-                if (iface.channels[chan].state === "CONNECTED") {
-                    iface.channels[chan].process(CLOSECONN);
+        const myaddress = iface.address;
+        const bestaddress = best[ifname].b;
+        const neighaddresses = best[ifname].n;
+
+        // Always have a connection to the best address (unless that's me)
+        if (bestaddress != myaddress && !findChannelByAddress(bestaddress)) {
+            const channel = createChannel("IDLE", null, 0, 0, null);
+            channel.interface = ifname;
+            channel.myaddress = iface.address;
+            channel.address = bestaddress;
+            channel.process(NEWADDRESS);
+        }
+
+        if (isNetworkSymmetric(iface)) {
+            // If network is symmetric, close every other channel I created on this interface except the best one.
+            for (let id in channels) {
+                const channel = channels[id];
+                if (channel.interface == ifname && bestaddress != channel.address && channel.state === "CONNECTED") {
+                    channel.process(CLOSECONN);
                 }
             }
-            // If we ourself are not the best, connect to it.
-            if (iface.address != bestaddress) {
-                const channel = createChannel("IDLE", null, 0, 0, null);
-                channel.interface = ifname;
-                channel.myaddress = iface.address;
-                channel.address = bestaddress;
-                iface.channels[bestaddress] = channel;
-                channel.process(NEWADDRESS);
+        }
+        else {
+            // If network is asymmetric ...
+            // If we're not the best, close any channel to a worse neighbor I created
+            if (bestaddress != myaddress) {
+                for (let id in channels) {
+                    const channel = channels[id];
+                    if (channel.interface == ifname && bestAddress(myaddress, channel.address) != channel.address && channel.state === "CONNECTED") {
+                        channel.process(CLOSECONN);
+                    }
+                }
+            }
+            // Else open a connection to every neighbor
+            else {
+                for (let i = 0; i < length(neighaddresses); i++) {
+                    const nipv6addr = neighaddresses[i];
+                    if (!findChannelByAddress(nipv6addr)) {
+                        const channel = createChannel("IDLE", null, 0, 0, null);
+                        channel.interface = ifname;
+                        channel.myaddress = iface.address;
+                        channel.address = nipv6addr;
+                        channel.process(NEWADDRESS);
+                    }
+                }
             }
         }
     }
@@ -1101,7 +1131,7 @@ function routeProcess(event) {
     for (let id in channels) {
         const channel = channels[id];
         const sync = newr[channel.interface];
-        if (sync && (channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING")) {
+        if (sync && isChannelConnected(channel)) {
             channel.outgoing += buildMessage(channel, CMD_SYNC, myipv4address, 1, sync);
             channel.polling |= POLLOUT;
         }
@@ -1120,9 +1150,20 @@ function routeProcess(event) {
 function mainProcess(event) {
     if (event & POLLIN) {
         const address = {};
-        const channel = createChannel("INCOMING", main.accept(address, socket.SOCK_NONBLOCK), POLLIN|POLLRDHUP, null, null);
-        channel.interface = address.interface;
-        channel.address = address.address;
+        const connection = main.accept(address, socket.SOCK_NONBLOCK);
+        const echannel = findChannelByAddress(address.address);
+        if (echannel && echannel.state == "CONNECTED" && bestAddress(address.address, interfaces[address.interface].address) != address.addess) {
+            // We have an existing channel and we're the best address, so we'll keep that and close this.
+            connection.close();
+        }
+        else {
+            if (echannel) {
+                echannel.process(CLOSECONN);
+            }
+            const channel = createChannel("INCOMING", connection, POLLIN|POLLRDHUP, null, null);
+            channel.interface = address.interface;
+            channel.address = address.address;
+        }
     }
 }
 
