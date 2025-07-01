@@ -34,13 +34,22 @@
 
 let DEBUG = false;
 
-const VERSION = "0.0.1";
-
 import * as fs from "fs";
 import * as socket from "socket";
 import * as uci from "uci";
 import * as babel from "aredn.babel";
 
+//
+// Supported versions
+//
+
+const VERSION_0_0_1 = "0.0.1";
+const VERSION_0_0_2 = "0.0.2";
+//
+// Supported features
+//
+const FEATURES_CRC          = 0x00000001;
+const FEATURES_ALL          = (FEATURES_CRC);
 //
 // Events
 //
@@ -54,12 +63,10 @@ const CLOSECONN             = 0x80000;
 //
 // Commands
 //
-const CMD_FWD_START         = ord('A');
 const CMD_UPDATE_PUBLISH    = ord("B");
 const CMD_UPDATE_SUBSCRIBE  = ord("C");
 const CMD_UPDATE_HOSTS      = ord('H');
 const CMD_UPDATE_SERVICES   = ord('U');
-const CMD_FWD_END           = ord('M');
 const CMD_KEEPALIVE         = ord('K');
 const CMD_SYNC              = ord('S');
 const CMD_VERSION           = ord('V');
@@ -92,6 +99,7 @@ const DELETE_TIMEOUT        = 600;
 //
 const AREDNLINK_PORT        = 9623;
 const AREDNLINK_MGR         = "/var/run/arednlink.sock";
+const RECV_SIZE             = 32768;
 //
 // Resources
 //
@@ -156,7 +164,8 @@ const statistics = {
         publish: 0,
         subscribe: 0,
         invalidhop: 0,
-        invalidhost: 0
+        invalidhost: 0,
+        badcrc: 0
     },
     outgoing: {
         connection: 0,
@@ -179,7 +188,8 @@ const statistics = {
         version: 0,
         hop: 0,
         command: 0,
-        toself: 0
+        toself: 0,
+        keepalive: 0
     }
 };
 //
@@ -191,6 +201,7 @@ const myipv4iparr = iptoarr(myipv4address);
 let channelId = 1;
 let exiting = false;
 const poller = { fn: null, len: -1 };
+const netmodes = {};
 
 //
 // Compare two addresses and select the best/highest one.
@@ -216,10 +227,42 @@ function bestAddress(a, b) {
 }
 
 //
-// Is interface symmetric? Can everyone see everyone else?
+// Is network symmetric? Does everyone have at least one neighbor in common?
 //
 function isNetworkSymmetric(iface) {
-    return index(iface.name, "wlan") === 0 ? false : true;
+    let mode = netmodes[iface.name];
+    if (mode === null) {
+        mode = true;
+        if (index(iface.name, "wlan") === 0) {
+            uci.cursor().foreach("wireless", "wifi-iface", function(s)
+            {
+                if (s.ifname == iface.name && s.mode === "adhoc") {
+                    mode = false;
+                }
+            });
+        }
+        netmodes[iface.name] = mode;
+    }
+    return mode;
+}
+
+//
+// Find channel for the given address.
+//
+function findChannelByAddress(address) {
+    for (let id in channels) {
+        if (channels[id].address == address) {
+            return channels[id];
+        }
+    }
+    return null;
+}
+
+//
+// Is a channel connected?
+//
+function isChannelConnected(channel) {
+    return channel.state == "CONNECTED" || channel.state == "CONNECTED_INCOMING";
 }
 
 //
@@ -255,6 +298,20 @@ function eventString(polling) {
 }
 
 //
+// Make features human readable.
+//
+function featureString(features) {
+    if (features == 0) {
+        return "none";
+    }
+    let s = "";
+    if (features & FEATURES_CRC) {
+        s += "|CRC";
+    }
+    return substr(s, 1);
+}
+
+//
 // Calculate time for timer
 //
 function when(timeout) {
@@ -262,35 +319,51 @@ function when(timeout) {
 }
 
 //
+// Calculate CRC16
+//
+function crc16(data, start, end) {
+    let crc = 0;
+    for (let i = start; i < end; i++) {
+        let t = (crc >> 8) ^ ord(data, i);
+        t = t ^ t >> 4;
+        crc = (crc << 8) ^ (t << 12) ^ (t << 5) ^ t;
+        crc &= 0xFFFF;
+    }
+    return crc;
+}
+
+//
 // Build a message
 //
-function buildMessage(cmd, ipv4addr, hop, payload) {
+function buildMessage(channel, cmd, ipv4addr, hop, payload) {
     DEBUG && print(`buildMessage: cmd ${chr(cmd)} ip ${ipv4addr} hop ${hop} payload ${payload}\n`);
     payload = payload ?? "";
-    let len = 8 + length(payload); // Length is the entire message including the length itself.
+    const overhead = 8 + (channel.features & FEATURES_CRC ? 2 : 0);
+    let len = overhead + length(payload); // Length is the entire message including the length itself.
     if (len > MAX_MESSAGE_SIZE) {
         DEBUG && print(`buildMessage: truncating payload ${ipv4addr}, len = ${len}\n`);
         len = MAX_MESSAGE_SIZE;
-        payload = substr(payload, 0, len - 8);
+        payload = substr(payload, 0, len - overhead);
     }
     const addr = ipv4addr == myipv4address ? myipv4iparr : iptoarr(ipv4addr);
     if (!addr) {
         DEBUG && print(`buildMessage: bad ip address ${ipv4addr}\n`);
         return "";
     }
-    return chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
+    let msg = chr(len >> 8, len & 255, cmd, hop , addr[0], addr[1], addr[2], addr[3]) + payload;
+    if (channel.features & FEATURES_CRC) {
+        const chksum = crc16(msg, 0, length(msg));
+        msg += chr(chksum >> 8, chksum & 255);
+    }
+    return msg;
 }
-
-//
-// Cache useful messages
-//
-const keepaliveMsg = buildMessage(CMD_KEEPALIVE, myipv4address, 1);
 
 //
 // Build a targetted sync message.
 //
-function buildTargettedSyncMessage(target) {
+function buildTargettedSyncMessage(channel) {
     DEBUG && print("buildTargettedSyncMessage:");
+    const target = channel.interface;
     let sync = "";
     for (let ip in hostroutes) {
         if (ip !== myipv4address && hostroutes[ip] === target) {
@@ -300,19 +373,36 @@ function buildTargettedSyncMessage(target) {
         }
     }
     DEBUG && print("\n");
-    return length(sync) ? buildMessage(CMD_SYNC, myipv4address, 1, sync) : "";
+    return length(sync) ? buildMessage(channel, CMD_SYNC, myipv4address, 1, sync) : "";
 }
 
 //
 // Send message to all (most) of our connected channels.
 //
-function sendMsgToAll(msg, from) {
-    let count = 0;
-    const fromiface = from?.interface;
+function sendMsgToAll(cmd, ipv4addr, hop, payload, from) {
+    const fromifname = from?.interface;
+    const highs = {};
+    const rest = [];
     for (let id in channels) {
         const channel = channels[id];
-        if ((channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING") && channel !== from && (channel.interface === fromiface || !isolated[channel.interface] || !from)) {
-            channel.outgoing += msg;
+        const ifname = channel.interface;
+        if (isChannelConnected(channel) && (!from || fromifname === ifname || !isolated[ifname])) {
+            if (!channel.rbest || channel.rbest == interfaces[ifname].address) {
+                push(rest, channel);
+            }
+            else if (bestAddress(channel.address, highs[channel.rbest]?.address) == channel.address) {
+                highs[channel.rbest] = channel;
+            }
+        }
+    }
+    for (let k in highs) {
+        push(rest, highs[k]);
+    }
+    let count = 0;
+    for (let i = 0; i < length(rest); i++) {
+        const channel = rest[i];
+        if (channel != from) {
+            channel.outgoing += buildMessage(channel, cmd, ipv4addr, hop, payload);
             channel.polling |= POLLOUT;
             count++;
         }
@@ -343,14 +433,48 @@ function processMessage(cmd, hop, srcipv4, payload)
     switch (cmd) {
         case CMD_VERSION:
             statistics.incoming.version++;
-            if (payload != VERSION) {
-                graylist[`${this.interface}/${this.address}`] = { timer: when(GRAY_TIMEOUT + GRAY_BACKOFF * GRAY_MAX_SCALE), scale: GRAY_MAX_SCALE };
-                this.process(CLOSECONN);
+            // v0.0.1: A very simply version sync system - they must match or the connection fails.
+            // Downgrade ourselves to v0.0.1 and act appropriately. If we initiated the connection already
+            // then the remote side will terminate because we sent it an invalid version number.
+            if (payload == VERSION_0_0_1) {
+                if (this.state == "CONNECTED_INCOMING") {
+                    this.version = VERSION_0_0_1;
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                    statistics.outgoing.sync++;
+                    this.outgoing += buildTargettedSyncMessage(this);
+                }
+            }
+            // v0.0.2: The initiator send the version number first together with a feature vector of 16 bits.
+            // The target sends back its own version and feature vector. Each end will use only the union of
+            // the features. Once each end has received the version information, the sync process can begin.
+            else if (substr(payload, 0, 5) == VERSION_0_0_2) {
+                this.downgradable = false;
+                this.features = ((ord(payload, 5) << 24) + (ord(payload, 6) << 16) + (ord(payload, 7) << 8) + ord(payload, 8)) & FEATURES_ALL;
+                if (this.state == "CONNECTED_INCOMING") {
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                }
+                statistics.outgoing.sync++;
+                this.outgoing += buildTargettedSyncMessage(this);
+            }
+            // v?.?.?: For unknown versions, v0.0.1 instances just disconnected forcing the other end
+            // to recover the connection by downgrading and reconnecting. From v0.0.2 onward the remote
+            // end just sends its version information instead, letting the initiator determine how to proceed.
+            else {
+                this.downgradable = false;
+                if (this.state == "CONNECTED_INCOMING") {
+                    statistics.outgoing.version++;
+                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
+                }
                 statistics.error.version++;
             }
             return false;
         case CMD_KEEPALIVE:
             statistics.incoming.keepalive++;
+            if (length(payload)) {
+                this.rbest = payload;
+            }
             return false;
         case CMD_SYNC:
             // A sync request from a neighbor. Payload contains a list of addresses the neighbor is soliciting data for.
@@ -366,12 +490,9 @@ function processMessage(cmd, hop, srcipv4, payload)
                     if (data !== null) {
                         DEBUG && print(`-- sending ${res.dir}${ip}\n`);
                         statistics.outgoing[res.name]++;
-                        this.outgoing += buildMessage(res.cmd, ip, HOP_DEFAULT, data);
+                        this.outgoing += buildMessage(this, res.cmd, ip, HOP_DEFAULT, data);
                     }
                 }
-            }
-            if (length(this.outgoing)) {
-                this.polling |= POLLOUT;
             }
             return false;
         default:
@@ -403,11 +524,6 @@ function processMessage(cmd, hop, srcipv4, payload)
                 }
             }
             statistics.error.command++;
-            // Unknown commands in this range are forwarded.
-            if (validif && cmd >= CMD_FWD_START && cmd <= CMD_FWD_END) {
-                return true;
-            }
-            // Otherwise they are not.
             return false;
     }
 }
@@ -417,7 +533,7 @@ function processMessage(cmd, hop, srcipv4, payload)
 //
 function processRequest() {
     DEBUG && print(`processRequest channel ${this}\n`);
-    const data = this.connection.recv();
+    const data = this.connection.recv(RECV_SIZE);
     DEBUG && print(`--- data length ${length(data)}\n`);
     if (!data || !length(data)) {
         return false;
@@ -444,16 +560,30 @@ function processRequest() {
         const srcipv4 = [ ord(this.incoming, i + 4), ord(this.incoming, i + 5), ord(this.incoming, i + 6), ord(this.incoming, i + 7) ];
         const srcipv4str = arrtoip(srcipv4);
         DEBUG && print(`--- msg ${chr(cmd)} hop ${hop} ${srcipv4src}\n`);
-        const payload = substr(this.incoming, i + 8, len - 8);
+        let overhead = 8;
+        if (this.features & FEATURES_CRC) {
+            overhead += 2;
+            const chksum = crc16(this.incoming, i, i + len - 2);
+            const rchksum = 256 * ord(this.incoming, i + len - 2) + ord(this.incoming, i + len - 1);
+            if (chksum !== rchksum) {
+                DEBUG && print(`--- bad crc ${chksum} recv ${rchksum}\n`);
+                statistics.incoming.badcrc++;
+                // Bad CRCs are fatal as it suggests the stream is corrupted. Terminate it and let it restart.
+                this.process(CLOSECONN);
+                i = ilen;
+                break;
+            }
+        }
+        const payload = substr(this.incoming, i + 8, len - overhead);
         const forward = call(processMessage, this, null, cmd, hop, srcipv4str, payload);
         if (forward) {
             if (hop > 1) {
                 // Build and forward message
-                const count = sendMsgToAll(chr(len >> 8, len & 255, cmd, hop - 1, srcipv4[0], srcipv4[1], srcipv4[2], srcipv4[3]) + payload, this);
+                const count = sendMsgToAll(cmd, srcipv4str, hop - 1, payload, this);
                 for (let r = 0; r < length(resources); r++) {
                     const res = resources[r];
                     if (cmd === res.cmd) {
-                        statistics.forward[res.name]++;
+                        statistics.forward[res.name] += count;
                         break;
                     }
                 }
@@ -485,13 +615,8 @@ function channelProcess(event) {
         {
             switch (event) {
                 case NEWADDRESS:
-                    if (bestAddress(this.myaddress, this.address) === this.myaddress) {
-                        this.timer = when(IDLE_POLL);
-                    }
-                    else {
-                        this.state = "NEW";
-                        this.timer = 0;
-                    }
+                    this.state = "NEW";
+                    this.timer = 0;
                     break;
                 case NOINTERFACE:
                 case CLOSECONN:
@@ -538,9 +663,9 @@ function channelProcess(event) {
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         this.incoming = "";
+                        this.downgradable = this.version == VERSION_0_0_1 ? false : true;
                         statistics.outgoing.version++;
-                        statistics.outgoing.sync++;
-                        this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+                        this.outgoing = buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
                     }
                     break;
                 case NEWADDRESS:
@@ -574,6 +699,13 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
+                    else {
+                        // Error - close because we dont know the state anymore
+                        this.state = "EXIT";
+                        this.polling = 0;
+                        this.timer = 0;
+                        break;
+                    }
                     this.keepalivetime = when(KEEPALIVE_POLL);
                     this.timer = this.keepalivetime;
                     break;
@@ -587,7 +719,15 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    this.state = "EXIT";
+                    if (this.downgradable) {
+                        // Downgrade the version and try the connection again.
+                        this.downgradable = false;
+                        this.version = VERSION_0_0_1;
+                        this.state = "NEW";
+                    }
+                    else {
+                        this.state = "EXIT";
+                    }
                     // Force neighbor update
                     neighborhood.timer = 0;
                     this.timer = 0;
@@ -596,12 +736,12 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += keepaliveMsg;
-                        this.polling |= POLLOUT;
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface].best);
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
                     }
+                    statistics.errors.keepalive++;
                     // Fall through
                 case NEWADDRESS:
                 case NOINTERFACE:
@@ -618,13 +758,13 @@ function channelProcess(event) {
         {
             statistics.incoming.connection++;
             this.incoming = "";
-            statistics.outgoing.version++;
-            statistics.outgoing.sync++;
-            this.outgoing = buildMessage(CMD_VERSION, myipv4address, 1, VERSION) + buildTargettedSyncMessage(this.interface);
+            this.outgoing = "";
             this.state = "CONNECTED_INCOMING";
             this.keepalive = 0;
             this.keepalivetime = when(KEEPALIVE_POLL);
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
+            // No longer grey
+            delete graylist[`${this.interface}/${this.address}`];
             // Fall through
         }
         case "CONNECTED_INCOMING":
@@ -648,6 +788,13 @@ function channelProcess(event) {
                     else if (send !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
+                    else {
+                        // Error - close because we dont know the state anymore
+                        this.state = "EXIT";
+                        this.polling = 0;
+                        this.timer = 0;
+                        break;
+                    }
                     this.keepalivetime = when(KEEPALIVE_POLL);
                     this.timer = this.keepalivetime;
                     break;
@@ -655,12 +802,12 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += keepaliveMsg;
-                        this.polling |= POLLOUT;
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface].best);
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
                     }
+                    statistics.errors.keepalive++;
                     // Fall through
                 case POLLRDHUP:
                 case POLLRDHUP|POLLOUT:
@@ -688,12 +835,11 @@ function channelProcess(event) {
                 this.connection = null;
             }
             delete channels[this.id];
-            const iface = interfaces[this.interface];
-            if (iface && iface.channels[this.address]) {
-                delete iface.channels[this.address];
-            }
             break;
         }
+    }
+    if (length(this.outgoing)) {
+        this.polling |= POLLOUT;
     }
 }
 
@@ -708,7 +854,11 @@ function createChannel(initialstate, connection, polling, timer, process) {
         state: initialstate,
         connection: connection,
         polling: polling,
-        timer: timer
+        timer: timer,
+        version: VERSION_0_0_2 + chr(FEATURES_ALL >> 24, (FEATURES_ALL >> 16) & 255, (FEATURES_ALL >> 8) & 255, FEATURES_ALL & 255),
+        features: 0,
+        incoming: "",
+        outgoing: ""
     };
     if (!process) {
         process = channelProcess;
@@ -742,7 +892,7 @@ function commandProcess(cmd) {
                         return "ok nochange";
                     }
                     fs.writefile(path, data);
-                    const count = sendMsgToAll(buildMessage(res.cmd, myipv4address, HOP_DEFAULT, data));
+                    const count = sendMsgToAll(res.cmd, myipv4address, HOP_DEFAULT, data, null);
                     statistics.outgoing[res.name] += count;
                     return old ? "ok updated" : "ok new";
                 }
@@ -754,14 +904,14 @@ function commandProcess(cmd) {
             const now = when(0);
             let r = "";
             for (let i in interfaces) {
-                r += `interface ${i} chanout ${length(interfaces[i].channels)} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}${isNetworkSymmetric(interfaces[i]) ? " symmetric" + (!length(interfaces[i].channels) ? " best" : "") : ""}\n`;
+                r += `interface ${i} address ${interfaces[i].address} chanout ${length(filter(values(channels), c => c.state == "CONNECTED" && c.interface == i))} chanin ${length(filter(values(channels), c => c.state == "CONNECTED_INCOMING" && c.interface == i))}${isNetworkSymmetric(interfaces[i]) ? " symmetric" : ""}${interfaces[i].address == interfaces[i].best ? " best" : ""}\n`;
             }
             for (let i in isolated) {
                 r += `isolated ${i}\n`;
             }
             for (let id in channels) {
                 const c = channels[id];
-                r += `channel ${id} state ${c.state} interface ${c.interface ?? "-"} address ${c.address ?? "-"} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
+                r += `channel ${id} state ${c.state} v${c.version == VERSION_0_0_1 ? VERSION_0_0_1 : VERSION_0_0_2} interface ${c.interface ?? "-"} address ${c.address ?? "-"} rbest ${c.rbest ?? "-"} features ${featureString(c.features)} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
             }
             for (let k in statistics) {
                 r += `statistics ${k}`;
@@ -800,7 +950,7 @@ function commandProcess(cmd) {
 function managerProcess(event) {
     switch (this.state) {
         case "INCOMING":
-            this.connection.send(`AREDNLink ${VERSION}\n`);
+            this.connection.send(`AREDNLink ${VERSION_0_0_2}\n`);
             this.state = "READING";
             this.polling &= ~POLLOUT;
             // Fall through
@@ -858,21 +1008,24 @@ function neighborhoodProcess(event) {
         }
         else {
             // Found new interface
-            interfaces[name] = { name: name, address: iface.ipv6address, channels: {} };
+            interfaces[name] = { name: name, address: iface.ipv6address, best: iface.ipv6address };
         }
     }
     for (let name in oldinterfaces) {
-        const iface = oldinterfaces[name];
-        if (iface) {
-            for (let n in iface.channels) {
-                iface.channels[n].timer = null;
-                iface.channels[n].process(NOINTERFACE);
+        // Close any open channels on this interface
+        if (oldinterfaces[name]) {
+            for (let id in channels) {
+                const channel = channels[id];
+                if (channel.interface == name) {
+                    channel.timer = null;
+                    channel.process(NOINTERFACE);
+                }
             }
-        }
-        // Remove any graylist entries when the interface disappears
-        for (let key in graylist) {
-            if (index(key, name) === 0) {
-                delete graylist[key];
+            // Remove any graylist entries when the interface disappears
+            for (let key in graylist) {
+                if (index(key, name) === 0) {
+                    delete graylist[key];
+                }
             }
         }
     }
@@ -883,51 +1036,68 @@ function neighborhoodProcess(event) {
     const nlength = length(neighbors);
     statistics.count.neighbors = nlength;
     const now = when(0);
-    const best = {};
+    const ifgroups = {};
+    // Sort the neighbors into groups based on their interfaces, and track which is the best one for each.
     for (let i = 0; i < nlength; i++) {
         const n = neighbors[i];
         const gray = graylist[`${n.interface}/${n.ipv6address}`];
         if (!gray || gray.timer < now) {
             const iface = interfaces[n.interface];
             if (iface) {
-                // For symmetric networks, we just need a connection to the best neighbor. We work out what that will
-                // be for use later.
-                if (isNetworkSymmetric(iface)) {
-                    best[n.interface] = bestAddress(best[n.interface] || iface.address, n.ipv6address);
+                if (!ifgroups[n.interface]) {
+                    ifgroups[n.interface] = { b: iface.address, n: [] };
                 }
-                else {
-                    // For a valid interface, without a channel to the neighbor, and the neighnor is better than us, create a channel.
-                    if (!iface.channels[n.ipv6address] && bestAddress(iface.address, n.ipv6address) != iface.address) {
-                        const channel = createChannel("IDLE", null, 0, 0, null);
-                        channel.interface = n.interface;
-                        channel.myaddress = iface.address;
-                        channel.address = n.ipv6address;
-                        iface.channels[n.ipv6address] = channel;
-                        channel.process(NEWADDRESS);
-                    }
-                }
+                ifgroups[n.interface].b = bestAddress(ifgroups[n.interface].b, n.ipv6address);
+                push(ifgroups[n.interface].n, n.ipv6address);
             }
         }
     }
-    // Look through the symmetric interfaces and make sure we're connected to the best node.
-    for (let ifname in best) {
+    // For each interface we work out who we need to be connected to.
+    for (let ifname in ifgroups) {
         const iface = interfaces[ifname];
-        const bestaddress = best[ifname];
-        if (!iface.channels[bestaddress]) {
-            // Make sure to disconnect from anything which isnt the current best.
-            for (let chan in iface.channels) {
-                if (iface.channels[chan].state === "CONNECTED") {
-                    iface.channels[chan].process(CLOSECONN);
+        const myaddress = iface.address;
+        const bestaddress = ifgroups[ifname].b;
+        const neighaddresses = ifgroups[ifname].n;
+
+        // Always have a connection to the best address (unless that's me)
+        iface.best = bestaddress;
+        if (bestaddress != myaddress && !findChannelByAddress(bestaddress)) {
+            const channel = createChannel("IDLE", null, 0, 0, null);
+            channel.interface = ifname;
+            channel.myaddress = myaddress;
+            channel.address = bestaddress;
+            channel.process(NEWADDRESS);
+        }
+
+        if (isNetworkSymmetric(iface)) {
+            // If network is symmetric, close every other channel I created on this interface except the best one.
+            for (let id in channels) {
+                const channel = channels[id];
+                if (channel.interface == ifname && bestaddress != channel.address && channel.state === "CONNECTED") {
+                    channel.process(CLOSECONN);
                 }
             }
-            // If we ourself are not the best, connect to it.
-            if (iface.address != bestaddress) {
-                const channel = createChannel("IDLE", null, 0, 0, null);
-                channel.interface = ifname;
-                channel.myaddress = iface.address;
-                channel.address = bestaddress;
-                iface.channels[bestaddress] = channel;
-                channel.process(NEWADDRESS);
+        }
+        else {
+            // If network is asymmetric, open a channel to every neighbor better than me and close any which are worse.
+            // This creates far too much network traffic, but because we can have hidden nodes, there's no good other options.
+            for (let i = 0; i < length(neighaddresses); i++) {
+                const nipv6addr = neighaddresses[i];
+                let channel = findChannelByAddress(nipv6addr);
+                if (bestAddress(myaddress, nipv6addr) == nipv6addr) {
+                    if (!channel) {
+                        channel = createChannel("IDLE", null, 0, 0, null);
+                        channel.interface = ifname;
+                        channel.myaddress = myaddress;
+                        channel.address = nipv6addr;
+                        channel.process(NEWADDRESS);
+                    }
+                }
+                else {
+                    if (channel && channel.state === "CONNECTED") {
+                        channel.process(CLOSECONN);
+                    }
+                }
             }
         }
     }
@@ -994,8 +1164,8 @@ function routeProcess(event) {
     for (let id in channels) {
         const channel = channels[id];
         const sync = newr[channel.interface];
-        if (sync && (channel.state === "CONNECTED" || channel.state === "CONNECTED_INCOMING")) {
-            channel.outgoing += buildMessage(CMD_SYNC, myipv4address, 1, sync);
+        if (sync && isChannelConnected(channel)) {
+            channel.outgoing += buildMessage(channel, CMD_SYNC, myipv4address, 1, sync);
             channel.polling |= POLLOUT;
         }
     }
@@ -1085,7 +1255,7 @@ for (let r = 0; r < length(resources); r++) {
 createChannel("MAIN", main, POLLIN, null, mainProcess);
 createChannel("MGR", mgr, POLLIN, null, mgrProcess);
 createChannel("ROUTES", null, 0, 0, routeProcess);
-neighborhood = createChannel("NEIGHBORHOOD", null, 0, when(10), neighborhoodProcess);
+neighborhood = createChannel("NEIGHBORHOOD", null, 0, when(5), neighborhoodProcess);
 
 //
 // Command line
@@ -1111,7 +1281,7 @@ while (!exiting) {
         const event = events[i];
         if (event[1]) {
             event[2].timer = null;
-            event[2].process(event[1]);
+            event[2].process(event[1] & (POLLIN|POLLOUT|POLLRDHUP));
         }
     }
     // Check for expired timers
