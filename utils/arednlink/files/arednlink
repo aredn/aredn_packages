@@ -696,7 +696,7 @@ function channelProcess(event) {
                         this.outgoing = "";
                         this.polling &= ~POLLOUT;
                     }
-                    else if (send !== null) {
+                    else if (sent !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
                     else {
@@ -785,7 +785,7 @@ function channelProcess(event) {
                         this.outgoing = "";
                         this.polling &= ~POLLOUT;
                     }
-                    else if (send !== null) {
+                    else if (sent !== null) {
                         this.outgoing = substr(this.outgoing, sent);
                     }
                     else {
