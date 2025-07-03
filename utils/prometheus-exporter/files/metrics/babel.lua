@@ -54,7 +54,6 @@ if f then
             routes = routes + 1
         end
     end
-    f:close()
     print('# HELP node_babel_interface_total')
     print('# HELP node_babel_interface_total counter')
     print('# HELP node_babel_neighbor_total')
