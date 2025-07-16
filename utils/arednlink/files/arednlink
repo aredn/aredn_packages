@@ -736,7 +736,7 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface].best);
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface]?.best);
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
@@ -802,7 +802,7 @@ function channelProcess(event) {
                     this.keepalive++;
                     if (this.keepalive < KEEPALIVE_LIMIT) {
                         statistics.outgoing.keepalive++;
-                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface].best);
+                        this.outgoing += buildMessage(this, CMD_KEEPALIVE, myipv4address, 1, interfaces[this.interface]?.best);
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         break;
