@@ -58,12 +58,12 @@ for (let w = 0; w < length(wlans); w++) {
     const stations = nl80211.request(nl80211.const.NL80211_CMD_GET_STATION, nl80211.const.NLM_F_DUMP, { dev: wlans[w] });
     for (let s = 0; s < length(stations); s++) {
         const station = stations[s];
-        print(`node_wifi_station_receive_mcs}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_bitrate.mcs}\n`);
-        print(`node_wifi_station_receive_packets_total}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_packets}\n`);
-        print(`node_wifi_station_receive_rate_bits_per_second}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_bitrate.bitrate32 * 100000}\n`);
-        print(`node_wifi_station_signal}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.signal}\n`);
-        print(`node_wifi_station_transmit_mcs}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_bitrate.mcs}\n`);
-        print(`node_wifi_station_transmit_packets_total}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_packets}\n`);
-        print(`node_wifi_station_transmit_rate_bits_per_second}{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_bitrate.bitrate32 * 100000}\n`);
+        print(`node_wifi_station_receive_mcs{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_bitrate.mcs}\n`);
+        print(`node_wifi_station_receive_packets_total{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_packets}\n`);
+        print(`node_wifi_station_receive_rate_bits_per_second{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.rx_bitrate.bitrate32 * 100000}\n`);
+        print(`node_wifi_station_signal{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.signal}\n`);
+        print(`node_wifi_station_transmit_mcs{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_bitrate.mcs}\n`);
+        print(`node_wifi_station_transmit_packets_total{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_packets}\n`);
+        print(`node_wifi_station_transmit_rate_bits_per_second{device="${wlans[w]}",mac="${station.mac}"} ${station.sta_info.tx_bitrate.bitrate32 * 100000}\n`);
     }
 }
