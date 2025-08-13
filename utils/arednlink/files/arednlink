@@ -101,6 +101,10 @@ const AREDNLINK_PORT        = 9623;
 const AREDNLINK_MGR         = "/var/run/arednlink.sock";
 const RECV_SIZE             = 32768;
 //
+// Info dump
+//
+const INFO_DUMP             = "/tmp/arednlink.info";
+//
 // Resources
 //
 const resources = [
@@ -609,7 +613,7 @@ function processRequest() {
 // this: channel
 //
 function channelProcess(event) {
-    DEBUG && print(`channelProcess: id ${this.id} event ${eventString(event)} state ${this.state} address ${this.address ?? '<none>'}\n`);
+    DEBUG && print(`channelProcess: id ${this.id} event ${eventString(event)} state ${this.state} address ${this.address ?? '<none>'} in-len ${length(this.incoming) ?? "-"} out-len ${length(this.outgoing) ?? "-"}\n`);
     switch (this.state) {
         case "IDLE":
         {
@@ -691,7 +695,7 @@ function channelProcess(event) {
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
-                    const sent = this.connection.send(this.outgoing);
+                    const sent = this.connection.send(this.outgoing, socket.MSG_DONTWAIT);
                     if (sent == length(this.outgoing)) {
                         this.outgoing = "";
                         this.polling &= ~POLLOUT;
@@ -780,7 +784,7 @@ function channelProcess(event) {
                     break;
                 case POLLOUT:
                 case POLLIN|POLLOUT:
-                    const sent = this.connection.send(this.outgoing);
+                    const sent = this.connection.send(this.outgoing, socket.MSG_DONTWAIT);
                     if (sent == length(this.outgoing)) {
                         this.outgoing = "";
                         this.polling &= ~POLLOUT;
@@ -841,6 +845,7 @@ function channelProcess(event) {
     if (length(this.outgoing)) {
         this.polling |= POLLOUT;
     }
+    DEBUG && print(`channelProcess done: id ${this.id} state ${this.state}\n`);
 }
 
 //
@@ -1105,6 +1110,9 @@ function neighborhoodProcess(event) {
         }
     }
 
+    // Dump the current state for easier debugging
+    fs.writefile(INFO_DUMP, commandProcess("dump"));
+
     // Run GC now as this has all been very memory expensive
     gc("collect");
 
@@ -1193,7 +1201,7 @@ function mainProcess(event) {
 }
 
 //
-// Our mgr socket profcess handles incoming manage requests, accepts them
+// Our mgr socket process handles incoming manage requests, accepts them
 // then creates a channel to handle the incoming manager calls.
 //
 function mgrProcess(event) {
