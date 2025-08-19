@@ -52,24 +52,10 @@ getmetatable(io.output()).lines = function(self, ...)
     end
 end
 
-local gzip = (os.getenv("HTTP_ACCEPT_ENCODING") or ""):match("gzip")
-
 print "Content-type: text/plain; version=0.0.4\r"
 print "Cache-Control: no-store\r"
-if gzip then
-    print "Content-Encoding: gzip\r"
-end
 print("Access-Control-Allow-Origin: *\r")
 print("\r")
-
-local output = nil
-if gzip then
-    io.flush()
-    output = io.popen("gzip", "w")
-    function print(line)
-        output:write(line .. "\n")
-    end
-end
 
 -- Find, sort then generate the metrics to be returned
 local metrics = {}
@@ -92,8 +78,4 @@ end
 -- Touch a file so we know when this was last done
 io.open("/tmp/metrics-ran", "w+"):close()
 
-if output then
-    output:close()
-else
-    io.flush()
-end
+io.flush()
