@@ -39,6 +39,7 @@ build_active() {
                         ;;
                     *)
                         echo "interface ${i} type wireless" >> ${C}
+                        echo "interface ${i} enable-timestamps true" >> ${C}
                         echo "interface ${i} rxcost $(uci -q get babel.wireless.rxcost)" >> ${C}
                         ;;
                 esac
