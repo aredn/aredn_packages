@@ -197,10 +197,10 @@ start_service() {
 
 stop_service() {
     kill -1 $(cat /var/run/babeld.pid)
-    sleep 2
 }
 
-reload_service() {
+restart() {
     stop
+    sleep 5
     start
 }
