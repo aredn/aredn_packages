@@ -923,13 +923,8 @@ parse_packet(const unsigned char *from, struct interface *ifp,
 
         old_rttcost = neighbour_rttcost(neigh);
         if(valid_rtt(neigh)) {
-            if (rtt > neigh->rtt) {
-                /* We pessimistically prefer worse rtts */
-                smoothed_rtt = rtt * 256;
-            } else {
-                /* Running exponential average. */
-                smoothed_rtt = (ifp->rtt_decay * rtt + (256 - ifp->rtt_decay) * neigh->rtt);
-            }
+            /* Running exponential average. */
+            smoothed_rtt = (ifp->rtt_decay * rtt + (256 - ifp->rtt_decay) * neigh->rtt);
             /* Rounding (up or down) to get closer to the sample. */
             neigh->rtt = (neigh->rtt >= rtt) ? smoothed_rtt / 256 :
                 (smoothed_rtt + 255) / 256;
