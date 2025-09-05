@@ -80,7 +80,12 @@ for (let i = 0; i < length(props); i++) {
                 if (type(val) == "bool") {
                     val = val ? 1 : 0;
                 }
-                print(`node_lqm_tracker_${key}{type="${ltype}",hostname="${hostname}",ip="${ip}",mac="${mac}"} ${val}\n`);
+                if (type(val) == "string") {
+                    print(`node_lqm_tracker_${key}{type="${ltype}",hostname="${hostname}",ip="${ip}",mac="${mac}",${key}="${val}"} 1\n`);
+                }
+                else {
+                    print(`node_lqm_tracker_${key}{type="${ltype}",hostname="${hostname}",ip="${ip}",mac="${mac}"} ${val}\n`);
+                }
             }
         }
     }
