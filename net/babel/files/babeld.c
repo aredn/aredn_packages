@@ -357,18 +357,32 @@ main(int argc, char **argv)
         int pfd, len;
         char buf[100];
 
-        len = snprintf(buf, 100, "%lu", (unsigned long)getpid());
-        if(len < 0 || len >= 100) {
-            perror("snprintf(getpid)");
-            exit(1);
-        }
-
         pfd = open(pidfile, O_WRONLY | O_CREAT | O_EXCL, 0644);
+        if(pfd < 0) {
+            pfd = open(pidfile, O_RDONLY);
+            if (pfd >= 0) {
+                len = read(pfd, buf, 100);
+                close(pfd);
+                pfd = -1;
+                buf[len] = 0;
+                int opid = atoi(buf);
+                if(kill(opid, 0) < 0) {
+                    unlink(pidfile);
+                    pfd = open(pidfile, O_WRONLY | O_CREAT | O_EXCL, 0644);
+                }
+            }
+        }
         if(pfd < 0) {
             char buf[40];
             snprintf(buf, 40, "creat(%s)", pidfile);
             buf[39] = '\0';
             perror(buf);
+            exit(1);
+        }
+
+        len = snprintf(buf, 100, "%lu", (unsigned long)getpid());
+        if(len < 0 || len >= 100) {
+            perror("snprintf(getpid)");
             exit(1);
         }
 
@@ -528,6 +542,7 @@ babel_main(char **interface_names, int num_interface_names)
             goto fail;
         }
     } else if(local_server_path) {
+        unlink(local_server_path);
         local_server_socket = unix_server_socket(local_server_path);
         if(local_server_socket < 0) {
             perror("local_server_socket");
