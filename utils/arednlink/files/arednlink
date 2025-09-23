@@ -391,7 +391,7 @@ function sendMsgToAll(cmd, ipv4addr, hop, payload, from) {
         const channel = channels[id];
         const ifname = channel.interface;
         if (isChannelConnected(channel) && (!from || fromifname === ifname || !isolated[ifname])) {
-            if (!channel.rbest || channel.rbest == interfaces[ifname].address) {
+            if (!channel.rbest || channel.rbest == interfaces[ifname]?.address) {
                 push(rest, channel);
             }
             else if (bestAddress(channel.address, highs[channel.rbest]?.address) == channel.address) {
