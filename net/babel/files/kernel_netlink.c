@@ -430,7 +430,7 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
         len = recvmsg(nl->sock, &msg, 0);
 
         if(len < 0) {
-            if (errno == EAGAIN || errno == EINTR) {
+            if (errno == EAGAIN || errno == EINTR || errno == ENOBUFS) {
                 int rc;
                 rc = wait_for_fd(0, nl->sock, 100);
                 if(rc <= 0) {
@@ -439,32 +439,6 @@ netlink_read(struct netlink *nl, struct netlink *nl_ignore, int answer,
                 } else {
                     len = recvmsg(nl->sock, &msg, 0);
                 }
-            }
-            else if (errno == ENOBUFS) {
-                /* Automatically bump the received buffer if it's too small */
-                int rcvsize = 0;
-                socklen_t rcvlen = sizeof(rcvsize);
-                int rc = getsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, &rcvlen);
-                if (rc < 0) {
-                    perror("netlink_read: failed to read SO_RCVBUF");
-                    return -1;
-                }
-                else {
-                    rcvsize += 512 * 1024;
-#ifdef SO_RCVBUFFORCE
-                    rc = setsockopt(nl->sock, SOL_SOCKET, SO_RCVBUFFORCE, &rcvsize, sizeof(rcvsize));
-#else
-                    rc = setsockopt(nl->sock, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(rcvsize));
-#endif
-                    if (rc < 0) {
-                        perror("netlink_read: failed to set SO_RCVBUF");
-                        return -1;
-                    }
-                    else {
-                        fprintf(stderr, "netlink_read: increasing SO_RCVBUF to %dK\n", rcvsize / 1024);
-                    }
-                }
-                len = recvmsg(nl->sock, &msg, 0);
             }
         }
 
