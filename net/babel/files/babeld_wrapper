@@ -206,4 +206,4 @@ echo "install ip 0.0.0.0/0 ge 0 deny" >> ${C}
 
 rm -f /var/run/babel.sock /var/run/babeld.pid
 
-exec /usr/sbin/babeld $* -c ${C}
+exec nice --20 /usr/sbin/babeld $* -c ${C}
