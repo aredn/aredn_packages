@@ -16,10 +16,10 @@ start_service() {
 
 stop_service() {
     kill -1 $(cat /var/run/babeld.pid)
+    while pidof babeld > /dev/null; do sleep 1; done
 }
 
 restart() {
     stop
-    sleep 5
     start
 }
