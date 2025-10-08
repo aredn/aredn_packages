@@ -370,7 +370,7 @@ function buildTargettedSyncMessage(channel) {
     const target = channel.interface;
     let sync = "";
     for (let ip in hostroutes) {
-        if (ip !== myipv4address && hostroutes[ip] === target) {
+        if (ip !== myipv4address && hostroutes[ip]?.iface === target) {
             const addr = iptoarr(ip);
             sync += chr(addr[0], addr[1], addr[2], addr[3]);
             DEBUG && print(` ${ip}`);
@@ -500,7 +500,7 @@ function processMessage(cmd, hop, srcipv4, payload)
             }
             return false;
         default:
-            const validif = hostroutes[srcipv4] === this.interface ? true : false;
+            const validif = hostroutes[srcipv4]?.iface === this.interface ? true : false;
             const validhost = !!hostroutes[srcipv4];
             // Under some circumstances (see below) we might accept a resource from an invalid interface,
             // it must still be from a valid host.
@@ -1135,9 +1135,9 @@ function routeProcess(event) {
         const route = broutes[i];
         const dst = route.dst;
         const iface = route.oif;
-        hostroutes[dst] = iface;
-        if (oldr[dst] !== iface) {
-            // New route or an old route on an new interface
+        hostroutes[dst] = { iface: iface, dst: dst };
+        if (oldr[dst]?.dst !== dst) {
+            // New route or an old route to a new destination
             // Build the sync message payloads as we go
             const addr = iptoarr(dst);
             if (!newr[iface]) {
