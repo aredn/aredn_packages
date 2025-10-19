@@ -784,6 +784,15 @@ kernel_setup_interface(int setup, const char *ifname, int ifindex)
                     ifname);
     }
 
+    /* Make sure we don't queue any unresolved packets.
+       Doing this just stuffs up the socket buffer with junk blocking everything. */
+    rc = snprintf(buf, 100, "/proc/sys/net/ipv6/neigh/%s/unres_qlen_bytes", ifname);
+    if(rc < 0 || rc >= 100)
+        return -1;
+    rc = write_proc(buf, 0);
+    if (rc < 0)
+        return -1;
+
     return 1;
 }
 
