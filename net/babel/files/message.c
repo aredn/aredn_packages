@@ -1010,6 +1010,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
         // all we can do is close it and reopen a new one.
         if(rc < 0 && errno == EAGAIN) {
             close(protocol_socket);
+            fprintf(stderr, "Protocol socket returned EAGAIN - reopening\n");
             sleep(1);
             // Create a new socket
             protocol_socket = babel_socket(protocol_port);
