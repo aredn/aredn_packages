@@ -35,6 +35,8 @@ LICENSE
 
 C=/var/etc/babel-active.conf
 
+sn="$(uci -q get aredn.@supernode[0].enable)"
+
 # Defaults
 echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
 echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
@@ -80,6 +82,11 @@ do
         echo "interface ${i} type tunnel" >> ${C}
         echo "interface ${i} rxcost ${cost}" >> ${C}
         echo "interface ${i} hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
+        if [ "$sn" = "1" ]; then
+            echo "interface ${i} update-interval $(uci -q get babel.tunnel.supernode_update_interval)" >> ${C}
+        else
+            echo "interface ${i} update-interval $(uci -q get babel.tunnel.update_interval)" >> ${C}
+        fi
         echo "interface ${i} rtt-min $(uci -q get babel.tunnel.rtt_min)" >> ${C}
         echo "interface ${i} rtt-max $(uci -q get babel.tunnel.rtt_max)" >> ${C}
         echo "interface ${i} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
@@ -113,7 +120,6 @@ if [ -f /etc/aredn_include/babel-deny.conf ]; then
 fi
 
 # Limit what we redistribute
-sn="$(uci -q get aredn.@supernode[0].enable)"
 gw="$(uci -q get aredn.@wan[0].mesh_to_local_wan)"
 
 # If we allow it, let our default route be redistributed so others on
