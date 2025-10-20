@@ -53,6 +53,7 @@ babel_socket(int port)
     int saved_errno;
     int one = 1, zero = 0;
     const int ds = 0xc0;        /* CS6 - Network Control */
+    const int bufsize = 512 * 1024;
 
     s = socket(PF_INET6, SOCK_DGRAM, 0);
     if(s < 0)
@@ -91,6 +92,14 @@ babel_socket(int port)
         perror("Couldn't set traffic class");
 
     rc = setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &one, sizeof(one));
+    if(rc < 0)
+        goto fail;
+
+    rc = setsockopt(s, SOL_SOCKET, SO_SNDBUFFORCE, &bufsize, sizeof(bufsize));
+    if(rc < 0)
+        goto fail;
+
+    rc = setsockopt(s, SOL_SOCKET, SO_RCVBUFFORCE, &bufsize, sizeof(bufsize));
     if(rc < 0)
         goto fail;
 
