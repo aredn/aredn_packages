@@ -28,3 +28,4 @@ int babel_send(int s,
                const struct sockaddr *sin, int slen, int dontfrag);
 int tcp_server_socket(int port, int local);
 int unix_server_socket(const char *path);
+void babel_set_buffer_size(int sz);
