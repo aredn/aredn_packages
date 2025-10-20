@@ -40,6 +40,7 @@ THE SOFTWARE.
 #include "route.h"
 #include "kernel.h"
 #include "configuration.h"
+#include "net.h"
 
 static struct filter *input_filters = NULL;
 static struct filter *output_filters = NULL;
@@ -940,6 +941,12 @@ parse_option(int c, gnc_t gnc, void *closure, char *token)
         memcpy(myid, id, 8);
         free(id);
         have_id = 1;
+    } else if(strcmp(token, "protocol-buffer-size") == 0) {
+        int h;
+        c = getint(c, &h, gnc, closure);
+        if(c < -1 || h < 0)
+            goto error;
+        babel_set_buffer_size(h);
     } else {
         goto error;
     }

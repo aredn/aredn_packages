@@ -45,6 +45,8 @@ THE SOFTWARE.
 #include "util.h"
 #include "net.h"
 
+static int buffer_size = 0;
+
 int
 babel_socket(int port)
 {
@@ -53,7 +55,6 @@ babel_socket(int port)
     int saved_errno;
     int one = 1, zero = 0;
     const int ds = 0xc0;        /* CS6 - Network Control */
-    const int bufsize = 512 * 1024;
 
     s = socket(PF_INET6, SOCK_DGRAM, 0);
     if(s < 0)
@@ -95,13 +96,15 @@ babel_socket(int port)
     if(rc < 0)
         goto fail;
 
-    rc = setsockopt(s, SOL_SOCKET, SO_SNDBUFFORCE, &bufsize, sizeof(bufsize));
-    if(rc < 0)
-        goto fail;
+    if (buffer_size > 0) {
+        rc = setsockopt(s, SOL_SOCKET, SO_SNDBUFFORCE, &buffer_size, sizeof(buffer_size));
+        if(rc < 0)
+            goto fail;
 
-    rc = setsockopt(s, SOL_SOCKET, SO_RCVBUFFORCE, &bufsize, sizeof(bufsize));
-    if(rc < 0)
-        goto fail;
+        rc = setsockopt(s, SOL_SOCKET, SO_RCVBUFFORCE, &buffer_size, sizeof(buffer_size));
+        if(rc < 0)
+            goto fail;
+    }
 
     rc = fcntl(s, F_GETFL, 0);
     if(rc < 0)
@@ -345,4 +348,10 @@ unix_server_socket(const char *path)
     close(s);
     errno = saved_errno;
     return -1;
+}
+
+void
+babel_set_buffer_size(int sz)
+{
+    buffer_size = sz;
 }
