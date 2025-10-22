@@ -471,7 +471,7 @@ interface_updown(struct interface *ifp, int up)
                ifp->ipv4 ? ", IPv4" : "");
 
         set_timeout(&ifp->hello_timeout, ifp->hello_interval);
-        set_timeout(&ifp->update_timeout, ifp->update_interval);
+        set_timeout(&ifp->update_timeout, roughly(ifp->update_interval));
         send_hello(ifp);
         if(rc > 0)
             send_update(ifp, 0, NULL, 0, NULL, 0);
