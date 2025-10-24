@@ -430,6 +430,12 @@ network_address(int ae, const unsigned char *a, unsigned int len,
     return network_prefix(ae, -1, 0, a, NULL, len, a_r);
 }
 
+static int
+uint_compare(const void *v1, const void *v2)
+{
+    return *(unsigned int*)v1 - *(unsigned int*)v2;
+}
+
 void
 parse_packet(const unsigned char *from, struct interface *ifp,
              const unsigned char *packet, int packetlen,
@@ -905,7 +911,7 @@ parse_packet(const unsigned char *from, struct interface *ifp,
     /* We can calculate the RTT to this neighbour. */
     if(have_hello_rtt && hello_send_us && hello_rtt_receive_time) {
         int remote_waiting_us, local_waiting_us;
-        unsigned int rtt, smoothed_rtt;
+        unsigned int rtt;
         unsigned int old_rttcost;
         int changed = 0;
         remote_waiting_us = neigh->hello_send_us - hello_rtt_receive_time;
@@ -923,11 +929,12 @@ parse_packet(const unsigned char *from, struct interface *ifp,
 
         old_rttcost = neighbour_rttcost(neigh);
         if(valid_rtt(neigh)) {
-            /* Running exponential average. */
-            smoothed_rtt = (ifp->rtt_decay * rtt + (256 - ifp->rtt_decay) * neigh->rtt);
-            /* Rounding (up or down) to get closer to the sample. */
-            neigh->rtt = (neigh->rtt >= rtt) ? smoothed_rtt / 256 :
-                (smoothed_rtt + 255) / 256;
+            unsigned int sorted_set[sizeof(neigh->rtt_set) / sizeof(unsigned int)];
+            memmove(&neigh->rtt_set[1], &neigh->rtt_set[0], sizeof(neigh->rtt_set) - sizeof(unsigned int));
+            neigh->rtt_set[0] = rtt;
+            memcpy(sorted_set, neigh->rtt_set, sizeof(sorted_set));
+            qsort(sorted_set, sizeof(sorted_set) / sizeof(unsigned int), sizeof(unsigned int), uint_compare);
+            neigh->rtt = sorted_set[sizeof(sorted_set) / sizeof(unsigned int) / 4];
         } else {
             /* We prefer to be conservative with new neighbours
                (higher RTT) */
