@@ -999,7 +999,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
             }
         }
 
-        rc = babel_send(protocol_socket,
+        rc = babel_send(ifp->protocol_socket,
                         packet_header, sizeof(packet_header),
                         buf->buf, end,
                         (struct sockaddr*)&buf->sin6,
@@ -1009,30 +1009,24 @@ flushbuf(struct buffered *buf, struct interface *ifp)
         // If the socket stops working (the send buffer fills up and doesnt empty) then
         // all we can do is close it and reopen a new one.
         if(rc < 0 && errno == EAGAIN) {
-            close(protocol_socket);
+            close(ifp->protocol_socket);
             fprintf(stderr, "Protocol socket returned EAGAIN - reopening\n");
             sleep(1);
             // Create a new socket
-            protocol_socket = babel_socket(protocol_port);
-            if(protocol_socket < 0) {
+            ifp->protocol_socket = babel_socket(protocol_port);
+            if(ifp->protocol_socket < 0) {
                 // Let's hope this doesn't happen.
                 fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
-            // Add all up interfaces to the multicast group
-            struct interface *ifp;
-            FOR_ALL_INTERFACES(ifp) {
-                if (if_up(ifp)) {
-                    struct ipv6_mreq mreq;
-                    memset(&mreq, 0, sizeof(mreq));
-                    memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
-                    mreq.ipv6mr_interface = ifp->ifindex;
-                    int rc2 = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-                                    (char*)&mreq, sizeof(mreq));
-                    if(rc2 < 0) {
-                        perror("setsockopt(IPV6_JOIN_GROUP)");
-                    }
-                }
+            struct ipv6_mreq mreq;
+            memset(&mreq, 0, sizeof(mreq));
+            memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
+            mreq.ipv6mr_interface = ifp->ifindex;
+            int rc2 = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+                            (char*)&mreq, sizeof(mreq));
+            if(rc2 < 0) {
+                perror("setsockopt(IPV6_JOIN_GROUP)");
             }
         }
     }

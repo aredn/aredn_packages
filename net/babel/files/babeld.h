@@ -104,7 +104,6 @@ extern int protocol_port, local_server_port;
 extern char *local_server_path;
 extern int local_server_write;
 extern unsigned char protocol_group[16];
-extern int protocol_socket;
 extern int kernel_socket;
 extern int kernel_check_interval;
 extern int max_request_hopcount;
