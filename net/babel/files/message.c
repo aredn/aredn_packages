@@ -1019,15 +1019,19 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                 fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
+            rc = setsockopt(ifp->protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        ifp->name, strlen(ifp->name));
+            if(rc < 0)
+                perror("setsockopt(SO_BINDTODEVICE)");
+
             struct ipv6_mreq mreq;
             memset(&mreq, 0, sizeof(mreq));
             memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
             mreq.ipv6mr_interface = ifp->ifindex;
-            int rc2 = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+            rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
                             (char*)&mreq, sizeof(mreq));
-            if(rc2 < 0) {
+            if(rc < 0)
                 perror("setsockopt(IPV6_JOIN_GROUP)");
-            }
         }
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
