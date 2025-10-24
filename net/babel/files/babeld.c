@@ -597,6 +597,7 @@ babel_main(char **interface_names, int num_interface_names)
         struct timeval tv;
         fd_set readfds;
         struct neighbour *neigh;
+        int maxfd = 0;
 
         gettime(&now);
 
@@ -620,35 +621,36 @@ babel_main(char **interface_names, int num_interface_names)
             timeval_min(&tv, &neigh->buf.timeout);
         }
         FD_ZERO(&readfds);
-        if(timeval_compare(&tv, &now) > 0) {
-            int maxfd = 0;
+        if(timeval_compare(&tv, &now) > 0)
             timeval_minus(&tv, &tv, &now);
-            FOR_ALL_INTERFACES(ifp) {
-                if(if_up(ifp)) {
-                    FD_SET(ifp->protocol_socket, &readfds);
-                    maxfd = MAX(maxfd, ifp->protocol_socket);
-                }
+        else
+            tv.tv_sec = tv.tv_usec = 0;
+
+        FOR_ALL_INTERFACES(ifp) {
+            if(if_up(ifp)) {
+                FD_SET(ifp->protocol_socket, &readfds);
+                maxfd = MAX(maxfd, ifp->protocol_socket);
             }
-            FD_SET(kernel_socket, &readfds);
-            maxfd = MAX(maxfd, kernel_socket);
-            if(local_server_socket >= 0 &&
-               num_local_sockets < MAX_LOCAL_SOCKETS) {
-                FD_SET(local_server_socket, &readfds);
-                maxfd = MAX(maxfd, local_server_socket);
+        }
+        FD_SET(kernel_socket, &readfds);
+        maxfd = MAX(maxfd, kernel_socket);
+        if(local_server_socket >= 0 &&
+            num_local_sockets < MAX_LOCAL_SOCKETS) {
+            FD_SET(local_server_socket, &readfds);
+            maxfd = MAX(maxfd, local_server_socket);
+        }
+        for(i = 0; i < num_local_sockets; i++) {
+            FD_SET(local_sockets[i].fd, &readfds);
+            maxfd = MAX(maxfd, local_sockets[i].fd);
+        }
+        rc = select(maxfd + 1, &readfds, NULL, NULL, &tv);
+        if(rc < 0) {
+            if(errno != EINTR) {
+                perror("select");
+                sleep(1);
             }
-            for(i = 0; i < num_local_sockets; i++) {
-                FD_SET(local_sockets[i].fd, &readfds);
-                maxfd = MAX(maxfd, local_sockets[i].fd);
-            }
-            rc = select(maxfd + 1, &readfds, NULL, NULL, &tv);
-            if(rc < 0) {
-                if(errno != EINTR) {
-                    perror("select");
-                    sleep(1);
-                }
-                rc = 0;
-                FD_ZERO(&readfds);
-            }
+            rc = 0;
+            FD_ZERO(&readfds);
         }
 
         gettime(&now);
