@@ -461,6 +461,12 @@ interface_updown(struct interface *ifp, int up)
         if(rc < 0) {
             goto fail;
         }
+        rc = setsockopt(ifp->protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        ifp->name, strlen(ifp->name));
+        if(rc < 0) {
+            perror("setsockopt(SO_BINDTODEVICE)");
+            goto fail;
+        }
         memset(&mreq, 0, sizeof(mreq));
         memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
         mreq.ipv6mr_interface = ifp->ifindex;
