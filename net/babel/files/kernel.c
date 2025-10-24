@@ -42,7 +42,7 @@ gettime(struct timeval *tv)
 {
     struct timespec ts;
     int rc;
-    rc = clock_gettime(CLOCK_MONOTONIC, &ts);
+    rc = clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     if(rc < 0)
         return rc;
     tv->tv_sec = ts.tv_sec;
