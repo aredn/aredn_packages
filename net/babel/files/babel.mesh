@@ -28,4 +28,4 @@ config xlink 'xlink'
 
 config supernode 'supernode'
         option update_interval '300'
-        option protocol_buffer_size '1048576'
+        option protocol_buffer_size '262144'

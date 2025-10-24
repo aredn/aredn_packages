@@ -110,6 +110,7 @@ struct buffered {
 struct interface {
     struct interface *next;
     struct interface_conf *conf;
+    int protocol_socket;
     unsigned int ifindex;
     unsigned short flags;
     unsigned short cost;

@@ -22,6 +22,7 @@ THE SOFTWARE.
 
 #define __APPLE_USE_RFC_3542
 #include <string.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -43,6 +44,7 @@ THE SOFTWARE.
 #include "configuration.h"
 #include "local.h"
 #include "xroute.h"
+#include "net.h"
 
 #define MIN_MTU 512
 
@@ -268,6 +270,13 @@ interface_updown(struct interface *ifp, int up)
             goto fail;
         }
 
+        ifp->protocol_socket = babel_socket(protocol_port);
+        if (ifp->protocol_socket == -1) {
+            fprintf(stderr, "babel_socket(%s) failed.\n",
+                    ifp->name);
+            goto fail;
+        }
+
         rc = kernel_setup_interface(1, ifp->name, ifp->ifindex);
         if(rc < 0) {
             fprintf(stderr, "kernel_setup_interface(%s, %u) failed.\n",
@@ -452,10 +461,16 @@ interface_updown(struct interface *ifp, int up)
         if(rc < 0) {
             goto fail;
         }
+        rc = setsockopt(ifp->protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
+                        ifp->name, strlen(ifp->name));
+        if(rc < 0) {
+            perror("setsockopt(SO_BINDTODEVICE)");
+            goto fail;
+        }
         memset(&mreq, 0, sizeof(mreq));
         memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
         mreq.ipv6mr_interface = ifp->ifindex;
-        rc = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+        rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
                         (char*)&mreq, sizeof(mreq));
         if(rc < 0) {
             perror("setsockopt(IPV6_JOIN_GROUP)");
@@ -492,11 +507,17 @@ interface_updown(struct interface *ifp, int up)
             memset(&mreq, 0, sizeof(mreq));
             memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
             mreq.ipv6mr_interface = ifp->ifindex;
-            rc = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
-                            (char*)&mreq, sizeof(mreq));
-            if(rc < 0)
-                perror("setsockopt(IPV6_LEAVE_GROUP)");
+            if (ifp->protocol_socket > 0) {
+                rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
+                                (char*)&mreq, sizeof(mreq));
+                if(rc < 0)
+                    perror("setsockopt(IPV6_LEAVE_GROUP)");
+            }
             kernel_setup_interface(0, ifp->name, ifp->ifindex);
+        }
+        if (ifp->protocol_socket > 0) {
+            close(ifp->protocol_socket);
+            ifp->protocol_socket = 0;
         }
         if(ifp->ll)
             free(ifp->ll);

@@ -97,10 +97,6 @@ babel_socket(int port)
         goto fail;
 
     if (buffer_size > 0) {
-        rc = setsockopt(s, SOL_SOCKET, SO_SNDBUFFORCE, &buffer_size, sizeof(buffer_size));
-        if(rc < 0)
-            goto fail;
-
         rc = setsockopt(s, SOL_SOCKET, SO_RCVBUFFORCE, &buffer_size, sizeof(buffer_size));
         if(rc < 0)
             goto fail;
