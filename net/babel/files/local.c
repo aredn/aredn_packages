@@ -242,7 +242,7 @@ local_notify_route_1(struct local_socket *s, struct babel_route *route, int kind
 
     rc = snprintf(buf, 512,
                   "%s route %lx prefix %s from %s installed %s "
-                  "id %s metric %d refmetric %d via %s if %s\n",
+                  "id %s metric %d refmetric %d via %s nexthop %s table %d if %s\n",
                   local_kind(kind),
                   (unsigned long)route,
                   dst_prefix, src_prefix,
@@ -250,6 +250,8 @@ local_notify_route_1(struct local_socket *s, struct babel_route *route, int kind
                   format_eui64(route->src->id),
                   route_metric(route), route->refmetric,
                   format_address(route->neigh->address),
+                  route->nexthop ? format_address(route->nexthop) : "-",
+                  route->table,
                   route->neigh->ifp->name);
 
     if(rc < 0 || rc >= 512)
@@ -390,6 +392,19 @@ local_read(struct local_socket *s)
                     }
                     route_stream_done(routes);
                 }
+            }
+            break;
+        case CONFIG_ACTION_DUMP_INSTALLED_ROUTES:
+            routes = route_stream(0);
+            if(routes) {
+                while(1) {
+                    struct babel_route *route = route_stream_next(routes);
+                    if(route == NULL)
+                        break;
+                    if(route->installed)
+                        local_notify_route_1(s, route, LOCAL_ADD);
+                }
+                route_stream_done(routes);
             }
             break;
         case CONFIG_ACTION_NO:
