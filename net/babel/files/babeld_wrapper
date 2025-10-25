@@ -40,12 +40,6 @@ sn="$(uci -q get aredn.@supernode[0].enable)"
 # Defaults
 echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
 echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
-bs=$(uci -q get aredn.@babel[0].protocol_buffer_size)
-if [ "$bs" != "" ]; then
-    echo "protocol-buffer-size $bs" >> ${C}
-elif [ "$sn" = "1" ]; then
-    echo "protocol-buffer-size $(uci -q get babel.supernode.protocol_buffer_size)" >> ${C}
-fi
 echo "default rxcost $(uci -q get babel.default.rxcost)" >> ${C}
 echo "default hello-interval $(uci -q get babel.default.hello_interval)" >> ${C}
 echo "default update-interval $(uci -q get babel.default.update_interval)" >> ${C}
