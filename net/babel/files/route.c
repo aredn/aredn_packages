@@ -438,7 +438,7 @@ move_installed_route(struct babel_route *route, int i)
 }
 
 static int
-change_route(int operation, const struct babel_route *route, int metric,
+change_route(int operation, struct babel_route *route, int metric,
              const unsigned char *new_next_hop,
              int new_ifindex, int new_metric)
 {
@@ -458,6 +458,8 @@ change_route(int operation, const struct babel_route *route, int metric,
 
     pref_src = filter_result.pref_src;
     table = filter_result.table ? filter_result.table : export_table;
+
+    route->table = table;
 
     return kernel_route(operation, table, route->src->prefix, route->src->plen,
                         route->src->src_prefix, route->src->src_plen, pref_src,
