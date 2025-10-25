@@ -1,5 +1,5 @@
 #!/bin/sh
-socat -T 5 UNIX-CLIENT:/var/run/arednlink.sock - <<__EOF__
+socat -T 5 UNIX-CLIENT:/var/run/arednlink.sock - 2> /dev/null <<__EOF__
 dump
 quit
 __EOF__
