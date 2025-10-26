@@ -228,14 +228,15 @@ check_neighbours()
     struct neighbour *neigh;
     struct neighbour *nneigh;
     unsigned msecs = 50000;
-    int i;
+    int i, anychanged = 0;
 
     debugf("Checking neighbours.\n");
 
     for(neigh = neighs; neigh; neigh = nneigh) {
+        int changed;
         nneigh = neigh->next;
-        update_neighbour(neigh, &neigh->hello, 0, -1, 0);
-        update_neighbour(neigh, &neigh->uhello, 1, -1, 0);
+        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
+        changed = update_neighbour(neigh, &neigh->uhello, 1, -1, 0) || changed;
 
         if(neigh->hello.reach == 0 ||
            neigh->hello.time.tv_sec > now.tv_sec || /* clock stepped */
@@ -243,9 +244,11 @@ check_neighbours()
             flush_neighbour(neigh);
         }
         else {
-            reset_txcost(neigh);
+            changed = reset_txcost(neigh) || changed;
             /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = neighbour_cost(neigh);
+            neigh->temp_cost = changed ? (int)neighbour_cost(neigh) : -1;
+
+            anychanged |= changed;
 
             if(neigh->hello.interval > 0)
                 msecs = MIN(msecs, neigh->hello.interval * 10);
@@ -257,16 +260,21 @@ check_neighbours()
     }
 
     /* Now we have the neighbours up-to-date we can update the route metrics */
-    for(i = 0; i < route_slots; i++) {
-        struct babel_route *r;
-        for(r = routes[i]; r; r = r->next) {
-            struct neighbour *n = r->neigh;
-            update_route_metric(r, n, n->temp_cost);
+    if (anychanged) {
+        for(i = 0; i < route_slots; i++) {
+            struct babel_route *r;
+            for(r = routes[i]; r; r = r->next) {
+                struct neighbour *n = r->neigh;
+                int temp_cost = n->temp_cost;
+                if (temp_cost >= 0)
+                    update_route_metric(r, n, temp_cost);
+            }
         }
-    }
 
-    for(neigh = neighs; neigh; neigh = neigh->next) {
-        local_notify_neighbour(neigh, LOCAL_CHANGE);
+        for(neigh = neighs; neigh; neigh = neigh->next) {
+            if (neigh->temp_cost >= 0)
+                local_notify_neighbour(neigh, LOCAL_CHANGE);
+        }
     }
 
     return msecs;
