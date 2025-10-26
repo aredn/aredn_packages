@@ -83,7 +83,7 @@ add_interface(char *ifname, struct interface_conf *if_conf)
     if(ifp == NULL)
         return NULL;
 
-    strncpy(ifp->name, ifname, IF_NAMESIZE);
+    strncpy(ifp->name, ifname, IF_NAMESIZE - 1);
     ifp->conf = if_conf ? if_conf : default_interface_conf;
     ifp->hello_seqno = (random() & 0xFFFF);
 

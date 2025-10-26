@@ -324,7 +324,7 @@ unix_server_socket(const char *path)
 
     memset(&sun, 0, sizeof(sun));
     sun.sun_family = AF_UNIX;
-    strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+    strncpy(sun.sun_path, path, sizeof(sun.sun_path) - 1);
     rc = bind(s, (struct sockaddr *)&sun, sizeof(sun));
     if(rc < 0)
         goto fail;
