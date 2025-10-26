@@ -270,9 +270,9 @@ flush_route(struct babel_route *route)
         else if(max_route_slots > 8 && route_slots < max_route_slots / 4)
             resize_route_table(max_route_slots / 2);
     } else {
-        struct babel_route *r = routes[i];
-        while(r->next != route)
-            r = r->next;
+        struct babel_route *r;
+        for(r = routes[i]; r->next != route; r = r->next)
+            ;
         r->next = route->next;
         route->next = NULL;
         destroy_route(route);
@@ -428,9 +428,9 @@ move_installed_route(struct babel_route *route, int i)
     assert(route->installed);
 
     if(route != routes[i]) {
-        struct babel_route *r = routes[i];
-        while(r->next != route)
-            r = r->next;
+        struct babel_route *r;
+        for(r = routes[i]; r->next != route; r = r->next)
+            ;
         r->next = route->next;
         route->next = routes[i];
         routes[i] = route;
@@ -759,7 +759,7 @@ find_best_route(const unsigned char *prefix, unsigned char plen,
 }
 
 void
-update_route_metric(struct babel_route *route)
+update_route_metric(struct babel_route *route, struct neighbour *neigh, unsigned int cost)
 {
     int oldmetric = route_metric(route);
     int old_smoothed_metric = route_smoothed_metric(route);
@@ -772,15 +772,13 @@ update_route_metric(struct babel_route *route)
                 route_changed(route, route->src, oldmetric);
         }
     } else {
-        struct neighbour *neigh = route->neigh;
         int add_metric = input_filter(route->src->id,
                                       route->src->prefix, route->src->plen,
                                       route->src->src_prefix,
                                       route->src->src_plen,
                                       neigh->address,
                                       neigh->ifp->ifindex);
-        change_route_metric(route, route->refmetric,
-                            neighbour_cost(route->neigh), add_metric);
+        change_route_metric(route, route->refmetric, cost, add_metric);
         if(route_metric(route) != oldmetric ||
            route_smoothed_metric(route) != old_smoothed_metric)
             route_changed(route, route->src, oldmetric);
@@ -796,12 +794,12 @@ update_neighbour_metric(struct neighbour *neigh, int changed)
     if(changed) {
         int i;
 
+        unsigned int cost = neighbour_cost(neigh);
         for(i = 0; i < route_slots; i++) {
-            struct babel_route *r = routes[i];
-            while(r) {
+            struct babel_route *r;
+            for(r = routes[i]; r; r = r->next) {
                 if(r->neigh == neigh)
-                    update_route_metric(r);
-                r = r->next;
+                    update_route_metric(r, neigh, cost);
             }
         }
     }
@@ -815,11 +813,10 @@ update_interface_metric(struct interface *ifp)
     int i;
 
     for(i = 0; i < route_slots; i++) {
-        struct babel_route *r = routes[i];
-        while(r) {
+        struct babel_route *r;
+        for(r = routes[i]; r; r = r->next) {
             if(r->neigh->ifp == ifp)
-                update_route_metric(r);
-            r = r->next;
+                update_route_metric(r, r->neigh, neighbour_cost(r->neigh));
         }
     }
 }
@@ -1067,8 +1064,8 @@ retract_neighbour_routes(struct neighbour *neigh)
     int i;
 
     for(i = 0; i < route_slots; i++) {
-        struct babel_route *r = routes[i];
-        while(r) {
+        struct babel_route *r;
+        for(r = routes[i]; r; r = r->next) {
             if(r->neigh == neigh) {
                 if(r->refmetric != INFINITY) {
                     unsigned short oldmetric = route_metric(r);
@@ -1077,7 +1074,6 @@ retract_neighbour_routes(struct neighbour *neigh)
                         route_changed(r, r->src, oldmetric);
                 }
             }
-            r = r->next;
         }
     }
 }
@@ -1208,8 +1204,12 @@ expire_routes(void)
                 flush_route(r);
                 goto again;
             }
-
-            update_route_metric(r);
+        /* I dont understand how the following can do anything. Updating the neighbor metric
+           happens periodically elsewhere and it doesnt change how route_old(...) evaluates the route
+           so if it wasnt old above it wont be old now.
+        */
+#if 0
+            update_route_metric(r, r->neigh, neighbour_cost(r->neigh));
 
             if(r->installed && r->refmetric < INFINITY) {
                 if(route_old(r))
@@ -1218,6 +1218,7 @@ expire_routes(void)
                                          r->src->prefix, r->src->plen,
                                          r->src->src_prefix, r->src->src_plen);
             }
+#endif
             r = r->next;
         }
         i++;

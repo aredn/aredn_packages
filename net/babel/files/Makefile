@@ -1,7 +1,7 @@
 PREFIX = /usr/local
 MANDIR = $(PREFIX)/share/man
 
-CDEBUGFLAGS = -Os -g -Wall
+CDEBUGFLAGS = -O2 -Wall
 
 DEFINES = $(PLATFORM_DEFINES)
 

@@ -173,7 +173,7 @@ if_eui64(char *ifname, int ifindex, unsigned char *eui)
     s = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
     if(s < 0) return -1;
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name) - 1);
     rc = ioctl(s, SIOCGIFHWADDR, &ifr);
     if(rc < 0) {
         int saved_errno = errno;
@@ -804,7 +804,7 @@ kernel_interface_operational(const char *ifname, int ifindex)
     int flags = link_detect ? (IFF_UP | IFF_RUNNING) : IFF_UP;
 
     memset(&req, 0, sizeof(req));
-    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name));
+    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name) - 1);
     rc = ioctl(dgram_socket, SIOCGIFFLAGS, &req);
     if(rc < 0)
         return -1;
@@ -818,7 +818,7 @@ kernel_interface_ipv4(const char *ifname, int ifindex, unsigned char *addr_r)
     int rc;
 
     memset(&req, 0, sizeof(req));
-    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name));
+    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name) - 1);
     req.ifr_addr.sa_family = AF_INET;
     rc = ioctl(dgram_socket, SIOCGIFADDR, &req);
     if(rc < 0)
@@ -835,7 +835,7 @@ kernel_interface_mtu(const char *ifname, int ifindex)
     int rc;
 
     memset(&req, 0, sizeof(req));
-    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name));
+    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name) - 1);
     rc = ioctl(dgram_socket, SIOCGIFMTU, &req);
     if(rc < 0)
         return -1;
@@ -917,7 +917,7 @@ kernel_interface_wireless(const char *ifname, int ifindex)
         return -1;
 
     memset(&req, 0, sizeof(req));
-    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name));
+    strncpy(req.ifr_name, ifname, sizeof(req.ifr_name) - 1);
     rc = ioctl(dgram_socket, SIOCGIWNAME, &req);
     if(rc < 0) {
         if(errno == EOPNOTSUPP || errno == EINVAL)
