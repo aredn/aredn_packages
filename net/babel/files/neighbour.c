@@ -226,38 +226,47 @@ unsigned
 check_neighbours()
 {
     struct neighbour *neigh;
+    struct neighbour *nneigh;
     unsigned msecs = 50000;
+    int i;
 
     debugf("Checking neighbours.\n");
 
-    neigh = neighs;
-    while(neigh) {
-        int changed, rc;
-        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
-        rc = update_neighbour(neigh, &neigh->uhello, 1, -1, 0);
-        changed = changed || rc;
+    for(neigh = neighs; neigh; neigh = nneigh) {
+        nneigh = neigh->next;
+        update_neighbour(neigh, &neigh->hello, 0, -1, 0);
+        update_neighbour(neigh, &neigh->uhello, 1, -1, 0);
 
         if(neigh->hello.reach == 0 ||
            neigh->hello.time.tv_sec > now.tv_sec || /* clock stepped */
            timeval_minus_msec(&now, &neigh->hello.time) > 300000) {
-            struct neighbour *old = neigh;
-            neigh = neigh->next;
-            flush_neighbour(old);
-            continue;
+            flush_neighbour(neigh);
         }
+        else {
+            reset_txcost(neigh);
+            /* Temp cost to avoid recalculating later */
+            neigh->temp_cost = neighbour_cost(neigh);
 
-        rc = reset_txcost(neigh);
-        changed = changed || rc;
+            if(neigh->hello.interval > 0)
+                msecs = MIN(msecs, neigh->hello.interval * 10);
+            if(neigh->uhello.interval > 0)
+                msecs = MIN(msecs, neigh->uhello.interval * 10);
+            if(neigh->ihu_interval > 0)
+                msecs = MIN(msecs, neigh->ihu_interval * 10);
+        }
+    }
 
-        update_neighbour_metric(neigh, changed);
+    /* Now we have the neighbours up-to-date we can update the route metrics */
+    for(i = 0; i < route_slots; i++) {
+        struct babel_route *r;
+        for(r = routes[i]; r; r = r->next) {
+            struct neighbour *n = r->neigh;
+            update_route_metric(r, n, n->temp_cost);
+        }
+    }
 
-        if(neigh->hello.interval > 0)
-            msecs = MIN(msecs, neigh->hello.interval * 10);
-        if(neigh->uhello.interval > 0)
-            msecs = MIN(msecs, neigh->uhello.interval * 10);
-        if(neigh->ihu_interval > 0)
-            msecs = MIN(msecs, neigh->ihu_interval * 10);
-        neigh = neigh->next;
+    for(neigh = neighs; neigh; neigh = neigh->next) {
+        local_notify_neighbour(neigh, LOCAL_CHANGE);
     }
 
     return msecs;

@@ -270,9 +270,9 @@ flush_route(struct babel_route *route)
         else if(max_route_slots > 8 && route_slots < max_route_slots / 4)
             resize_route_table(max_route_slots / 2);
     } else {
-        struct babel_route *r = routes[i];
-        while(r->next != route)
-            r = r->next;
+        struct babel_route *r;
+        for(r = routes[i]; r->next != route; r = r->next)
+            ;
         r->next = route->next;
         route->next = NULL;
         destroy_route(route);
@@ -428,9 +428,9 @@ move_installed_route(struct babel_route *route, int i)
     assert(route->installed);
 
     if(route != routes[i]) {
-        struct babel_route *r = routes[i];
-        while(r->next != route)
-            r = r->next;
+        struct babel_route *r;
+        for(r = routes[i]; r->next != route; r = r->next)
+            ;
         r->next = route->next;
         route->next = routes[i];
         routes[i] = route;
@@ -796,11 +796,10 @@ update_neighbour_metric(struct neighbour *neigh, int changed)
 
         unsigned int cost = neighbour_cost(neigh);
         for(i = 0; i < route_slots; i++) {
-            struct babel_route *r = routes[i];
-            while(r) {
+            struct babel_route *r;
+            for(r = routes[i]; r; r = r->next) {
                 if(r->neigh == neigh)
                     update_route_metric(r, neigh, cost);
-                r = r->next;
             }
         }
     }
@@ -814,11 +813,10 @@ update_interface_metric(struct interface *ifp)
     int i;
 
     for(i = 0; i < route_slots; i++) {
-        struct babel_route *r = routes[i];
-        while(r) {
+        struct babel_route *r;
+        for(r = routes[i]; r; r = r->next) {
             if(r->neigh->ifp == ifp)
                 update_route_metric(r, r->neigh, neighbour_cost(r->neigh));
-            r = r->next;
         }
     }
 }
@@ -1066,8 +1064,8 @@ retract_neighbour_routes(struct neighbour *neigh)
     int i;
 
     for(i = 0; i < route_slots; i++) {
-        struct babel_route *r = routes[i];
-        while(r) {
+        struct babel_route *r;
+        for(r = routes[i]; r; r = r->next) {
             if(r->neigh == neigh) {
                 if(r->refmetric != INFINITY) {
                     unsigned short oldmetric = route_metric(r);
@@ -1076,7 +1074,6 @@ retract_neighbour_routes(struct neighbour *neigh)
                         route_changed(r, r->src, oldmetric);
                 }
             }
-            r = r->next;
         }
     }
 }
