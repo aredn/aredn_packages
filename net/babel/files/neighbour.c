@@ -247,7 +247,7 @@ check_neighbours()
         else {
             changed = reset_txcost(neigh) || changed;
             /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = (int)neighbour_cost(neigh);
+            neigh->temp_cost = changed ? (int)neighbour_cost(neigh) : -1;
 
             anychanged |= changed;
 
@@ -272,7 +272,11 @@ check_neighbours()
                 struct neighbour *n = r->neigh;
                 int old_metric = route_metric(r);
                 int old_smoothed_metric = route_smoothed_metric(r);
-                if(r->time < now.tv_sec - r->hold_time) { // route_expired
+                if (n->temp_cost < 0) {
+                    if (route_feasible(r) && (!best || old_smoothed_metric < best->smoothed_metric))
+                        best = r;
+                }
+                else if(r->time < now.tv_sec - r->hold_time) { // route_expired
                     if(r->refmetric < INFINITY) {
                         r->seqno = seqno_plus(r->src->seqno, 1);
                         change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
@@ -288,7 +292,7 @@ check_neighbours()
                     if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
                         best = r;
                 }
-                if (r->installed && route_metric(r) < INFINITY) {
+                if (r->installed) {
                     installed = r;
                     installed_oldmetric = old_metric;
                     installed_smoothed_metrict = old_smoothed_metric;
