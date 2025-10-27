@@ -684,15 +684,17 @@ babel_main(char **interface_names, int num_interface_names)
         }
 
         FOR_ALL_INTERFACES(ifp) {
-            if(if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+            while (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
                 unsigned char to[16];
                 rc = babel_recv(ifp->protocol_socket,
                                 receive_buffer, receive_buffer_size,
                                 (struct sockaddr*)&sin6, sizeof(sin6), to);
-                if(rc < 0) {
+                if(rc == 0) {
+                    FD_CLR(ifp->protocol_socket, &readfds);
+                } else if(rc < 0) {
+                    FD_CLR(ifp->protocol_socket, &readfds);
                     if(errno != EAGAIN && errno != EINTR) {
                         perror("recv");
-                        sleep(1);
                     }
                 } else if(ifp->ifindex == sin6.sin6_scope_id) {
                     parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
