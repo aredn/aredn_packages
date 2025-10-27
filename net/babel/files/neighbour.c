@@ -38,6 +38,7 @@ THE SOFTWARE.
 #include "message.h"
 #include "resend.h"
 #include "local.h"
+#include "configuration.h"
 
 struct neighbour *neighs = NULL;
 
@@ -246,7 +247,7 @@ check_neighbours()
         else {
             changed = reset_txcost(neigh) || changed;
             /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = changed ? (int)neighbour_cost(neigh) : -1;
+            neigh->temp_cost = (int)neighbour_cost(neigh);
 
             anychanged |= changed;
 
@@ -263,18 +264,42 @@ check_neighbours()
     if (anychanged) {
         for(i = 0; i < route_slots; i++) {
             struct babel_route *r;
+            struct babel_route *installed = NULL;
+            struct babel_route *best = NULL;
+            unsigned int installed_oldmetric = INFINITY;
             for(r = routes[i]; r; r = r->next) {
                 struct neighbour *n = r->neigh;
-                int temp_cost = n->temp_cost;
-                if (temp_cost >= 0)
-                    update_route_metric(r, n, temp_cost);
+                int oldmetric = route_metric(r);
+                if(r->time < now.tv_sec - r->hold_time) { // route_expired
+                    if(r->refmetric < INFINITY) {
+                        r->seqno = seqno_plus(r->src->seqno, 1);
+                        change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
+                    }
+                } else {
+                    int add_metric = input_filter(r->src->id,
+                                                r->src->prefix, r->src->plen,
+                                                r->src->src_prefix,
+                                                r->src->src_plen,
+                                                n->address,
+                                                n->ifp->ifindex);
+                    change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
+                    if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
+                        best = r;
+                }
+                if (r->installed && route_metric(r) < INFINITY) {
+                    installed = r;
+                    installed_oldmetric = oldmetric;
+                }
             }
+            if (best && best != installed)
+                consider_route(best);
+            else if (installed)
+                send_triggered_update(installed, installed->src, installed_oldmetric);
         }
 
-        for(neigh = neighs; neigh; neigh = neigh->next) {
+        for(neigh = neighs; neigh; neigh = neigh->next)
             if (neigh->temp_cost >= 0)
                 local_notify_neighbour(neigh, LOCAL_CHANGE);
-        }
     }
 
     return msecs;
