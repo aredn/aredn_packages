@@ -663,7 +663,10 @@ parse_packet(const unsigned char *from, struct interface *ifp,
             unsigned char prefix[16], src_prefix[16], *nh;
             unsigned char plen, src_plen;
             unsigned short interval, seqno, metric;
-            int rc, parsed_len, is_ss;
+            int rc, parsed_len;
+#ifndef NO_DEBUG
+            int is_ss;
+#endif
             if(len < 10) {
                 if(len < 2 || message[3] & 0x80)
                     have_v4_prefix = have_v6_prefix = have_v4viav6_prefix = 0;
@@ -790,7 +793,9 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                 goto done;
             }
 
+#ifndef NO_DEBUG
             is_ss = !is_default(src_prefix, src_plen);
+#endif
             debugf("Received update%s%s for dst %s%s%s from %s on %s.\n",
                    (message[3] & 0x80) ? "/prefix" : "",
                    (message[3] & 0x40) ? "/id" : "",
@@ -859,7 +864,10 @@ parse_packet(const unsigned char *from, struct interface *ifp,
         } else if(type == MESSAGE_MH_REQUEST) {
             unsigned char prefix[16], src_prefix[16], plen, src_plen;
             unsigned short seqno;
-            int rc, is_ss;
+            int rc;
+#ifndef NO_DEBUG
+            int is_ss;
+#endif
             if(len < 14) goto fail;
             if(!known_ae(message[2])) {
                 debugf("Received mh_request with unknown AE %d. Ignoring.\n",
@@ -882,7 +890,9 @@ parse_packet(const unsigned char *from, struct interface *ifp,
                                             &src_plen);
             if(rc < 0)
                 goto done;
+#ifndef NO_DEBUG
             is_ss = !is_default(src_prefix, src_plen);
+#endif
             plen = message[3] + (ae_is_v4(message[2]) ? 96 : 0);
             debugf("Received request (%d) for dst %s%s%s from %s on "
                    "%s (%s, %d).\n",

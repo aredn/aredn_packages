@@ -418,6 +418,23 @@ main(int argc, char **argv)
 }
 #endif
 
+#if 0
+static void progress(int v)
+{
+    static struct timeval last;
+    char buffer[100];
+    struct timeval now, d;
+    sprintf(buffer, "/tmp/progress%d", v);
+    int p = open(buffer, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    gettime(&now);
+    timeval_minus(&d, &now, &last);
+    sprintf(buffer, "%d\n", (int)(d.tv_sec * 1000 + d.tv_usec / 1000));
+    write(p, buffer, strlen(buffer));
+    close(p);
+    last = now;
+}
+#endif
+
 int
 babel_main(char **interface_names, int num_interface_names)
 {
@@ -677,7 +694,7 @@ babel_main(char **interface_names, int num_interface_names)
                         perror("recv");
                         sleep(1);
                     }
-                } else {
+                } else if(ifp->ifindex == sin6.sin6_scope_id) {
                     parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
                                 receive_buffer, rc, to);
                     VALGRIND_MAKE_MEM_UNDEFINED(receive_buffer,

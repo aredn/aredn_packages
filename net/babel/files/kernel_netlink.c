@@ -1435,8 +1435,10 @@ filter_link(struct nlmsghdr *nh, struct kernel_link *link)
 {
     struct ifinfomsg *info;
     int len;
+#ifndef NO_DEBUG
     int ifindex;
     unsigned int ifflags;
+#endif
 
     len = nh->nlmsg_len;
 
@@ -1446,8 +1448,10 @@ filter_link(struct nlmsghdr *nh, struct kernel_link *link)
     info = (struct ifinfomsg*)NLMSG_DATA(nh);
     len -= NLMSG_LENGTH(0);
 
+#ifndef NO_DEBUG
     ifindex = info->ifi_index;
     ifflags = info->ifi_flags;
+#endif
 
     link->ifname = parse_ifname_rta(info, len);
     if(link->ifname == NULL)
@@ -1467,7 +1471,9 @@ filter_addresses(struct nlmsghdr *nh, struct kernel_addr *addr)
     int rc;
     int len;
     struct ifaddrmsg *ifa;
+#ifndef NO_DEBUG
     char ifname[IFNAMSIZ];
+#endif
 
     len = nh->nlmsg_len;
 
