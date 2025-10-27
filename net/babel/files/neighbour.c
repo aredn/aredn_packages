@@ -267,9 +267,11 @@ check_neighbours()
             struct babel_route *installed = NULL;
             struct babel_route *best = NULL;
             unsigned int installed_oldmetric = INFINITY;
+            unsigned int installed_smoothed_metrict = INFINITY;
             for(r = routes[i]; r; r = r->next) {
                 struct neighbour *n = r->neigh;
-                int oldmetric = route_metric(r);
+                int old_metric = route_metric(r);
+                int old_smoothed_metric = route_smoothed_metric(r);
                 if(r->time < now.tv_sec - r->hold_time) { // route_expired
                     if(r->refmetric < INFINITY) {
                         r->seqno = seqno_plus(r->src->seqno, 1);
@@ -288,12 +290,13 @@ check_neighbours()
                 }
                 if (r->installed && route_metric(r) < INFINITY) {
                     installed = r;
-                    installed_oldmetric = oldmetric;
+                    installed_oldmetric = old_metric;
+                    installed_smoothed_metrict = old_smoothed_metric;
                 }
             }
             if (best && best != installed)
                 consider_route(best);
-            else if (installed)
+            else if (installed && installed_oldmetric != route_metric(installed) && installed_smoothed_metrict != installed->smoothed_metric)
                 send_triggered_update(installed, installed->src, installed_oldmetric);
         }
 
