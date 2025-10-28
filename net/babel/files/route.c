@@ -168,19 +168,6 @@ installed_routes_estimate(void)
     return route_slots;
 }
 
-/* Return an overestimate of the total number of routes. */
-int
-total_routes_estimate(void)
-{
-    struct neighbour *neigh;
-    int count = 0;
-
-    FOR_ALL_NEIGHBOURS(neigh)
-        count++;
-
-    return route_slots * count;
-}
-
 static int
 resize_route_table(int new_slots)
 {

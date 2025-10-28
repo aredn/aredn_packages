@@ -1418,10 +1418,10 @@ flushupdates(struct interface *ifp)
 {
     struct xroute *xroute;
     struct babel_route *route;
-    const unsigned char *last_prefix = NULL;
-    const unsigned char *last_src_prefix = NULL;
-    unsigned char last_plen = 0xFF;
-    unsigned char last_src_plen = 0xFF;
+    //const unsigned char *last_prefix = NULL;
+    //const unsigned char *last_src_prefix = NULL;
+    //unsigned char last_plen = 0xFF;
+    //unsigned char last_src_plen = 0xFF;
     int i;
 
     if(ifp == NULL) {
@@ -1464,12 +1464,12 @@ flushupdates(struct interface *ifp)
                sent out.  Since our buffer is now sorted, it is enough to
                compare with the previous update. */
 
-            if(last_prefix &&
-               b[i].plen == last_plen &&
-               b[i].src_plen == last_src_plen &&
-               memcmp(b[i].prefix, last_prefix, 16) == 0 &&
-               memcmp(b[i].src_prefix, last_src_prefix, 16) == 0)
-                continue;
+            //if(last_prefix &&
+            //   b[i].plen == last_plen &&
+            //   b[i].src_plen == last_src_plen &&
+            //   memcmp(b[i].prefix, last_prefix, 16) == 0 &&
+            //   memcmp(b[i].src_prefix, last_src_prefix, 16) == 0)
+            //    continue;
 
             xroute = find_xroute(b[i].prefix, b[i].plen,
                                  b[i].src_prefix, b[i].src_plen);
@@ -1481,10 +1481,10 @@ flushupdates(struct interface *ifp)
                                    xroute->prefix, xroute->plen,
                                    xroute->src_prefix, xroute->src_plen,
                                    myseqno, xroute->metric);
-                last_prefix = xroute->prefix;
-                last_plen = xroute->plen;
-                last_src_prefix = xroute->src_prefix;
-                last_src_plen = xroute->src_plen;
+                //last_prefix = xroute->prefix;
+                //last_plen = xroute->plen;
+                //last_src_prefix = xroute->src_prefix;
+                //last_src_plen = xroute->src_plen;
             } else if(route) {
                 unsigned short metric;
                 unsigned short seqno;
@@ -1508,10 +1508,10 @@ flushupdates(struct interface *ifp)
                                    route->src->src_plen,
                                    seqno, metric);
                 update_source(route->src, seqno, metric);
-                last_prefix = route->src->prefix;
-                last_plen = route->src->plen;
-                last_src_prefix = route->src->src_prefix;
-                last_src_plen = route->src->src_plen;
+                //last_prefix = route->src->prefix;
+                //last_plen = route->src->plen;
+                //last_src_prefix = route->src->src_prefix;
+                //last_src_plen = route->src->src_plen;
             } else {
             /* There's no route for this prefix.  This can happen shortly
                after an xroute has been retracted, so send a retraction. */
@@ -1565,7 +1565,7 @@ buffer_update(struct interface *ifp,
         /* Allocate enough space to hold a full update.  Since the
            number of installed routes will grow over time, make sure we
            have enough space to send a full-ish frame. */
-        n = total_routes_estimate() + xroutes_estimate() + 4;
+        n = installed_routes_estimate() + xroutes_estimate() + 4;
         n = MAX(n, ifp->buf.size / 16);
     again:
         ifp->buffered_updates = malloc(n * sizeof(struct buffered_update));
@@ -1582,13 +1582,33 @@ buffer_update(struct interface *ifp,
         ifp->num_buffered_updates = 0;
     }
 
-    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].prefix,
-           prefix, 16);
-    ifp->buffered_updates[ifp->num_buffered_updates].plen = plen;
-    memcpy(ifp->buffered_updates[ifp->num_buffered_updates].src_prefix,
-           src_prefix, 16);
-    ifp->buffered_updates[ifp->num_buffered_updates].src_plen = src_plen;
-    ifp->num_buffered_updates++;
+    /* Ordered insertion to avoid duplicates */
+    struct buffered_update update = {
+        .id = { 0 },
+        .plen = plen,
+        .src_plen = src_plen
+    };
+    memcpy(update.prefix, prefix, sizeof(update.prefix));
+    memcpy(update.src_prefix, src_prefix, sizeof(update.src_prefix));
+
+    struct buffered_update *buffered_updates = ifp->buffered_updates;
+    int c = -1, p = 0, g = ifp->num_buffered_updates - 1;
+    while (p <= g) {
+        int m = (p + g) / 2;
+        c = compare_buffered_updates(&update, &buffered_updates[m]);
+        if(c == 0)
+            break;
+        else if(c < 0)
+            g = m - 1;
+        else
+            p = m + 1;
+    }
+    if (c != 0) {
+        if (p < ifp->num_buffered_updates)
+            memmove(&buffered_updates[p + 1], &buffered_updates[p], (ifp->num_buffered_updates - p) * sizeof(struct buffered_update));
+        buffered_updates[p] = update;
+        ifp->num_buffered_updates++;
+    }
 }
 
 /* Full wildcard update with prefix == src_prefix == NULL,
