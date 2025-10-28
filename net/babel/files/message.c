@@ -1565,7 +1565,7 @@ buffer_update(struct interface *ifp,
         /* Allocate enough space to hold a full update.  Since the
            number of installed routes will grow over time, make sure we
            have enough space to send a full-ish frame. */
-        n = installed_routes_estimate() + xroutes_estimate() + 4;
+        n = total_routes_estimate() + xroutes_estimate() + 4;
         n = MAX(n, ifp->buf.size / 16);
     again:
         ifp->buffered_updates = malloc(n * sizeof(struct buffered_update));

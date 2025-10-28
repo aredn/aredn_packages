@@ -263,17 +263,20 @@ check_neighbours()
     /* Now we have the neighbours up-to-date we can update the route metrics */
     if (anychanged) {
         for(i = 0; i < route_slots; i++) {
-            struct babel_route *r;
+            struct babel_route *r = routes[i];
             struct babel_route *installed = NULL;
             struct babel_route *best = NULL;
             unsigned int installed_oldmetric = INFINITY;
             unsigned int installed_smoothed_metrict = INFINITY;
-            for(r = routes[i]; r; r = r->next) {
+            if (r && r->installed) {
+                installed = r;
+                installed_oldmetric = route_metric(r);
+                installed_smoothed_metrict = route_smoothed_metric(r);
+            }
+            for(; r; r = r->next) {
                 struct neighbour *n = r->neigh;
-                int old_metric = route_metric(r);
-                int old_smoothed_metric = route_smoothed_metric(r);
                 if (n->temp_cost < 0) {
-                    if (route_feasible(r) && (!best || old_smoothed_metric < best->smoothed_metric))
+                    if (route_feasible(r) && (!best || route_smoothed_metric(r) < best->smoothed_metric))
                         best = r;
                 }
                 else if(r->time < now.tv_sec - r->hold_time) { // route_expired
@@ -291,11 +294,6 @@ check_neighbours()
                     change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
                     if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
                         best = r;
-                }
-                if (r->installed) {
-                    installed = r;
-                    installed_oldmetric = old_metric;
-                    installed_smoothed_metrict = old_smoothed_metric;
                 }
             }
             if (best && best != installed)
