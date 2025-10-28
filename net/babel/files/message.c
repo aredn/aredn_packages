@@ -1016,7 +1016,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
             }
         }
 
-#ifdef MULTILE_SOCKET
+#ifdef MULTIPLE_SOCKETS
         int protocol_socket = ifp->protocol_socket;
 #endif
         rc = babel_send(protocol_socket,
