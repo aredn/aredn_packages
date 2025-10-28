@@ -701,7 +701,7 @@ babel_main(char **interface_names, int num_interface_names)
 
 #ifdef MULTIPLE_SOCKETS
         FOR_ALL_INTERFACES(ifp) {
-            while (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+            if (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
                 unsigned char to[16];
                 rc = babel_recv(ifp->protocol_socket,
                                 receive_buffer, receive_buffer_size,
