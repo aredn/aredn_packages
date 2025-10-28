@@ -542,7 +542,7 @@ babel_main(char **interface_names, int num_interface_names)
         fd = -1;
     }
 
-#ifndef MULTIPLE_SOCKET
+#ifndef MULTIPLE_SOCKETS
     protocol_socket = babel_socket(protocol_port);
     if(protocol_socket < 0) {
         perror("Couldn't create link local socket");
