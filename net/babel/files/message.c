@@ -1052,7 +1052,7 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                             (char*)&mreq, sizeof(mreq));
             if(rc < 0)
                 perror("setsockopt(IPV6_JOIN_GROUP)");
-#ifdef MULTIPLE_SOCKET
+#ifdef MULTIPLE_SOCKETS
             ifp->protocol_socket = protocol_socket;
 #endif
         }

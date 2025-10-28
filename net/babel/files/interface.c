@@ -474,7 +474,7 @@ interface_updown(struct interface *ifp, int up)
         memset(&mreq, 0, sizeof(mreq));
         memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
         mreq.ipv6mr_interface = ifp->ifindex;
-#ifdef MULTIPLE_SOCKET
+#ifdef MULTIPLE_SOCKETS
         rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
                         (char*)&mreq, sizeof(mreq));
 #else

@@ -84,7 +84,7 @@ const unsigned char ones[16] =
 
 int protocol_port;
 unsigned char protocol_group[16];
-#ifndef MULTIPLE_SOCKET
+#ifndef MULTIPLE_SOCKETS
 int protocol_socket = -1;
 #endif
 int kernel_socket = -1;
