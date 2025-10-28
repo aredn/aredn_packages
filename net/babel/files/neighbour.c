@@ -38,6 +38,7 @@ THE SOFTWARE.
 #include "message.h"
 #include "resend.h"
 #include "local.h"
+#include "configuration.h"
 
 struct neighbour *neighs = NULL;
 
@@ -263,18 +264,49 @@ check_neighbours()
     if (anychanged) {
         for(i = 0; i < route_slots; i++) {
             struct babel_route *r;
+            struct babel_route *installed = NULL;
+            struct babel_route *best = NULL;
+            unsigned int installed_oldmetric = INFINITY;
+            unsigned int installed_smoothed_metrict = INFINITY;
             for(r = routes[i]; r; r = r->next) {
                 struct neighbour *n = r->neigh;
-                int temp_cost = n->temp_cost;
-                if (temp_cost >= 0)
-                    update_route_metric(r, n, temp_cost);
+                int old_metric = route_metric(r);
+                int old_smoothed_metric = route_smoothed_metric(r);
+                if (n->temp_cost < 0) {
+                    if (route_feasible(r) && (!best || old_smoothed_metric < best->smoothed_metric))
+                        best = r;
+                }
+                else if(r->time < now.tv_sec - r->hold_time) { // route_expired
+                    if(r->refmetric < INFINITY) {
+                        r->seqno = seqno_plus(r->src->seqno, 1);
+                        change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
+                    }
+                } else {
+                    int add_metric = input_filter(r->src->id,
+                                                r->src->prefix, r->src->plen,
+                                                r->src->src_prefix,
+                                                r->src->src_plen,
+                                                n->address,
+                                                n->ifp->ifindex);
+                    change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
+                    if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
+                        best = r;
+                }
+                if (r->installed) {
+                    installed = r;
+                    installed_oldmetric = old_metric;
+                    installed_smoothed_metrict = old_smoothed_metric;
+                }
             }
+            if (best && best != installed)
+                consider_route(best);
+            else if (installed && installed_oldmetric != route_metric(installed) && installed_smoothed_metrict != installed->smoothed_metric)
+                send_triggered_update(installed, installed->src, installed_oldmetric);
         }
 
-        for(neigh = neighs; neigh; neigh = neigh->next) {
+        for(neigh = neighs; neigh; neigh = neigh->next)
             if (neigh->temp_cost >= 0)
                 local_notify_neighbour(neigh, LOCAL_CHANGE);
-        }
     }
 
     return msecs;
