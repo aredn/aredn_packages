@@ -84,6 +84,9 @@ const unsigned char ones[16] =
 
 int protocol_port;
 unsigned char protocol_group[16];
+#ifndef MULTIPLE_SOCKET
+int protocol_socket = -1;
+#endif
 int kernel_socket = -1;
 static int kernel_link_changed = 0;
 static int kernel_addr_changed = 0;
@@ -539,6 +542,14 @@ babel_main(char **interface_names, int num_interface_names)
         fd = -1;
     }
 
+#ifndef MULTIPLE_SOCKET
+    protocol_socket = babel_socket(protocol_port);
+    if(protocol_socket < 0) {
+        perror("Couldn't create link local socket");
+        goto fail;
+    }
+#endif
+
     rc = kernel_setup_socket(1);
     if(rc < 0 || kernel_socket < 0) {
         perror("Couldn't setup kernel socket");
@@ -643,12 +654,17 @@ babel_main(char **interface_names, int num_interface_names)
         else
             tv.tv_sec = tv.tv_usec = 0;
 
+#ifdef MULTIPLE_SOCKETS
         FOR_ALL_INTERFACES(ifp) {
             if(if_up(ifp)) {
                 FD_SET(ifp->protocol_socket, &readfds);
                 maxfd = MAX(maxfd, ifp->protocol_socket);
             }
         }
+#else
+        FD_SET(protocol_socket, &readfds);
+        maxfd = MAX(maxfd, protocol_socket);
+#endif
         FD_SET(kernel_socket, &readfds);
         maxfd = MAX(maxfd, kernel_socket);
         if(local_server_socket >= 0 &&
@@ -683,6 +699,7 @@ babel_main(char **interface_names, int num_interface_names)
             kernel_callback(&filter);
         }
 
+#ifdef MULTIPLE_SOCKETS
         FOR_ALL_INTERFACES(ifp) {
             while (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
                 unsigned char to[16];
@@ -704,6 +721,31 @@ babel_main(char **interface_names, int num_interface_names)
                 }
             }
         }
+#else
+        if(FD_ISSET(protocol_socket, &readfds)) {
+            unsigned char to[16];
+            rc = babel_recv(protocol_socket,
+                            receive_buffer, receive_buffer_size,
+                            (struct sockaddr*)&sin6, sizeof(sin6), to);
+            if(rc < 0) {
+                if(errno != EAGAIN && errno != EINTR) {
+                    perror("recv");
+                }
+            } else {
+                FOR_ALL_INTERFACES(ifp) {
+                    if(!if_up(ifp))
+                        continue;
+                    if(ifp->ifindex == sin6.sin6_scope_id) {
+                        parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
+                                     receive_buffer, rc, to);
+                        VALGRIND_MAKE_MEM_UNDEFINED(receive_buffer,
+                                                    receive_buffer_size);
+                        break;
+                    }
+                }
+            }
+        }
+#endif
 
         if(local_server_socket >= 0 && FD_ISSET(local_server_socket, &readfds))
            accept_local_connections();

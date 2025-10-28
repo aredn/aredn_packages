@@ -81,6 +81,8 @@ THE SOFTWARE.
 #endif
 #endif
 
+#undef MULTIPLE_SOCKETS
+
 extern struct timeval now;
 extern int debug;
 extern time_t reboot_time;
@@ -104,6 +106,9 @@ extern int protocol_port, local_server_port;
 extern char *local_server_path;
 extern int local_server_write;
 extern unsigned char protocol_group[16];
+#ifndef MULTIPLE_SOCKET
+extern int protocol_socket;
+#endif
 extern int kernel_socket;
 extern int kernel_check_interval;
 extern int max_request_hopcount;

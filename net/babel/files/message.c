@@ -1016,7 +1016,10 @@ flushbuf(struct buffered *buf, struct interface *ifp)
             }
         }
 
-        rc = babel_send(ifp->protocol_socket,
+#ifdef MULTILE_SOCKET
+        int protocol_socket = ifp->protocol_socket;
+#endif
+        rc = babel_send(protocol_socket,
                         packet_header, sizeof(packet_header),
                         buf->buf, end,
                         (struct sockaddr*)&buf->sin6,
@@ -1026,17 +1029,17 @@ flushbuf(struct buffered *buf, struct interface *ifp)
         // If the socket stops working (the send buffer fills up and doesnt empty) then
         // all we can do is close it and reopen a new one.
         if(rc < 0 && errno == EAGAIN) {
-            close(ifp->protocol_socket);
+            close(protocol_socket);
             fprintf(stderr, "Protocol socket returned EAGAIN - reopening\n");
             sleep(1);
             // Create a new socket
-            ifp->protocol_socket = babel_socket(protocol_port);
-            if(ifp->protocol_socket < 0) {
+            protocol_socket = babel_socket(protocol_port);
+            if(protocol_socket < 0) {
                 // Let's hope this doesn't happen.
                 fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
-            rc = setsockopt(ifp->protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
+            rc = setsockopt(protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
                         ifp->name, strlen(ifp->name));
             if(rc < 0)
                 perror("setsockopt(SO_BINDTODEVICE)");
@@ -1045,10 +1048,13 @@ flushbuf(struct buffered *buf, struct interface *ifp)
             memset(&mreq, 0, sizeof(mreq));
             memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
             mreq.ipv6mr_interface = ifp->ifindex;
-            rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+            rc = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
                             (char*)&mreq, sizeof(mreq));
             if(rc < 0)
                 perror("setsockopt(IPV6_JOIN_GROUP)");
+#ifdef MULTIPLE_SOCKET
+            ifp->protocol_socket = protocol_socket;
+#endif
         }
     }
     VALGRIND_MAKE_MEM_UNDEFINED(buf->buf, buf->size);
