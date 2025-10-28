@@ -1418,10 +1418,6 @@ flushupdates(struct interface *ifp)
 {
     struct xroute *xroute;
     struct babel_route *route;
-    //const unsigned char *last_prefix = NULL;
-    //const unsigned char *last_src_prefix = NULL;
-    //unsigned char last_plen = 0xFF;
-    //unsigned char last_src_plen = 0xFF;
     int i;
 
     if(ifp == NULL) {
@@ -1435,8 +1431,6 @@ flushupdates(struct interface *ifp)
         struct buffered_update *b = ifp->buffered_updates;
         int n = ifp->num_buffered_updates;
 
-        ifp->buffered_updates = NULL;
-        ifp->update_bufsize = 0;
         ifp->num_buffered_updates = 0;
 
         if(!if_up(ifp))
@@ -1460,17 +1454,6 @@ flushupdates(struct interface *ifp)
         qsort(b, n, sizeof(struct buffered_update), compare_buffered_updates);
 
         for(i = 0; i < n; i++) {
-            /* The same update may be scheduled multiple times before it is
-               sent out.  Since our buffer is now sorted, it is enough to
-               compare with the previous update. */
-
-            //if(last_prefix &&
-            //   b[i].plen == last_plen &&
-            //   b[i].src_plen == last_src_plen &&
-            //   memcmp(b[i].prefix, last_prefix, 16) == 0 &&
-            //   memcmp(b[i].src_prefix, last_src_prefix, 16) == 0)
-            //    continue;
-
             xroute = find_xroute(b[i].prefix, b[i].plen,
                                  b[i].src_prefix, b[i].src_plen);
             route = find_installed_route(b[i].prefix, b[i].plen,
@@ -1481,10 +1464,6 @@ flushupdates(struct interface *ifp)
                                    xroute->prefix, xroute->plen,
                                    xroute->src_prefix, xroute->src_plen,
                                    myseqno, xroute->metric);
-                //last_prefix = xroute->prefix;
-                //last_plen = xroute->plen;
-                //last_src_prefix = xroute->src_prefix;
-                //last_src_plen = xroute->src_plen;
             } else if(route) {
                 unsigned short metric;
                 unsigned short seqno;
@@ -1508,10 +1487,6 @@ flushupdates(struct interface *ifp)
                                    route->src->src_plen,
                                    seqno, metric);
                 update_source(route->src, seqno, metric);
-                //last_prefix = route->src->prefix;
-                //last_plen = route->src->plen;
-                //last_src_prefix = route->src->src_prefix;
-                //last_src_plen = route->src->src_plen;
             } else {
             /* There's no route for this prefix.  This can happen shortly
                after an xroute has been retracted, so send a retraction. */
@@ -1532,8 +1507,7 @@ flushupdates(struct interface *ifp)
         } else {
             schedule_flush_now(&ifp->buf);
         }
-    done:
-        free(b);
+    done:;
     }
     ifp->update_flush_timeout.tv_sec = 0;
     ifp->update_flush_timeout.tv_usec = 0;
@@ -1559,27 +1533,22 @@ buffer_update(struct interface *ifp,
        ifp->num_buffered_updates >= ifp->update_bufsize)
         flushupdates(ifp);
 
-    if(ifp->update_bufsize == 0) {
-        int n;
-        assert(ifp->buffered_updates == NULL);
+    if(ifp->num_buffered_updates == 0) {
         /* Allocate enough space to hold a full update.  Since the
            number of installed routes will grow over time, make sure we
            have enough space to send a full-ish frame. */
-        n = installed_routes_estimate() + xroutes_estimate() + 4;
+        int n = installed_routes_estimate() + xroutes_estimate() + 4;
         n = MAX(n, ifp->buf.size / 16);
-    again:
-        ifp->buffered_updates = malloc(n * sizeof(struct buffered_update));
-        if(ifp->buffered_updates == NULL) {
-            perror("malloc(buffered_updates)");
-            if(n > 4) {
-                /* Try again with a tiny buffer. */
-                n = 4;
-                goto again;
+        if (n > ifp->update_bufsize) {
+            if (ifp->buffered_updates)
+                free(ifp->buffered_updates);
+            ifp->buffered_updates = malloc(n * sizeof(struct buffered_update));
+            if(ifp->buffered_updates == NULL) {
+                perror("malloc(buffered_updates)");
+                return;
             }
-            return;
+            ifp->update_bufsize = n;
         }
-        ifp->update_bufsize = n;
-        ifp->num_buffered_updates = 0;
     }
 
     /* Ordered insertion to avoid duplicates */
