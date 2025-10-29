@@ -701,9 +701,9 @@ babel_main(char **interface_names, int num_interface_names)
 
 #ifdef MULTIPLE_SOCKETS
         FOR_ALL_INTERFACES(ifp) {
-            struct timeval start, curr;
+            struct timeval start;
             gettime(&start);
-            for (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+            while (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
                 gettime(&now);
                 if (timeval_minus_msec(&now, &start) > 1000) {
                     break;
