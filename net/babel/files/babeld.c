@@ -706,10 +706,7 @@ babel_main(char **interface_names, int num_interface_names)
                 rc = babel_recv(ifp->protocol_socket,
                                 receive_buffer, receive_buffer_size,
                                 (struct sockaddr*)&sin6, sizeof(sin6), to);
-                if(rc == 0) {
-                    FD_CLR(ifp->protocol_socket, &readfds);
-                } else if(rc < 0) {
-                    FD_CLR(ifp->protocol_socket, &readfds);
+                if(rc < 0) {
                     if(errno != EAGAIN && errno != EINTR) {
                         perror("recv");
                     }
