@@ -701,7 +701,13 @@ babel_main(char **interface_names, int num_interface_names)
 
 #ifdef MULTIPLE_SOCKETS
         FOR_ALL_INTERFACES(ifp) {
-            if (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+            struct timeval start, curr;
+            gettime(&start);
+            for (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+                gettime(&now);
+                if (timeval_minus_msec(&now, &start) > 1000) {
+                    break;
+                }
                 unsigned char to[16];
                 rc = babel_recv(ifp->protocol_socket,
                                 receive_buffer, receive_buffer_size,
@@ -710,7 +716,10 @@ babel_main(char **interface_names, int num_interface_names)
                     if(errno != EAGAIN && errno != EINTR) {
                         perror("recv");
                     }
-                } else if(ifp->ifindex == sin6.sin6_scope_id) {
+                    break;
+                } else if(rc == 0)
+                    break;
+                else if(ifp->ifindex == sin6.sin6_scope_id) {
                     parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
                                 receive_buffer, rc, to);
                     VALGRIND_MAKE_MEM_UNDEFINED(receive_buffer,
