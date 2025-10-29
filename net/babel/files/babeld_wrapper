@@ -75,6 +75,7 @@ do
                 echo "interface ${i} type wireless" >> ${C}
                 echo "interface ${i} enable-timestamps true" >> ${C}
                 echo "interface ${i} rxcost $(uci -q get babel.wireless.rxcost)" >> ${C}
+                echo "interface ${i} split-horizon false" >> ${C}
                 ;;
         esac
         ;;
@@ -85,6 +86,7 @@ do
         fi
         echo "interface ${i} type tunnel" >> ${C}
         echo "interface ${i} rxcost ${cost}" >> ${C}
+        echo "interface ${i} split-horizon true" >> ${C}
         echo "interface ${i} hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
         if [ "$sn" = "1" ]; then
             echo "interface ${i} update-interval $(uci -q get babel.supernode.update_interval)" >> ${C}
@@ -105,6 +107,7 @@ do
             fi
             echo "interface ${i} type wireless" >> ${C}
             echo "interface ${i} rxcost ${cost}" >> ${C}
+            echo "interface ${i} split-horizon true" >> ${C}
             echo "redistribute anyproto if ${i} deny" >> ${C}
         fi
         ;;

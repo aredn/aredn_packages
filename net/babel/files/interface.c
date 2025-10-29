@@ -270,12 +270,14 @@ interface_updown(struct interface *ifp, int up)
             goto fail;
         }
 
+#ifdef MULTIPLE_SOCKETS
         ifp->protocol_socket = babel_socket(protocol_port);
         if (ifp->protocol_socket == -1) {
             fprintf(stderr, "babel_socket(%s) failed.\n",
                     ifp->name);
             goto fail;
         }
+#endif
 
         rc = kernel_setup_interface(1, ifp->name, ifp->ifindex);
         if(rc < 0) {
@@ -461,17 +463,24 @@ interface_updown(struct interface *ifp, int up)
         if(rc < 0) {
             goto fail;
         }
+#ifdef MULTIPLE_SOCKETS
         rc = setsockopt(ifp->protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
                         ifp->name, strlen(ifp->name));
         if(rc < 0) {
             perror("setsockopt(SO_BINDTODEVICE)");
             goto fail;
         }
+#endif
         memset(&mreq, 0, sizeof(mreq));
         memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
         mreq.ipv6mr_interface = ifp->ifindex;
+#ifdef MULTIPLE_SOCKETS
         rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
                         (char*)&mreq, sizeof(mreq));
+#else
+        rc = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+                        (char*)&mreq, sizeof(mreq));
+#endif
         if(rc < 0) {
             perror("setsockopt(IPV6_JOIN_GROUP)");
             goto fail;
@@ -507,18 +516,27 @@ interface_updown(struct interface *ifp, int up)
             memset(&mreq, 0, sizeof(mreq));
             memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
             mreq.ipv6mr_interface = ifp->ifindex;
+#ifdef MULTIPLE_SOCKETS
             if (ifp->protocol_socket > 0) {
                 rc = setsockopt(ifp->protocol_socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
                                 (char*)&mreq, sizeof(mreq));
                 if(rc < 0)
                     perror("setsockopt(IPV6_LEAVE_GROUP)");
             }
+#else
+            rc = setsockopt(protocol_socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP,
+                            (char*)&mreq, sizeof(mreq));
+            if(rc < 0)
+                perror("setsockopt(IPV6_LEAVE_GROUP)");
+#endif
             kernel_setup_interface(0, ifp->name, ifp->ifindex);
         }
+#ifdef MULTIPLE_SOCKETS
         if (ifp->protocol_socket > 0) {
             close(ifp->protocol_socket);
             ifp->protocol_socket = 0;
         }
+#endif
         if(ifp->ll)
             free(ifp->ll);
         ifp->ll = NULL;
