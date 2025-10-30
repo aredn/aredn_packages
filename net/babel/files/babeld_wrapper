@@ -41,13 +41,7 @@ sn="$(uci -q get aredn.@supernode[0].enable)"
 echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
 if [ "$sn" = "1" ]; then
     echo "smoothing-half-life 0" >> ${C}
-    bogomips=$(grep -i 'bogomips' /proc/cpuinfo | head -1 | tr ':.' ' ' | awk '{print $2}')
-    # We use smaller buffers on slower devices because its better to loose data than get behind reading it
-    if [ ${bogomips} -lt 1000 ]; then
-        echo "protocol-buffer-size 32768" >> ${C}
-    else
-        echo "protocol-buffer-size 65536" >> ${C}
-    fi
+    echo "protocol-buffer-size 32768" >> ${C}
 else
     echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
     echo "protocol-buffer-size 65536" >> ${C}
