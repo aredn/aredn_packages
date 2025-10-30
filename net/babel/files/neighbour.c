@@ -223,13 +223,14 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
+#if 1
 unsigned
 check_neighbours()
 {
     struct neighbour *neigh;
     struct neighbour *nneigh;
     unsigned msecs = 50000;
-    int i, anychanged = 0;
+    int i;
 
     debugf("Checking neighbours.\n");
 
@@ -249,8 +250,6 @@ check_neighbours()
             /* Temp cost to avoid recalculating later */
             neigh->temp_cost = changed ? (int)neighbour_cost(neigh) : -1;
 
-            anychanged |= changed;
-
             if(neigh->hello.interval > 0)
                 msecs = MIN(msecs, neigh->hello.interval * 10);
             if(neigh->uhello.interval > 0)
@@ -261,54 +260,94 @@ check_neighbours()
     }
 
     /* Now we have the neighbours up-to-date we can update the route metrics */
-    if (anychanged) {
-        for(i = 0; i < route_slots; i++) {
-            struct babel_route *r = routes[i];
-            struct babel_route *installed = NULL;
-            struct babel_route *best = NULL;
-            unsigned int installed_oldmetric = INFINITY;
-            unsigned int installed_smoothed_metrict = INFINITY;
-            if (r && r->installed) {
-                installed = r;
-                installed_oldmetric = route_metric(r);
-                installed_smoothed_metrict = route_smoothed_metric(r);
+    for(i = 0; i < route_slots; i++) {
+        struct babel_route *r = routes[i];
+        struct babel_route *installed = NULL;
+        struct babel_route *best = NULL;
+        unsigned int installed_oldmetric = INFINITY;
+        unsigned int installed_smoothed_metrict = INFINITY;
+        if (r && r->installed) {
+            installed = r;
+            installed_oldmetric = route_metric(r);
+            installed_smoothed_metrict = route_smoothed_metric(r);
+        }
+        for(; r; r = r->next) {
+            struct neighbour *n = r->neigh;
+            if (n->temp_cost < 0) {
+                if (route_feasible(r) && (!best || route_smoothed_metric(r) < best->smoothed_metric))
+                    best = r;
             }
-            for(; r; r = r->next) {
-                struct neighbour *n = r->neigh;
-                if (n->temp_cost < 0) {
-                    if (route_feasible(r) && (!best || route_smoothed_metric(r) < best->smoothed_metric))
-                        best = r;
+            else if(r->time < now.tv_sec - r->hold_time) { // route_expired
+                if(r->refmetric < INFINITY) {
+                    r->seqno = seqno_plus(r->src->seqno, 1);
+                    change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
                 }
-                else if(r->time < now.tv_sec - r->hold_time) { // route_expired
-                    if(r->refmetric < INFINITY) {
-                        r->seqno = seqno_plus(r->src->seqno, 1);
-                        change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
-                    }
-                } else {
-                    int add_metric = input_filter(r->src->id,
-                                                r->src->prefix, r->src->plen,
-                                                r->src->src_prefix,
-                                                r->src->src_plen,
-                                                n->address,
-                                                n->ifp->ifindex);
-                    change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
-                    if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
-                        best = r;
-                }
+            } else {
+                int add_metric = input_filter(r->src->id,
+                                            r->src->prefix, r->src->plen,
+                                            r->src->src_prefix,
+                                            r->src->src_plen,
+                                            n->address,
+                                            n->ifp->ifindex);
+                change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
+                if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
+                    best = r;
             }
-            if (best && best != installed)
-                consider_route(best);
-            else if (installed && installed_oldmetric != route_metric(installed) && installed_smoothed_metrict != installed->smoothed_metric)
-                send_triggered_update(installed, installed->src, installed_oldmetric);
+        }
+        if (best && best != installed)
+            consider_route(best);
+        else if (installed && installed_oldmetric != route_metric(installed) && installed_smoothed_metrict != installed->smoothed_metric)
+            send_triggered_update(installed, installed->src, installed_oldmetric);
+    }
+
+    for(neigh = neighs; neigh; neigh = neigh->next)
+        if (neigh->temp_cost >= 0)
+            local_notify_neighbour(neigh, LOCAL_CHANGE);
+
+    return msecs;
+}
+#else
+unsigned
+check_neighbours()
+{
+    struct neighbour *neigh;
+    unsigned msecs = 50000;
+
+    debugf("Checking neighbours.\n");
+
+    neigh = neighs;
+    while(neigh) {
+        int changed, rc;
+        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
+        rc = update_neighbour(neigh, &neigh->uhello, 1, -1, 0);
+        changed = changed || rc;
+
+        if(neigh->hello.reach == 0 ||
+           neigh->hello.time.tv_sec > now.tv_sec || /* clock stepped */
+           timeval_minus_msec(&now, &neigh->hello.time) > 300000) {
+            struct neighbour *old = neigh;
+            neigh = neigh->next;
+            flush_neighbour(old);
+            continue;
         }
 
-        for(neigh = neighs; neigh; neigh = neigh->next)
-            if (neigh->temp_cost >= 0)
-                local_notify_neighbour(neigh, LOCAL_CHANGE);
+        rc = reset_txcost(neigh);
+        changed = changed || rc;
+
+        update_neighbour_metric(neigh, changed);
+
+        if(neigh->hello.interval > 0)
+            msecs = MIN(msecs, neigh->hello.interval * 10);
+        if(neigh->uhello.interval > 0)
+            msecs = MIN(msecs, neigh->uhello.interval * 10);
+        if(neigh->ihu_interval > 0)
+            msecs = MIN(msecs, neigh->ihu_interval * 10);
+        neigh = neigh->next;
     }
 
     return msecs;
 }
+#endif
 
 /* To lose one hello is a misfortune, to lose two is carelessness. */
 static int
