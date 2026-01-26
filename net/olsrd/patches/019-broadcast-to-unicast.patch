@@ -28,7 +28,7 @@ index f853bf64..f0e5c662 100644
    char *int_name;                      /* from kernel if structure */
    uint16_t olsr_seqnum;                /* Olsr message seqno */
 +  uint8_t mac[6];                      /* Mac address of interface */
-+  char stations[60];                   /* Path to peer file > strlen("/sys/kernel/debug/ieee80211/phy0/netdev:wlan0/stations") */
++  char stations[60];                   /* Path to peer file > strlen("/tmp/lqm.phy%d.macs") */
  
    /* Periodic message generation timers */
    struct timer_entry *hello_gen_timer;
@@ -172,8 +172,8 @@ index 22a0fa16..689db076 100644
 +  uint32_t check = 0;
 +  struct sockaddr_ll socket_address;
 +  struct pseudo_header pseudo;
-+  DIR *f;
-+  struct dirent* d;
++  FILE *f;
++  char macbuf[32];
 +
 +  struct ether_header *ether_hdr = (struct ether_header *)pkt;
 +  struct iphdr *ip_hdr = (struct iphdr *)(pkt + sizeof(struct ether_header));
@@ -242,15 +242,15 @@ index 22a0fa16..689db076 100644
 +#endif
 +
 +  /* Get destinations */
-+  if (iface->stations[0] == 0 || (f = opendir(iface->stations)) == NULL) {
++  if (iface->stations[0] == 0 || (f = fopen(iface->stations, "r")) == NULL) {
 +    /* No stations - use broadcast */
 +    memset(socket_address.sll_addr, 255, sizeof(dst_mac));
 +    memset(ether_hdr->ether_dhost, 255, sizeof(dst_mac));
 +    return sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
 +  }
 +  /* Send the packet to each peer individually */
-+  while ((d = readdir(f)) != NULL) {
-+    if (sscanf(d->d_name, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]) == 6) {
++  while (fgets(macbuf, sizeof(macbuf), f) != NULL) {
++    if (sscanf(macbuf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst_mac[0], &dst_mac[1], &dst_mac[2], &dst_mac[3], &dst_mac[4], &dst_mac[5]) == 6) {
 +      socket_address.sll_addr[0] = ether_hdr->ether_dhost[0] = dst_mac[0];
 +      socket_address.sll_addr[1] = ether_hdr->ether_dhost[1] = dst_mac[1];
 +      socket_address.sll_addr[2] = ether_hdr->ether_dhost[2] = dst_mac[2];
@@ -260,7 +260,7 @@ index 22a0fa16..689db076 100644
 +      r = sendto(s, pkt, sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct udphdr) + len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
 +    }
 +  }
-+  closedir(f);
++  fclose(f);
 +
 +  return r;
 +}
@@ -338,12 +338,12 @@ index c286289b..a39653a4 100644
  
  static const uint8_t  zero_v6[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
  
-+static const char PATH_STATIONS_PATTERN[] = "/sys/kernel/debug/ieee80211/phy%d/netdev:wlan%d/stations";
++static const char PATH_STATIONS_PATTERN[] = "/tmp/lqm.phy%d.macs";
 +
  void
  check_interface_updates(void *foo __attribute__ ((unused)))
  {
-@@ -222,6 +225,24 @@ chk_if_changed(struct olsr_if *iface)
+@@ -222,6 +225,20 @@ chk_if_changed(struct olsr_if *iface)
    /* Get interface index */
    ifp->if_index = if_nametoindex(ifr.ifr_name);
  
@@ -357,12 +357,8 @@ index c286289b..a39653a4 100644
 +  /* Find path to stations */
 +  ifp->stations[0] = 0;
 +  if (strcmp(ifr.ifr_name, "wlan0") == 0 || strcmp(ifr.ifr_name, "wlan1") == 0) {
-+    struct stat stat_buf;
 +    int phyid = ifr.ifr_name[4] - '0';
-+    sprintf(ifp->stations, PATH_STATIONS_PATTERN, phyid, phyid);
-+    if (stat(ifp->stations, &stat_buf) != 0) {
-+      ifp->stations[0] = 0;
-+    }
++    sprintf(ifp->stations, PATH_STATIONS_PATTERN, phyid);
 +  }
 +
    /*

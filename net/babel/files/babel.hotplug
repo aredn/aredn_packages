@@ -1,0 +1,54 @@
+#!/bin/sh
+
+BABEL_PORT=6697
+BABEL_PATH=/var/run/babel.sock
+
+case "${ACTION}" in
+    ifdown)
+        socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+flush interface ${DEVICE}
+__END__
+        ;;
+    ifup)
+        if [ "${INTERFACE}" == "wifi" ]; then
+            if [ "${DEVICE}" != "br-nomesh" ]; then
+                socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+interface ${DEVICE} type wireless
+interface ${DEVICE} enable-timestamps true
+interface ${DEVICE} rxcost $(uci -q get babel.wireless.rxcost)
+__END__
+            fi
+        elif [ "${INTERFACE:0:2}" = "wg" ]; then
+            cost=$(uci -q get network.${INTERFACE}.cost)
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.tunnel.rxcost)
+            fi
+            update_interval=$(uci -q get babel.tunnel.update_interval)
+            if [ "$(uci -q get aredn.@supernode[0].enable)" = "1" ]; then
+                update_interval=$(uci -q get babel.tunnel.supernode_update_interval)
+            fi
+            socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+interface ${DEVICE} type tunnel
+interface ${DEVICE} rxcost ${cost}
+interface ${DEVICE} hello-interval $(uci -q get babel.tunnel.hello_interval)
+interface ${DEVICE} update-interval ${update_interval}
+interface ${DEVICE} rtt-min $(uci -q get babel.tunnel.rtt_min)
+interface ${DEVICE} rtt-max $(uci -q get babel.tunnel.rtt_max)
+interface ${DEVICE} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)
+redistribute anyproto if ${DEVICE} deny
+__END__
+        elif [ "${INTERFACE:0:5}" = "xlink" ]; then
+            cost=$(uci -q get network.${INTERFACE}.cost)
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.xlink.rxcost)
+            fi
+            socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+interface ${DEVICE} type wireless
+interface ${DEVICE} rxcost ${cost}
+redistribute anyproto if ${DEVICE} deny
+__END__
+        fi
+        ;;
+    *)
+        ;;
+esac

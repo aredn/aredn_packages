@@ -3,7 +3,7 @@
 
 OLSRD_OLSRD_SCHEMA='ignore:internal config_file:internal DebugLevel=0 AllowNoInt=yes'
 OLSRD_IPCCONNECT_SCHEMA='ignore:internal Host:list Net:list2'
-OLSRD_LOADPLUGIN_SCHEMA='ignore:internal library:internal Host4:list Net4:list2 Host:list Net:list2 Host6:list Net6:list2 Ping:list redistribute:list NonOlsrIf:list name:list lat lon latlon_infile HNA:list2 hosts:list2'
+OLSRD_LOADPLUGIN_SCHEMA='ignore:internal library:internal Host4:list Net4:list2 Host:list Net:list2 Host6:list Net6:list2 Ping:list redistribute:list NonOlsrIf:list name:list lat lon latlon_infile HNA:list2 hosts:list2 service:list'
 OLSRD_INTERFACE_SCHEMA='ignore:internal interface:internal AutoDetectChanges:bool LinkQualityMult:list2'
 OLSRD_INTERFACE_DEFAULTS_SCHEMA='AutoDetectChanges:bool'
 
@@ -137,11 +137,6 @@ olsrd_write_plparam() {
 			0|off|false|disabled|no) value=no;;
 			*) warning_invalid_value olsrd "$cfg" "$option"; return 1;;
 		esac
-	fi
-
-	if ! validate_olsrd_option "$value"; then
-		warning_invalid_value olsrd "$cfg" "$option"
-		return 1
 	fi
 
 	oldIFS="$IFS"
@@ -636,8 +631,6 @@ olsrd_write_config() {
 	INTERFACES_COUNT=0
 	config_foreach olsrd_write_interface_defaults InterfaceDefaults
 	config_foreach olsrd_write_interface Interface
-	echo
-	/usr/local/bin/olsrd-config $UCI_CONF_NAME
 	echo
 
 	return 0

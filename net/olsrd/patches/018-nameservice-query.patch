@@ -16,7 +16,7 @@
    strscat(regex_service, my_suffix, regex_size);
    strscat(regex_service,
 -          ")|([[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3})):[[:digit:]]+[[:alnum:]/?._=#-]*\\|(tcp|udp)\\|[^|[:cntrl:]]+$",
-+          ")|([[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3})):[[:digit:]]+[[:alnum:]/?&._=#-]*\\|(tcp|udp)\\|[^|[:cntrl:]]+$",
++          ")|([[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3}\\.[[:digit:]]{1,3})):[[:digit:]]+[[:alnum:]/?&._=#:!@-]*\\|(tcp|udp)\\|[^|[:cntrl:]]+$",
            regex_size);
  
    /* #1: call regcomp() to compile the regex */

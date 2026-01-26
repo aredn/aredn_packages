@@ -1,0 +1,224 @@
+#! /bin/sh
+true <<'LICENSE'
+  Part of AREDN® -- Used for creating Amateur Radio Emergency Data Networks
+  Copyright (C) 2025 Tim Wilkinson KN6PLV
+  See Contributors file for additional contributors
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation version 3 of the License.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Additional Terms:
+
+  Additional use restrictions exist on the AREDN® trademark and logo.
+    See AREDNLicense.txt for more info.
+
+  Attributions to the AREDN® Project must be retained in the source code.
+  If importing this code into a new or existing project attribution
+  to the AREDN® project must be added to the source code.
+
+  You must not misrepresent the origin of the material contained within.
+
+  Modified versions must be modified to attribute to the original source
+  and be marked in reasonable ways as differentiate it from the original
+  version.
+
+LICENSE
+
+C=/var/etc/babel-active.conf
+
+sn="$(uci -q get aredn.@supernode[0].enable)"
+
+# Defaults
+echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
+if [ "$sn" = "1" ]; then
+    echo "smoothing-half-life 0" >> ${C}
+    echo "protocol-buffer-size 32768" >> ${C}
+else
+    echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
+    echo "protocol-buffer-size 65536" >> ${C}
+fi
+echo "default rxcost $(uci -q get babel.default.rxcost)" >> ${C}
+echo "default hello-interval $(uci -q get babel.default.hello_interval)" >> ${C}
+echo "default update-interval $(uci -q get babel.default.update_interval)" >> ${C}
+echo "default rtt-decay $(uci -q get babel.default.rtt_decay)" >> ${C}
+echo "default rtt-min $(uci -q get babel.default.rtt_min)" >> ${C}
+echo "default rtt-max $(uci -q get babel.default.rtt_max)" >> ${C}
+echo "default max-rtt-penalty $(uci -q get babel.default.max_rtt_penalty)" >> ${C}
+
+# Always dtdlink so Babel is happy to have one interface
+echo "interface br-dtdlink type wired" >> ${C}
+echo "interface br-dtdlink rxcost $(uci -q get babel.wired.rxcost)" >> ${C}
+echo "interface br-dtdlink enable-timestamps false" >> ${C}
+echo "interface br-dtdlink split-horizon true" >> ${C}
+# Configure each of the interfaces which are already have as we wont (usually) be dynamically
+# told about them later. If we are informed again later, it's harmless.
+for p in /sys/class/net/*
+do
+    i=$(basename $p)
+    case $i in
+    br-*|lo|tunl0|eth*|br0.2|br0.3)
+        ;;
+    wlan*)
+        radio=$(echo ${i} | sed s/wlan/radio/)
+        case "$(uci -q -c /etc/config.mesh get setup.globals.${radio}_mode)" in
+            lan|wan|off)
+                echo "redistribute anyproto if ${i} deny" >> ${C}
+                ;;
+            *)
+                echo "interface ${i} type wireless" >> ${C}
+                echo "interface ${i} enable-timestamps true" >> ${C}
+                echo "interface ${i} rxcost $(uci -q get babel.wireless.rxcost)" >> ${C}
+                echo "interface ${i} split-horizon false" >> ${C}
+                ;;
+        esac
+        ;;
+    wg*)
+        cost=$(uci -q get network.${i}.cost)
+        if [ "$cost" = "" ]; then
+            cost=$(uci -q get babel.tunnel.rxcost)
+        fi
+        echo "interface ${i} type tunnel" >> ${C}
+        echo "interface ${i} rxcost ${cost}" >> ${C}
+        echo "interface ${i} split-horizon true" >> ${C}
+        echo "interface ${i} hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
+        if [ "$sn" = "1" ]; then
+            echo "interface ${i} update-interval $(uci -q get babel.supernode.update_interval)" >> ${C}
+        else
+            echo "interface ${i} update-interval $(uci -q get babel.tunnel.update_interval)" >> ${C}
+        fi
+        echo "interface ${i} rtt-min $(uci -q get babel.tunnel.rtt_min)" >> ${C}
+        echo "interface ${i} rtt-max $(uci -q get babel.tunnel.rtt_max)" >> ${C}
+        echo "interface ${i} max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
+        echo "redistribute anyproto if ${i} deny" >> ${C}
+        ;;
+    br0.*)
+        xlink=$(uci -q show network | sed -n "s/network\.\(xlink.*\)\.ifname='${i}'/\1/p")
+        if [ "${xlink}" != "" ]; then
+            cost=$(uci -q get network.${xlink}.cost)
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.xlink.rxcost)
+            fi
+            echo "interface ${i} type wireless" >> ${C}
+            echo "interface ${i} rxcost ${cost}" >> ${C}
+            echo "interface ${i} split-horizon true" >> ${C}
+            echo "redistribute anyproto if ${i} deny" >> ${C}
+        fi
+        ;;
+    *)
+        ;;
+    esac
+done
+
+# Include custom rules
+if [ -f /etc/aredn_include/babel-user.conf ]; then
+    cat /etc/aredn_include/babel-user.conf >> ${C}
+fi
+
+# Include user blocks
+if [ -f /etc/aredn_include/babel-deny.conf ]; then
+    cat /etc/aredn_include/babel-deny.conf >> ${C}
+fi
+
+# Limit what we redistribute
+gw="$(uci -q get aredn.@wan[0].mesh_to_local_wan)"
+
+# If we allow it, let our default route be redistributed so others on
+# the mesh can use it.
+if [ "$gw" = "1" ]; then
+    echo "redistribute anyproto ip 0.0.0.0/0 eq 0 allow" >> ${C}
+fi
+# Never redistribute our WAN address.
+# Make sure we do this after we allow redistribution of a default route if that's enabled.
+echo "redistribute anyproto if br-wan deny" >> ${C}
+
+if [ "$sn" = "1" ]; then
+    # Supernode redistribute a number of default routes; the default 10.X route
+    # as well as a set of 44.X routes.
+    echo "import-table 21" >> ${C}
+    echo "redistribute anyproto ip 10.0.0.0/8 allow" >> ${C}
+    if [ -f /etc/44net.conf ]; then
+        while read line; do
+            echo "redistribute anyproto ip ${line} allow" >> ${C}
+        done < /etc/44net.conf
+    fi
+    # Supernodes do not redistribute everything on their dtdlink, so we only
+    # allow our mesh default routes out that way and then deny everything else.
+    # We also prevent these default routes going anywhere but to their dtdlink.
+    echo "out if br-dtdlink ip 10.0.0.0/8 eq 8 allow" >> ${C}
+    echo "out ip 10.0.0.0/8 eq 8 deny" >> ${C}
+    if [ -f /etc/44net.conf ]; then
+        while read line; do
+            prefix=$(/bin/ipcalc.sh ${line}|grep PREFIX|cut -d= -f2)
+            echo "out if br-dtdlink ip ${line} eq ${prefix} allow" >> ${C}
+            echo "out ip ${line} eq ${prefix} deny" >> ${C}
+        done < /etc/44net.conf
+    fi
+    # We must include our own main IP address otherwise arednlink wont be able to verify
+    # any hosts or services we publish
+    echo "out if br-dtdlink ip $(uci -c /etc/config.mesh get setup.globals.wifi_ip) allow" >> ${C}
+    # Nothing else
+    echo "out if br-dtdlink deny" >> ${C}
+else
+    # Redistribute any locally originating 10.X and 44.X routes.
+    echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
+    echo "redistribute anyproto ip 44.0.0.0/8 ge 24 allow" >> ${C}
+fi
+
+# Dont redistribute tunnel endpoint addresses.
+if [ "$sn" = "1" ]; then
+    echo "redistribute anyproto ip 172.30.0.0/16 eq 32 deny" >> ${C}
+else
+    echo "redistribute anyproto ip 172.31.0.0/16 eq 32 deny" >> ${C}
+fi
+# Never redistribute any xlink addresses
+uci -q show network | grep network.xlink.*.ipaddr= | while read xlink; do
+    ip=$(echo ${xlink} | sed "s/^.*='\(.*\)'/\1/")
+    echo "redistribute anyproto ip ${ip} deny" >> ${C}
+done
+
+# Dont redistribute the LAN. The lan routes could be NAT addresses
+# and we dont want to redistribute them, rather relying on earlier 10.X rules.
+echo "redistribute anyproto if br-lan deny" >> ${C}
+# Finally, make sure nothing else is accidentally redistributed.
+# Note that if the br-wan interface is assigned an address from dhcp during boot, this address
+# get's redistributed without this rule in place. Not sure the the br-wan rule doesn't take care
+# of it, as it does when it's not assigned during bootup.
+echo "redistribute deny" >> ${C}
+
+# Control where we install incoming routes. If we dont specify a
+# table, and we dont deny, routes are installed in the table 20 (default)
+if [ "$sn" = "1" ]; then
+    # Dont install any of the default mesh route if this is a supernode
+    echo "install ip 10.0.0.0/8 eq 8 deny" >> ${C}
+    # We deny any large routes which are part of our 44net configuration
+    # and only allow small 44 subnets to be routed between meshes.
+    if [ -f /etc/44net.conf ]; then
+        while read line; do
+            echo "install ip ${line} le 23 deny" >> ${C}
+        done < /etc/44net.conf
+    fi
+else
+    # Install the mesh default route in table 21
+    echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
+    echo "install ip 44.0.0.0/8 le 23 allow table 21" >> ${C}
+fi
+# Install the internal default route in table 22
+echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
+# Install all other 10.X and 44.X routes in table 20
+echo "install ip 10.0.0.0/8 ge 24 allow table 20" >> ${C}
+echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
+# Drop everything else
+echo "install ip 0.0.0.0/0 ge 0 deny" >> ${C}
+
+rm -f /var/run/babel.sock /var/run/babeld.pid
+
+exec nice --20 /usr/sbin/babeld $* -c ${C}

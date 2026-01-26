@@ -1,0 +1,12 @@
+--- a/client.c
++++ b/client.c
+@@ -78,7 +78,7 @@
+ 	if( reconnect && (client_term != VTUN_SIG_HUP) ){
+ 	   if( vtun.persist || host->persist ){
+ 	      /* Persist mode. Sleep and reconnect. */
+-	      sleep(5);
++	      sleep(60);
+            } else {
+ 	      /* Exit */
+ 	      break;
+
