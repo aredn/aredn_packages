@@ -382,7 +382,7 @@ function resourceUpdate(resource, hash)
         default:
             for (let key in cache) {
             const entry = cache[key];
-                if (entry.hash === hash && entry.data) {
+                if (entry.hash === hash && entry.data && match(entry.data, /^[a-z]+:\/\//)) {
                     record += `##${key}##\n${entry.data}\n`;
                 }
             }
