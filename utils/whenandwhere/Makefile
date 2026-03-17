@@ -24,6 +24,7 @@ define Package/whenandwhere/description
 endef
 
 define Package/whenandwhere/install
+	$(INSTALL_DIR) $(1)/tmp
 	touch $(1)/tmp/whenandwhere
 endef
 
