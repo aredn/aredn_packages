@@ -108,10 +108,10 @@ const INFO_DUMP             = "/tmp/arednlink.info";
 // Resources
 //
 const resources = [
-    { name: "hosts",     dir: "/var/run/arednlink/hosts/",      cmd: CMD_UPDATE_HOSTS       },
-    { name: "services",  dir: "/var/run/arednlink/services/",   cmd: CMD_UPDATE_SERVICES    },
-    { name: "publish",   dir: "/var/run/arednlink/publish/",    cmd: CMD_UPDATE_PUBLISH     },
-    { name: "subscribe", dir: "/var/run/arednlink/subscribe/",  cmd: CMD_UPDATE_SUBSCRIBE   }
+    { name: "hosts",     dir: "/var/run/arednlink/hosts/",      cmd: CMD_UPDATE_HOSTS,     cache: {} },
+    { name: "services",  dir: "/var/run/arednlink/services/",   cmd: CMD_UPDATE_SERVICES,  cache: {} },
+    { name: "publish",   dir: "/var/run/arednlink/publish/",    cmd: CMD_UPDATE_PUBLISH,   cache: {} },
+    { name: "subscribe", dir: "/var/run/arednlink/subscribe/",  cmd: CMD_UPDATE_SUBSCRIBE, cache: {} }
 ];
 //
 // Default hop count for messages.
@@ -337,6 +337,79 @@ function crc16(data, start, end) {
 }
 
 //
+// Read/Write/Delete resources
+//
+function resourceHash(name)
+{
+    return int(split(name, ".")[1]) & 15;
+}
+
+function resourceRead(resource, name)
+{
+    return resource.cache[name]?.data;
+}
+
+function resourceUpdate(resource, hash)
+{
+    const cache = resource.cache;
+    let record = "";
+    switch (resource.name) {
+        case "publish":
+        case "subscribe":
+            for (let key in cache) {
+                const entry = cache[key];
+                try {
+                    if (entry.hash === hash && entry.data && json(entry.data)) {
+                        record += `"${key}": ${entry.data},\n`;
+                    }
+                }
+                catch (_) {
+                }
+            }
+            if (record != "") {
+                record = `{\n${record}}\n`;
+            }
+            break;
+        case "hosts":
+            for (let key in cache) {
+            const entry = cache[key];
+                if (entry.hash === hash) {
+                    record += `##${key}##\n${entry.data}\n`;
+                }
+            }
+            break;
+        case "services":
+        default:
+            for (let key in cache) {
+            const entry = cache[key];
+                if (entry.hash === hash && entry.data && match(entry.data, /^[a-z]+:\/\//)) {
+                    record += `##${key}##\n${entry.data}\n`;
+                }
+            }
+            break;
+    }
+    if (record == "") {
+        fs.unlink(`${resource.dir}${hash}`);
+    }
+    else {
+        fs.writefile(`${resource.dir}${hash}`, record);
+    }
+}
+
+function resourceWrite(resource, name, data)
+{
+    const hash = resourceHash(name);
+    resource.cache[name] = { hash: hash, data: data };
+    resourceUpdate(resource, hash);
+}
+
+function resourceRemove(resource, name)
+{
+    delete resource.cache[name];
+    resourceUpdate(resource, resourceHash(name));
+}
+
+//
 // Build a message
 //
 function buildMessage(channel, cmd, ipv4addr, hop, payload) {
@@ -490,7 +563,7 @@ function processMessage(cmd, hop, srcipv4, payload)
                 DEBUG && print(`-- syncing ${ip}\n`);
                 for (let r = 0; r < length(resources); r++) {
                     const res = resources[r];
-                    const data = fs.readfile(`${res.dir}${ip}`);
+                    const data = resourceRead(res, ip);
                     if (data !== null) {
                         DEBUG && print(`-- sending ${res.dir}${ip}\n`);
                         statistics.outgoing[res.name]++;
@@ -511,8 +584,7 @@ function processMessage(cmd, hop, srcipv4, payload)
             for (let r = 0; r < length(resources); r++) {
                 const res = resources[r];
                 if (cmd === res.cmd) {
-                    const path = `${res.dir}${srcipv4}`;
-                    const old = fs.readfile(path);
+                    const old = resourceRead(res, srcipv4);
                     // If the message is from an invalid host interface then we ignore it unless
                     // we don't have any current resource, in which case we'll take it anyway.
                     if (!validif && old !== null) {
@@ -523,7 +595,7 @@ function processMessage(cmd, hop, srcipv4, payload)
                     if (old == payload) {
                         return false;
                     }
-                    fs.writefile(path, payload);
+                    resourceWrite(res, srcipv4, payload);
                     return true;
                 }
             }
@@ -891,12 +963,11 @@ function commandProcess(cmd) {
             for (let r = 0; r < length(resources); r++) {
                 const res = resources[r];
                 if (res.name === type) {
-                    const path = `${res.dir}${myipv4address}`;
-                    const old = fs.readfile(path);
+                    const old = resourceRead(res, myipv4address);
                     if (old == data) {
                         return "ok nochange";
                     }
-                    fs.writefile(path, data);
+                    resourceWrite(res, myipv4address, data);
                     const count = sendMsgToAll(res.cmd, myipv4address, HOP_DEFAULT, data, null);
                     statistics.outgoing[res.name] += count;
                     return old ? "ok updated" : "ok new";
@@ -1162,7 +1233,7 @@ function routeProcess(event) {
     for (let ip in pendingremove) {
         if (pendingremove[ip] < now) {
             for (let r = 0; r < length(resources); r++) {
-                fs.unlink(`${resources[r].dir}${ip}`);
+                resourceRemove(resources[r], ip);
             }
             delete pendingremove[ip];
         }
