@@ -1205,10 +1205,11 @@ function routeProcess(event) {
     for (let i = length(broutes) - 1; i >= 0; i--) {
         const route = broutes[i];
         const dst = route.dst;
+        const gateway = route.gateway;
         const iface = route.oif;
-        hostroutes[dst] = { iface: iface, dst: dst };
-        if (oldr[dst]?.dst !== dst) {
-            // New route or an old route to a new destination
+        hostroutes[dst] = { iface: iface, dst: dst, gateway: gateway };
+        if (oldr[dst]?.gateway !== gateway) {
+            // New route or an old route to a new gateway
             // Build the sync message payloads as we go
             const addr = iptoarr(dst);
             if (!newr[iface]) {
