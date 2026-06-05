@@ -19,7 +19,7 @@ endef
 
 define Package/morsemicro-bcf/install
 	$(INSTALL_DIR) $(1)/lib/firmware/morse/
-	$(INSTALL_BIN) ./files/bcf_mm_hl2_ext.bin $(1)/lib/firmware/morse/
+	$(INSTALL_BIN) ./files/bcf_h7608_v2.bin $(1)/lib/firmware/morse/
 endef
 
 define Build/Compile
