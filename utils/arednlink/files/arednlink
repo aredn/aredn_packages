@@ -76,6 +76,7 @@ const CMD_VERSION           = ord('V');
 const NEIGHBORHOOD_POLL     = 60;
 const IDLE_POLL             = 60 * 60;
 const ROUTE_POLL            = 30;
+const FLUSH_POLL            = 10;
 //
 // Connection keepalive
 const KEEPALIVE_POLL        = 20;
@@ -372,7 +373,7 @@ function resourceUpdate(resource, hash)
             break;
         case "hosts":
             for (let key in cache) {
-            const entry = cache[key];
+                const entry = cache[key];
                 if (entry.hash === hash) {
                     record += `##${key}##\n${entry.data}\n`;
                 }
@@ -381,7 +382,7 @@ function resourceUpdate(resource, hash)
         case "services":
         default:
             for (let key in cache) {
-            const entry = cache[key];
+                const entry = cache[key];
                 if (entry.hash === hash && entry.data && match(entry.data, /^[a-z]+:\/\//)) {
                     record += `##${key}##\n${entry.data}\n`;
                 }
@@ -399,8 +400,10 @@ function resourceUpdate(resource, hash)
 function resourceWrite(resource, name, data)
 {
     const hash = resourceHash(name);
-    resource.cache[name] = { hash: hash, data: data };
-    resourceUpdate(resource, hash);
+    const entry = resource.cache[name];
+    if (!entry || sprintf("%J", data) != sprintf("%J", entry.data)) {
+        resource.cache[name] = { hash: hash, data: data, dirty: true };
+    }
 }
 
 function resourceRemove(resource, name)
@@ -1283,6 +1286,27 @@ function mgrProcess(event) {
 }
 
 //
+// Write any dirty data to disk
+//
+function flushProcess(event) {
+    DEBUG && print("flushProcess\n");
+
+    for (let r = 0; r < length(resources); r++) {
+        const resource = resources[r];
+        const cache = resource.cache ?? {};
+        for (let name in cache) {
+            const entry = cache[name];
+            if (entry.dirty) {
+                entry.dirty = false;
+                resourceUpdate(resource, entry.hash);
+            }
+        }
+    }
+
+    this.timer = when(FLUSH_POLL);
+}
+
+//
 // Work out what to poll and poll it.
 // NOTE: Because socket.poll takes a list of arguments and not an array, and because there
 // is no fn.apply(...) method, we use 'loadstring' to build our own. We keep it around and
@@ -1338,6 +1362,7 @@ for (let r = 0; r < length(resources); r++) {
 createChannel("MAIN", main, POLLIN, null, mainProcess);
 createChannel("MGR", mgr, POLLIN, null, mgrProcess);
 createChannel("ROUTES", null, 0, 0, routeProcess);
+createChannel("FLUSH", null, 0, 0, flushProcess);
 neighborhood = createChannel("NEIGHBORHOOD", null, 0, when(5), neighborhoodProcess);
 
 //
