@@ -5,14 +5,14 @@ BABEL_PATH=/var/run/babel.sock
 
 case "${ACTION}" in
     ifdown)
-        socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+        socat - UNIX-CONNECT:${BABEL_PATH} <<__END__
 flush interface ${INTERFACE}
 __END__
         ;;
     ifup)
         if [ "${INTERFACE}" == "wifi" ]; then
             if [ "${DEVICE}" != "br-nomesh" ]; then
-                socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+                socat - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost)
 __END__
@@ -26,7 +26,7 @@ __END__
             if [ "$(uci -q get aredn.@supernode[0].enable)" = "1" ]; then
                 update_interval=$(uci -q get babel.supernode.update_interval)
             fi
-            socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+            socat - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type tunnel rxcost ${cost} hello-interval $(uci -q get babel.tunnel.hello_interval) update-interval ${update_interval} rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)
 redistribute anyproto if ${DEVICE} deny
@@ -36,7 +36,7 @@ __END__
             if [ "$cost" = "" ]; then
                 cost=$(uci -q get babel.xlink.rxcost)
             fi
-            socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
+            socat - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless rxcost ${cost}
 redistribute anyproto if ${DEVICE} deny

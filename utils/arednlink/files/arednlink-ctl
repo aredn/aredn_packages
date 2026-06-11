@@ -1,2 +1,2 @@
 #!/bin/sh
-socat UNIX-CLIENT:/var/run/arednlink.sock -
+socat UNIX-CONNECT:/var/run/arednlink.sock -
