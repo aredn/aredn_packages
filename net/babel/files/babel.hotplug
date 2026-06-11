@@ -24,7 +24,7 @@ __END__
             fi
             update_interval=$(uci -q get babel.tunnel.update_interval)
             if [ "$(uci -q get aredn.@supernode[0].enable)" = "1" ]; then
-                update_interval=$(uci -q get babel.tunnel.supernode_update_interval)
+                update_interval=$(uci -q get babel.supernode.update_interval)
             fi
             socat - UNIX-CLIENT:${BABEL_PATH} <<__END__
 flush interface ${DEVICE}
