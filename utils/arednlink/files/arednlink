@@ -498,7 +498,7 @@ main.setopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
 main.bind({ address: "::", port: AREDNLINK_PORT });                             
 main.listen();
 fs.unlink(AREDNLINK_MGR);
-const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM });
+const mgr = socket.listen({ path: AREDNLINK_MGR }, null, { socktype: socket.SOCK_STREAM }, 32);
 
 //
 // Process incoming message locally.
