@@ -1,2 +1,2 @@
 #!/bin/sh
-socat UNIX-CLIENT:/var/run/babel.sock -
+socat UNIX-CONNECT:/var/run/babel.sock -

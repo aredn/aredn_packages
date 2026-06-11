@@ -1,5 +1,5 @@
 #!/bin/sh
-socat UNIX-CLIENT:/var/run/babel.sock - <<__EOF__
+socat UNIX-CONNECT:/var/run/babel.sock - <<__EOF__
 dump
 quit
 __EOF__
