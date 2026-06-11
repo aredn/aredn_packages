@@ -280,7 +280,7 @@ tcp_server_socket(int port, int local)
     if(rc < 0)
         goto fail;
 
-    rc = listen(s, 2);
+    rc = listen(s, 32);
     if(rc < 0)
         goto fail;
 
@@ -329,7 +329,7 @@ unix_server_socket(const char *path)
     if(rc < 0)
         goto fail;
 
-    rc = listen(s, 2);
+    rc = listen(s, 32);
     if(rc < 0)
         goto fail_unlink;
 
