@@ -14,7 +14,7 @@ __END__
             if [ "${DEVICE}" != "br-nomesh" ]; then
                 socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
-interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost)
+interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false
 __END__
             fi
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
