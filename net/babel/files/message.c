@@ -1040,11 +1040,12 @@ flushbuf(struct buffered *buf, struct interface *ifp)
                 fprintf(stderr, "FATAL: Couldn't create new link local socket\n");
                 exit(1);
             }
+#ifdef MULTIPLE_SOCKETS
             rc = setsockopt(protocol_socket, SOL_SOCKET, SO_BINDTODEVICE,
                         ifp->name, strlen(ifp->name));
             if(rc < 0)
                 perror("setsockopt(SO_BINDTODEVICE)");
-
+#endif
             struct ipv6_mreq mreq;
             memset(&mreq, 0, sizeof(mreq));
             memcpy(&mreq.ipv6mr_multiaddr, protocol_group, 16);
