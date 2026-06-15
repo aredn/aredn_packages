@@ -700,50 +700,44 @@ babel_main(char **interface_names, int num_interface_names)
         }
 
 #ifdef MULTIPLE_SOCKETS
-        for (int repeat = 1; repeat; ) {
-            repeat = 0;
-            FOR_ALL_INTERFACES(ifp) {
-                if (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
-                    unsigned char to[16];
-                    rc = babel_recv(ifp->protocol_socket,
-                                    receive_buffer, receive_buffer_size,
-                                    (struct sockaddr*)&sin6, sizeof(sin6), to);
-                    if (rc <= 0)
-                        FD_CLR(ifp->protocol_socket, &readfds);
+        FOR_ALL_INTERFACES(ifp) {
+            if (if_up(ifp) && FD_ISSET(ifp->protocol_socket, &readfds)) {
+                unsigned char to[16];
+                rc = babel_recv(ifp->protocol_socket,
+                                receive_buffer, receive_buffer_size,
+                                (struct sockaddr*)&sin6, sizeof(sin6), to);
+                if(rc < 0) {
+                    if(errno != EAGAIN && errno != EINTR) {
+                        perror("recv");
+                    }
+                    break;
+                } else if(rc > 0 && ifp->ifindex == sin6.sin6_scope_id) {
+                    parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
+                                receive_buffer, rc, to);
+                    VALGRIND_MAKE_MEM_UNDEFINED(receive_buffer,
+                                                receive_buffer_size);
+                }
+            }
+        }
+
+        if(local_server_socket >= 0 && FD_ISSET(local_server_socket, &readfds))
+            accept_local_connections();
+
+        i = 0;
+        while(i < num_local_sockets) {
+            if(FD_ISSET(local_sockets[i].fd, &readfds)) {
+                rc = local_read(&local_sockets[i]);
+                if(rc <= 0) {
                     if(rc < 0) {
-                        if(errno != EAGAIN && errno != EINTR) {
-                            perror("recv");
-                        }
-                        break;
-                    } else if(rc > 0 && ifp->ifindex == sin6.sin6_scope_id) {
-                        parse_packet((unsigned char*)&sin6.sin6_addr, ifp,
-                                    receive_buffer, rc, to);
-                        VALGRIND_MAKE_MEM_UNDEFINED(receive_buffer,
-                                                    receive_buffer_size);
-                        repeat = 1;
+                        if(errno == EINTR || errno == EAGAIN)
+                            continue;
+                        if(errno != EPIPE)
+                            perror("read(local_socket)");
                     }
+                    local_socket_destroy(i);
                 }
             }
-
-            if(local_server_socket >= 0 && FD_ISSET(local_server_socket, &readfds))
-                accept_local_connections();
-
-            i = 0;
-            while(i < num_local_sockets) {
-                if(FD_ISSET(local_sockets[i].fd, &readfds)) {
-                    rc = local_read(&local_sockets[i]);
-                    if(rc <= 0) {
-                        if(rc < 0) {
-                            if(errno == EINTR || errno == EAGAIN)
-                                continue;
-                            if(errno != EPIPE)
-                                perror("read(local_socket)");
-                        }
-                        local_socket_destroy(i);
-                    }
-                }
-                i++;
-            }
+            i++;
         }
 #else
         if(FD_ISSET(protocol_socket, &readfds)) {
