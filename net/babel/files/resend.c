@@ -92,7 +92,7 @@ int
 record_resend(int kind, const unsigned char *prefix, unsigned char plen,
               const unsigned char *src_prefix, unsigned char src_plen,
               unsigned short seqno, const unsigned char *id,
-              struct interface *ifp, int delay)
+              struct interface *ifp, int delay, unsigned char max_resend)
 {
     struct resend *resend;
     unsigned int ifindex = ifp ? ifp->ifindex : 0;

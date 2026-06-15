@@ -42,6 +42,7 @@ echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C
 if [ "$sn" = "1" ]; then
     echo "smoothing-half-life $(uci -q get babel.supernode.smoothing_half_life)" >> ${C}
     echo "protocol-buffer-size $(uci -q get babel.supernode.buffer_size)" >> ${C}
+    echo "max-update-retry 0" >> ${C}
 else
     echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
     echo "protocol-buffer-size $(uci -q get babel.default.buffer_size)" >> ${C}

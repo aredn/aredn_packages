@@ -109,3 +109,5 @@ void handle_request(struct neighbour *neigh, const unsigned char *prefix,
                     const unsigned char *src_prefix, unsigned char src_plen,
                     unsigned char hop_count,
                     unsigned short seqno, const unsigned char *id);
+void
+message_set_update_retry(int retry);

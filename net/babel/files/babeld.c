@@ -748,7 +748,11 @@ babel_main(char **interface_names, int num_interface_names)
 #else
         if(FD_ISSET(protocol_socket, &readfds)) {
             unsigned char to[16];
-            for (;;) {
+            int rcvbufsize = 1;
+            socklen_t rcvlen = sizeof(rcvbufsize);
+            getsockopt(protocol_socket, SOL_SOCKET, SO_RCVBUF, &rcvbufsize, &rcvlen);
+            rcvbufsize /= 2;
+            while (rcvbufsize > 0) {
                 rc = babel_recv(protocol_socket,
                                 receive_buffer, receive_buffer_size,
                                 (struct sockaddr*)&sin6, sizeof(sin6), to);
@@ -760,6 +764,7 @@ babel_main(char **interface_names, int num_interface_names)
                     }
                     break;
                 } else {
+                    rcvbufsize -= rc;
                     FOR_ALL_INTERFACES(ifp) {
                         if(!if_up(ifp))
                             continue;

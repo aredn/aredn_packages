@@ -47,7 +47,7 @@ void flush_resends(struct neighbour *neigh);
 int record_resend(int kind, const unsigned char *prefix, unsigned char plen,
                   const unsigned char *src_prefix, unsigned char src_plen,
                   unsigned short seqno, const unsigned char *id,
-                  struct interface *ifp, int delay);
+                  struct interface *ifp, int delay, unsigned char max_resend);
 int unsatisfied_request(const unsigned char *prefix, unsigned char plen,
                         const unsigned char *src_prefix, unsigned char src_plen,
                         unsigned short seqno, const unsigned char *id);
