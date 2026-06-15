@@ -50,6 +50,7 @@ int split_horizon = 1;
 
 unsigned short myseqno = 0;
 struct timeval seqno_time = {0, 0};
+unsigned char update_resend_max = RESEND_MAX;
 
 #define MAX_CHANNEL_HOPS 20
 
@@ -1658,8 +1659,10 @@ send_update_resend(struct interface *ifp,
     assert(prefix != NULL);
 
     send_update(ifp, 1, prefix, plen, src_prefix, src_plen);
-    record_resend(RESEND_UPDATE, prefix, plen, src_prefix, src_plen,
-                  0, NULL, NULL, resend_delay);
+    if (update_resend_max > 0) {
+        record_resend(RESEND_UPDATE, prefix, plen, src_prefix, src_plen,
+                    0, NULL, NULL, resend_delay, update_resend_max);
+    }
 }
 
 void
@@ -2070,7 +2073,7 @@ send_request_resend(const unsigned char *prefix, unsigned char plen,
         send_unicast_multihop_request(neigh, prefix, plen, src_prefix, src_plen,
                                       seqno, id, 127);
         record_resend(RESEND_REQUEST, prefix, plen, src_prefix, src_plen, seqno,
-                      id, neigh->ifp, resend_delay);
+                      id, neigh->ifp, resend_delay, RESEND_MAX);
     } else {
         struct interface *ifp;
         FOR_ALL_INTERFACES(ifp) {
@@ -2152,5 +2155,11 @@ handle_request(struct neighbour *neigh, const unsigned char *prefix,
     send_unicast_multihop_request(successor, prefix, plen, src_prefix, src_plen,
                                   seqno, id, hop_count - 1);
     record_resend(RESEND_REQUEST, prefix, plen, src_prefix, src_plen, seqno, id,
-                  neigh->ifp, 0);
+                  neigh->ifp, 0, RESEND_MAX);
+}
+
+void
+message_set_update_retry(int retry)
+{
+    update_resend_max = (unsigned char)MAX(0, MIN(RESEND_MAX, retry));
 }

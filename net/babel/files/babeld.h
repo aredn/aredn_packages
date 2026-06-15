@@ -81,13 +81,14 @@ THE SOFTWARE.
 #endif
 #endif
 
-#define MULTIPLE_SOCKETS
+#undef MULTIPLE_SOCKETS
 
 extern struct timeval now;
 extern int debug;
 extern time_t reboot_time;
 extern int default_wireless_hello_interval, default_wired_hello_interval;
 extern int resend_delay;
+extern unsigned char update_resend_max;
 extern int random_id;
 extern int skip_kernel_setup;
 extern int do_daemonise;

@@ -41,6 +41,7 @@ THE SOFTWARE.
 #include "kernel.h"
 #include "configuration.h"
 #include "net.h"
+#include "message.h"
 
 static struct filter *input_filters = NULL;
 static struct filter *output_filters = NULL;
@@ -947,6 +948,12 @@ parse_option(int c, gnc_t gnc, void *closure, char *token)
         if(c < -1 || h < 0)
             goto error;
         babel_set_buffer_size(h);
+    } else if(strcmp(token, "max-update-retry") == 0) {
+        int h;
+        c = getint(c, &h, gnc, closure);
+        if(c < -1 || h < 0)
+            goto error;
+        message_set_update_retry(h);
     } else {
         goto error;
     }

@@ -23,12 +23,14 @@ __END__
                 cost=$(uci -q get babel.tunnel.rxcost)
             fi
             update_interval=$(uci -q get babel.tunnel.update_interval)
+            hello_interval=$(uci -q get babel.tunnel.hello_interval)
             if [ "$(uci -q get aredn.@supernode[0].enable)" = "1" ]; then
                 update_interval=$(uci -q get babel.supernode.update_interval)
+                hello_interval=$(uci -q get babel.supernode.hello_interval)
             fi
             socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
-interface ${DEVICE} type tunnel rxcost ${cost} hello-interval $(uci -q get babel.tunnel.hello_interval) update-interval ${update_interval} rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)
+interface ${DEVICE} type tunnel rxcost ${cost} hello-interval ${hello_interval} update-interval ${update_interval} rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)
 redistribute anyproto if ${DEVICE} deny
 __END__
         elif [ "${INTERFACE:0:5}" = "xlink" ]; then
