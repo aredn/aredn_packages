@@ -223,7 +223,7 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
-#if 0
+#if 1
 unsigned
 check_neighbours()
 {
@@ -231,6 +231,7 @@ check_neighbours()
     struct neighbour *nneigh;
     unsigned msecs = 50000;
     int i;
+    int changes = 0;
 
     debugf("Checking neighbours.\n");
 
@@ -256,53 +257,25 @@ check_neighbours()
                 msecs = MIN(msecs, neigh->uhello.interval * 10);
             if(neigh->ihu_interval > 0)
                 msecs = MIN(msecs, neigh->ihu_interval * 10);
+
+            changes |= changed;
         }
     }
 
-    /* Now we have the neighbours up-to-date we can update the route metrics */
-    for(i = 0; i < route_slots; i++) {
-        struct babel_route *r = routes[i];
-        struct babel_route *installed = NULL;
-        struct babel_route *best = NULL;
-        unsigned int installed_oldmetric = INFINITY;
-        unsigned int installed_smoothed_metrict = INFINITY;
-        if (r && r->installed) {
-            installed = r;
-            installed_oldmetric = route_metric(r);
-            installed_smoothed_metrict = route_smoothed_metric(r);
-        }
-        for(; r; r = r->next) {
-            struct neighbour *n = r->neigh;
-            if (n->temp_cost < 0) {
-                if (route_feasible(r) && (!best || route_smoothed_metric(r) < best->smoothed_metric))
-                    best = r;
-            }
-            else if(r->time < now.tv_sec - r->hold_time) { // route_expired
-                if(r->refmetric < INFINITY) {
-                    r->seqno = seqno_plus(r->src->seqno, 1);
-                    change_route_metric(r, INFINITY, INFINITY, 0); // retract_route
-                }
-            } else {
-                int add_metric = input_filter(r->src->id,
-                                            r->src->prefix, r->src->plen,
-                                            r->src->src_prefix,
-                                            r->src->src_plen,
-                                            n->address,
-                                            n->ifp->ifindex);
-                change_route_metric(r, r->refmetric, n->temp_cost, add_metric);
-                if (route_feasible(r) && (!best || r->smoothed_metric < best->smoothed_metric))
-                    best = r;
+    if (changes) {
+        for(i = 0; i < route_slots; i++) {
+            struct babel_route *r;
+            for(r = routes[i]; r; r = r->next) {
+                struct neighbour *neigh = r->neigh;
+                if (neigh->temp_cost != -1)
+                    update_route_metric(r, neigh, (unsigned int)(unsigned short)neigh->temp_cost);
             }
         }
-        if (best && best != installed)
-            consider_route(best);
-        else if (installed && installed_oldmetric != route_metric(installed) && installed_smoothed_metrict != installed->smoothed_metric)
-            send_triggered_update(installed, installed->src, installed_oldmetric);
-    }
 
-    for(neigh = neighs; neigh; neigh = neigh->next)
-        if (neigh->temp_cost >= 0)
-            local_notify_neighbour(neigh, LOCAL_CHANGE);
+        for(neigh = neighs; neigh; neigh = neigh->next)
+            if (neigh->temp_cost >= 0)
+                local_notify_neighbour(neigh, LOCAL_CHANGE);
+    }
 
     return msecs;
 }

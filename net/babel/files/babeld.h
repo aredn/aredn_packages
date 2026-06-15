@@ -81,7 +81,7 @@ THE SOFTWARE.
 #endif
 #endif
 
-#define MULTIPLE_SOCKETS
+#undef MULTIPLE_SOCKETS
 
 extern struct timeval now;
 extern int debug;

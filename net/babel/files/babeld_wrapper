@@ -40,11 +40,11 @@ sn="$(uci -q get aredn.@supernode[0].enable)"
 # Defaults
 echo "router-id $(uci -c /etc/local/uci -q get hsmmmesh.settings.wifimac)" > ${C}
 if [ "$sn" = "1" ]; then
-    echo "smoothing-half-life 0" >> ${C}
-    echo "protocol-buffer-size 262144" >> ${C}
+    echo "smoothing-half-life $(uci -q get babel.supernode.smoothing_half_life)" >> ${C}
+    echo "protocol-buffer-size $(uci -q get babel.supernode.buffer_size)" >> ${C}
 else
     echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
-    echo "protocol-buffer-size 65536" >> ${C}
+    echo "protocol-buffer-size $(uci -q get babel.default.buffer_size)" >> ${C}
 fi
 echo "default rxcost $(uci -q get babel.default.rxcost) hello-interval $(uci -q get babel.default.hello_interval) update-interval $(uci -q get babel.default.update_interval) rtt-decay $(uci -q get babel.default.rtt_decay) rtt-min $(uci -q get babel.default.rtt_min) rtt-max $(uci -q get babel.default.rtt_max) max-rtt-penalty $(uci -q get babel.default.max_rtt_penalty)" >> ${C}
 
@@ -74,11 +74,11 @@ do
         if [ "$cost" = "" ]; then
             cost=$(uci -q get babel.tunnel.rxcost)
         fi
-        echo -n "interface ${i} type tunnel rxcost ${cost} split-horizon true hello-interval $(uci -q get babel.tunnel.hello_interval)" >> ${C}
+        echo -n "interface ${i} type tunnel rxcost ${cost} split-horizon true" >> ${C}
         if [ "$sn" = "1" ]; then
-            echo -n " update-interval $(uci -q get babel.supernode.update_interval)" >> ${C}
+            echo -n " hello-interval $(uci -q get babel.supernode.hello_interval) update-interval $(uci -q get babel.supernode.update_interval)" >> ${C}
         else
-            echo -n " update-interval $(uci -q get babel.tunnel.update_interval)" >> ${C}
+            echo -n " hello-interval $(uci -q get babel.tunnel.hello_interval) update-interval $(uci -q get babel.tunnel.update_interval)" >> ${C}
         fi
         echo " rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
         echo "redistribute anyproto if ${i} deny" >> ${C}
