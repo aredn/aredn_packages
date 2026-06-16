@@ -98,6 +98,20 @@ add_interface(char *ifname, struct interface_conf *if_conf)
     return ifp;
 }
 
+struct interface*
+lookup_interface(char *ifname)
+{
+    struct interface *ifp;
+
+    ifp = interfaces;
+    while(ifp) {
+        if(strcmp(ifp->name, ifname) == 0)
+            return ifp;
+        ifp = ifp->next;
+    }
+    return NULL;
+}
+
 int
 flush_interface(char *ifname)
 {
