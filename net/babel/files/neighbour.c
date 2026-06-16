@@ -223,7 +223,7 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
-#if 1
+#if 0
 unsigned
 check_neighbours()
 {

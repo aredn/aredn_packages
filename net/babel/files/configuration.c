@@ -23,6 +23,7 @@ THE SOFTWARE.
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -1085,6 +1086,7 @@ parse_config_line(int c, gnc_t gnc, void *closure,
         }
         if(strcmp(token2, "interface") == 0) {
             char *ifname = NULL;
+            struct interface *ifp;
             int rc;
             c = getword(c, &ifname, gnc, closure);
             c = skip_eol(c, gnc, closure);
@@ -1092,6 +1094,16 @@ parse_config_line(int c, gnc_t gnc, void *closure,
                 free(ifname);
                 free(token2);
                 goto fail;
+            }
+            /* Retract everything on this interface before we close it down */
+            ifp = lookup_interface(ifname);
+            if (ifp && if_up(ifp)) {
+                send_wildcard_retraction(ifp);
+                /* Make sure that we expire quickly from our neighbours'
+                   association caches. */
+                send_multicast_hello(ifp, 10, 1);
+                flushbuf(&ifp->buf, ifp);
+                usleep(roughly(1000));
             }
             rc = flush_interface(ifname);
             if(rc <= 0) {
