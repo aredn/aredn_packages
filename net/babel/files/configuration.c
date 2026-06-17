@@ -1120,6 +1120,11 @@ parse_config_line(int c, gnc_t gnc, void *closure,
                         *message_return = "No such interface";
                 }
             }
+            /* Flush everything again */
+            FOR_ALL_INTERFACES(ifp) {
+                flushupdates(ifp);
+                flushbuf(&ifp->buf, ifp);
+            }
             free(token2);
             free(ifname);
         } else {
