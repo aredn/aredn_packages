@@ -223,7 +223,7 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
-#if 0
+#if 1
 unsigned
 check_neighbours()
 {
@@ -249,7 +249,7 @@ check_neighbours()
         else {
             changed = reset_txcost(neigh) || changed;
             /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = changed ? (int)neighbour_cost(neigh) : -1;
+            neigh->temp_cost = changed ? (unsigned short)neighbour_cost(neigh) : (INFINITY + 1);
 
             if(neigh->hello.interval > 0)
                 msecs = MIN(msecs, neigh->hello.interval * 10);
@@ -267,15 +267,15 @@ check_neighbours()
             struct babel_route *r;
             for(r = routes[i]; r; r = r->next) {
                 struct neighbour *neigh = r->neigh;
-                if (neigh->temp_cost != -1)
-                    update_route_metric(r, neigh, (unsigned int)(unsigned short)neigh->temp_cost);
+                unsigned int temp_cost = neigh->temp_cost;
+                if (temp_cost <= INFINITY)
+                    update_route_metric(r, neigh, temp_cost);
             }
         }
-
-        for(neigh = neighs; neigh; neigh = neigh->next)
-            if (neigh->temp_cost >= 0)
-                local_notify_neighbour(neigh, LOCAL_CHANGE);
     }
+
+    for(neigh = neighs; neigh; neigh = neigh->next)
+        local_notify_neighbour(neigh, LOCAL_CHANGE);
 
     return msecs;
 }

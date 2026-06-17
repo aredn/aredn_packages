@@ -50,7 +50,7 @@ struct neighbour {
     unsigned char index[32];
     struct interface *ifp;
     struct buffered buf;
-    int temp_cost; /* Temporarily holds the current cost */
+    unsigned int temp_cost; /* Temporarily holds the current cost */
 };
 
 extern struct neighbour *neighs;
