@@ -1103,7 +1103,7 @@ parse_config_line(int c, gnc_t gnc, void *closure,
                    association caches. */
                 send_multicast_hello(ifp, 10, 1);
                 flushbuf(&ifp->buf, ifp);
-                usleep(roughly(1000));
+                usleep(roughly(1000000)); /* ~1 second */
             }
             rc = flush_interface(ifname);
             if(rc <= 0) {
