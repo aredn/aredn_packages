@@ -1102,7 +1102,11 @@ parse_config_line(int c, gnc_t gnc, void *closure,
                 /* Make sure that we expire quickly from our neighbours'
                    association caches. */
                 send_multicast_hello(ifp, 10, 1);
-                flushbuf(&ifp->buf, ifp);
+                /* Flush everything */
+                FOR_ALL_INTERFACES(ifp) {
+                    flushupdates(ifp);
+                    flushbuf(&ifp->buf, ifp);
+                }
                 usleep(roughly(1000000)); /* ~1 second */
             }
             rc = flush_interface(ifname);
