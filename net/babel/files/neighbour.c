@@ -282,7 +282,6 @@ check_neighbours()
                     route->src->src_prefix, route->src->src_plen, 1, NULL);
             if(better_route && route_metric(better_route) < route_metric(route))
                 consider_route(better_route);
-            }
         }
     }
 
