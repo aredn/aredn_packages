@@ -231,15 +231,13 @@ check_neighbours()
     struct neighbour *nneigh;
     unsigned msecs = 50000;
     int i;
-    int changes = 0;
 
     debugf("Checking neighbours.\n");
 
     for(neigh = neighs; neigh; neigh = nneigh) {
-        int changed;
         nneigh = neigh->next;
-        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
-        changed = update_neighbour(neigh, &neigh->uhello, 1, -1, 0) || changed;
+        update_neighbour(neigh, &neigh->hello, 0, -1, 0);
+        update_neighbour(neigh, &neigh->uhello, 1, -1, 0);
 
         if(neigh->hello.reach == 0 ||
            neigh->hello.time.tv_sec > now.tv_sec || /* clock stepped */
@@ -247,9 +245,9 @@ check_neighbours()
             flush_neighbour(neigh);
         }
         else {
-            changed = reset_txcost(neigh) || changed;
+            reset_txcost(neigh);
             /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = changed ? (unsigned short)neighbour_cost(neigh) : (INFINITY + 1);
+            neigh->temp_cost = neighbour_cost(neigh);
 
             if(neigh->hello.interval > 0)
                 msecs = MIN(msecs, neigh->hello.interval * 10);
@@ -257,20 +255,15 @@ check_neighbours()
                 msecs = MIN(msecs, neigh->uhello.interval * 10);
             if(neigh->ihu_interval > 0)
                 msecs = MIN(msecs, neigh->ihu_interval * 10);
-
-            changes |= changed;
         }
     }
 
-    if (changes) {
-        for(i = 0; i < route_slots; i++) {
-            struct babel_route *r;
-            for(r = routes[i]; r; r = r->next) {
-                struct neighbour *neigh = r->neigh;
-                unsigned int temp_cost = neigh->temp_cost;
-                if (temp_cost <= INFINITY)
-                    update_route_metric(r, neigh, temp_cost);
-            }
+    for(i = 0; i < route_slots; i++) {
+        struct babel_route *r;
+        struct babel_route *rn;
+        for(r = routes[i]; r; r = rn) {
+            rn = r->next;
+            update_route_metric(r, r->neigh, r->neigh->temp_cost);
         }
     }
 
