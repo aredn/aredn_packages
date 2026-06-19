@@ -274,6 +274,18 @@ check_neighbours()
         }
     }
 
+    for(i = 0; i < route_slots; i++) {
+        struct babel_route *route = routes[i];
+        if (route) {
+            struct babel_route *better_route =
+                find_best_route(route->src->prefix, route->src->plen,
+                    route->src->src_prefix, route->src->src_plen, 1, NULL);
+            if(better_route && route_metric(better_route) < route_metric(route))
+                consider_route(better_route);
+            }
+        }
+    }
+
     for(neigh = neighs; neigh; neigh = neigh->next)
         local_notify_neighbour(neigh, LOCAL_CHANGE);
 
