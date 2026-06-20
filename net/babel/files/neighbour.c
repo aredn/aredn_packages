@@ -223,63 +223,6 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
-#if 1
-unsigned
-check_neighbours()
-{
-    struct neighbour *neigh;
-    struct neighbour *nneigh;
-    unsigned msecs = 50000;
-    int i;
-    int changes = 0;
-
-    debugf("Checking neighbours.\n");
-
-    for(neigh = neighs; neigh; neigh = nneigh) {
-        int changed;
-        nneigh = neigh->next;
-        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
-        changed = update_neighbour(neigh, &neigh->uhello, 1, -1, 0) || changed;
-
-        if(neigh->hello.reach == 0 ||
-           neigh->hello.time.tv_sec > now.tv_sec || /* clock stepped */
-           timeval_minus_msec(&now, &neigh->hello.time) > 300000) {
-            flush_neighbour(neigh);
-        }
-        else {
-            changed = reset_txcost(neigh) || changed;
-            /* Temp cost to avoid recalculating later */
-            neigh->temp_cost = changed ? (unsigned short)neighbour_cost(neigh) : (INFINITY + 1);
-
-            if(neigh->hello.interval > 0)
-                msecs = MIN(msecs, neigh->hello.interval * 10);
-            if(neigh->uhello.interval > 0)
-                msecs = MIN(msecs, neigh->uhello.interval * 10);
-            if(neigh->ihu_interval > 0)
-                msecs = MIN(msecs, neigh->ihu_interval * 10);
-
-            changes |= changed;
-        }
-    }
-
-    if (changes) {
-        for(i = 0; i < route_slots; i++) {
-            struct babel_route *r;
-            for(r = routes[i]; r; r = r->next) {
-                struct neighbour *neigh = r->neigh;
-                unsigned int temp_cost = neigh->temp_cost;
-                if (temp_cost <= INFINITY)
-                    update_route_metric(r, neigh, temp_cost);
-            }
-        }
-    }
-
-    for(neigh = neighs; neigh; neigh = neigh->next)
-        local_notify_neighbour(neigh, LOCAL_CHANGE);
-
-    return msecs;
-}
-#else
 unsigned
 check_neighbours()
 {
@@ -320,7 +263,6 @@ check_neighbours()
 
     return msecs;
 }
-#endif
 
 /* To lose one hello is a misfortune, to lose two is carelessness. */
 static int
