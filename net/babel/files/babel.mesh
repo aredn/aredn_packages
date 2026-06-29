@@ -11,7 +11,7 @@ config default 'default'
 
 config wireless 'wireless'
         option rxcost '256'
-        option directrxcost '180'
+        option remoterxcost '180'
 
 config wired 'wired'
         option rxcost '96'
