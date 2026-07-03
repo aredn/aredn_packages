@@ -64,13 +64,13 @@ do
                 echo "redistribute anyproto if ${i} deny" >> ${C}
                 ;;
             *)
-                if [ ! -d /sys/class/net/br-wifi ]; then
+                if [ ! -d /sys/class/net/br-wifi0 ]; then
                     echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
                 fi
                 ;;
         esac
         ;;
-    br-wifi)
+    br-wifi*)
         echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
         ;;
     wg*)
