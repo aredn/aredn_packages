@@ -73,6 +73,9 @@ do
     br-wifi*)
         echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
         ;;
+    br-rrf*)
+        echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.remoterxcost) split-horizon false" >> ${C}
+        ;;
     wg*)
         cost=$(uci -q get network.${i}.cost)
         if [ "$cost" = "" ]; then
