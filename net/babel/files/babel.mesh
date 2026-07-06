@@ -11,6 +11,12 @@ config default 'default'
 
 config wireless 'wireless'
         option rxcost '256'
+        # Added to a mesh radio's rxcost when this node has more than one mesh
+        # radio active and this one isn't the highest-frequency band among
+        # them (e.g. HaLow vs 2.4GHz on the same node) - so babel prefers the
+        # faster/less-congested band without needing a manual babel-user.conf
+        # override. Has no effect on nodes with only one mesh radio.
+        option rxcost_penalty '256'
 
 config wired 'wired'
         option rxcost '96'

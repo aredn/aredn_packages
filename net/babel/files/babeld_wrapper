@@ -51,6 +51,62 @@ echo "default rxcost $(uci -q get babel.default.rxcost) hello-interval $(uci -q 
 
 # Always dtdlink so Babel is happy to have one interface
 echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
+
+# Rank every currently-mesh wlan interface by band so that, on a node with
+# more than one simultaneous mesh radio, the non-highest band gets a cost
+# penalty below - preferring the faster/less-congested band by default.
+# Nodes with only one mesh radio are completely unaffected: the penalty is
+# only ever applied relative to another mesh radio on the same node, never
+# as an absolute cost.
+wireless_band_tier() {
+    # HaLow (802.11ah) is the only AREDN-supported band that ever uses a
+    # channel width under 5 MHz (it uses 1/2/4/8 MHz); every other band
+    # uses 5/10/20/40/80/160. Check this first and trust it over "iw dev
+    # info", because HaLow interfaces (e.g. Morse Micro) report a bogus
+    # translated frequency there (seen on-device reporting "5180 MHz"/
+    # channel 36 for a radio actually configured on HaLow channel 6 at
+    # 2 MHz width) - so frequency alone would misclassify HaLow as 5GHz.
+    chanbw=$(uci -q -c /etc/config.mesh get setup.globals.${2}_bandwidth)
+    if [ -n "$chanbw" ] && [ "$chanbw" -le 4 ] 2>/dev/null; then
+        echo 0 # HaLow (narrow channel width)
+        return
+    fi
+    freq=$(iw dev "$1" info 2>/dev/null | sed -n 's/.*channel [-0-9]* (\([0-9]*\) MHz).*/\1/p')
+    if [ -z "$freq" ]; then
+        # Couldn't determine the frequency (e.g. interface not fully up yet) -
+        # assume the highest tier so we never mistakenly penalize a radio we
+        # can't identify. This self-corrects the next time babeld_wrapper runs.
+        echo 3
+    elif [ "$freq" -lt 1000 ]; then
+        echo 0 # 900MHz
+    elif [ "$freq" -lt 2500 ]; then
+        echo 1 # 2.4GHz
+    elif [ "$freq" -lt 4000 ]; then
+        echo 2 # 3GHz
+    else
+        echo 3 # 5GHz and above
+    fi
+}
+mesh_ifaces=""
+mesh_count=0
+max_tier=-1
+for p in /sys/class/net/wlan*
+do
+    [ -e "$p" ] || continue
+    i=$(basename $p)
+    radio=$(echo ${i} | sed s/wlan/radio/)
+    case "$(uci -q -c /etc/config.mesh get setup.globals.${radio}_mode)" in
+        lan|wan|off)
+            ;;
+        *)
+            tier=$(wireless_band_tier "$i" "$radio")
+            mesh_ifaces="${mesh_ifaces}${i}:${tier} "
+            mesh_count=$((mesh_count + 1))
+            [ "$tier" -gt "$max_tier" ] && max_tier=$tier
+            ;;
+    esac
+done
+
 # Configure each of the interfaces which are already have as we wont (usually) be dynamically
 # told about them later. If we are informed again later, it's harmless.
 for p in /sys/class/net/*
@@ -64,7 +120,16 @@ do
                 echo "redistribute anyproto if ${i} deny" >> ${C}
                 ;;
             *)
-                echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
+                cost=$(uci -q get babel.wireless.rxcost)
+                if [ "$mesh_count" -gt 1 ]; then
+                    tier=$(echo "$mesh_ifaces" | tr ' ' '\n' | sed -n "s/^${i}:\(.*\)\$/\1/p")
+                    if [ -n "$tier" ] && [ "$tier" -lt "$max_tier" ]; then
+                        penalty=$(uci -q get babel.wireless.rxcost_penalty)
+                        [ -z "$penalty" ] && penalty=256
+                        cost=$((cost + penalty))
+                    fi
+                fi
+                echo "interface ${i} type wireless enable-timestamps true rxcost ${cost} split-horizon false" >> ${C}
                 ;;
         esac
         ;;
