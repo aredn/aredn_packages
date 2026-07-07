@@ -5,9 +5,15 @@ BABEL_PATH=/var/run/babel.sock
 
 case "${ACTION}" in
     ifdown)
-        socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
+        if [ "${INTERFACE:0:3}" = "rrf" ]; then
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
+flush interface br-${INTERFACE}
+__END__
+        else
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
 flush interface ${INTERFACE}
 __END__
+        fi
         ;;
     ifup)
         if [ "${INTERFACE:0:4}" == "wifi" ]; then
