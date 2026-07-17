@@ -5,18 +5,27 @@ BABEL_PATH=/var/run/babel.sock
 
 case "${ACTION}" in
     ifdown)
-        socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
+        if [ "${INTERFACE:0:3}" = "rrf" ]; then
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
+flush interface br-${INTERFACE}
+__END__
+        else
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH} <<__END__
 flush interface ${INTERFACE}
 __END__
+        fi
         ;;
     ifup)
-        if [ "${INTERFACE}" == "wifi" ]; then
-            if [ "${DEVICE}" != "br-nomesh" ]; then
-                socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
+        if [ "${INTERFACE:0:4}" == "wifi" ]; then
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false
 __END__
-            fi
+        elif [ "${INTERFACE:0:3}" = "rrf" ]; then
+                socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
+flush interface ${DEVICE}
+interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.remoterxcost) split-horizon false
+__END__
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
             cost=$(uci -q get network.${INTERFACE}.cost)
             if [ "$cost" = "" ]; then
