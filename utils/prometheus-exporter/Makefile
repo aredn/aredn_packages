@@ -21,7 +21,6 @@ endef
 
 define Package/prometheus-exporter/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin/
-	$(INSTALL_DIR) $(1)/usr/local/bin/mgr/
 	$(INSTALL_DIR) $(1)/usr/local/bin/metrics/
 	$(INSTALL_BIN) ./files/main $(1)/www/cgi-bin/metrics
 	$(CP) ./files/metrics/* $(1)/usr/local/bin/metrics/
