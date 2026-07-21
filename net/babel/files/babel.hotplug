@@ -15,6 +15,11 @@ __END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false
 __END__
+        elif [ "${INTERFACE}" == "fast" ]; then
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
+flush interface ${DEVICE}
+interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcostfast) split-horizon false
+__END__
         elif [ "${INTERFACE:0:2}" = "wg" ]; then
             cost=$(uci -q get network.${INTERFACE}.cost)
             if [ "$cost" = "" ]; then
