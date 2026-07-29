@@ -120,9 +120,16 @@ fi
 
 # Limit what we redistribute
 gw="$(uci -q get aredn.@wan[0].mesh_to_local_wan)"
+internet="$(uci -q get aredn.@wan[0].mesh_internet)"
 
-# If we allow it, let our default route be redistributed so others on
-# the mesh can use it.
+# We can choose not to allow internet bound connections thought this node except to our dtd neighbors
+if [ "$internet" = "0" ]; then
+    echo "out if br-dtdlink ip 0.0.0.0/0 eq 0 allow" >> ${C}
+    echo "in if br-dtdlink ip 0.0.0.0/0 eq 0 allow" >> ${C}
+    echo "out ip 0.0.0.0/0 eq 0 deny" >> ${C}
+    echo "in ip 0.0.0.0/0 eq 0 deny" >> ${C}
+fi
+# If we allow it, let our default route be redistributed so others on the mesh can use it.
 if [ "$gw" = "1" ]; then
     echo "redistribute anyproto ip 0.0.0.0/0 eq 0 allow" >> ${C}
 fi
@@ -162,18 +169,6 @@ else
     echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
     echo "redistribute anyproto ip 44.0.0.0/8 ge 24 allow" >> ${C}
 fi
-
-# Dont redistribute tunnel endpoint addresses.
-if [ "$sn" = "1" ]; then
-    echo "redistribute anyproto ip 172.30.0.0/16 eq 32 deny" >> ${C}
-else
-    echo "redistribute anyproto ip 172.31.0.0/16 eq 32 deny" >> ${C}
-fi
-# Never redistribute any xlink addresses
-uci -q show network | grep network.xlink.*.ipaddr= | while read xlink; do
-    ip=$(echo ${xlink} | sed "s/^.*='\(.*\)'/\1/")
-    echo "redistribute anyproto ip ${ip} deny" >> ${C}
-done
 
 # Dont redistribute the LAN. The lan routes could be NAT addresses
 # and we dont want to redistribute them, rather relying on earlier 10.X rules.
