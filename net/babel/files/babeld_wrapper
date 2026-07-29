@@ -204,10 +204,11 @@ else
     echo "install ip 44.0.0.0/8 le 23 allow table 21" >> ${C}
 fi
 # Install the internal default route in table 22
-echo "install ip 0.0.0.0/0 le 1 allow table 22" >> ${C}
-# Install all other 10.X and 44.X routes in table 20
+echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
+# Install all other 10.X, 44.X and local WAN routes in table 20
 echo "install ip 10.0.0.0/8 ge 24 allow table 20" >> ${C}
 echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
+echo "install ip 0.0.0.0/0 eq 1 allow table 20" >> ${C}
 # Drop everything else
 echo "install ip 0.0.0.0/0 ge 0 deny" >> ${C}
 # Dont accept or send routes for private IP addresses
