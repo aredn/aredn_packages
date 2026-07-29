@@ -118,6 +118,13 @@ if [ -f /etc/aredn_include/babel-deny.conf ]; then
     cat /etc/aredn_include/babel-deny.conf >> ${C}
 fi
 
+# Local WAN distribution and restriction
+echo "redistribute anyproto ip 0.0.0.0/0 eq 1 allow" >> ${C}
+echo "out if br-dtdlink ip 0.0.0.0/0 eq 1 allow" >> ${C}
+echo "in if br-dtdlink ip 0.0.0.0/0 eq 1 allow" >> ${C}
+echo "out ip 0.0.0.0/0 eq 1 deny" >> ${C}
+echo "in ip 0.0.0.0/0 eq 1 deny" >> ${C}
+
 # Limit what we redistribute
 gw="$(uci -q get aredn.@wan[0].mesh_to_local_wan)"
 internet="$(uci -q get aredn.@wan[0].mesh_internet)"
@@ -198,9 +205,10 @@ else
 fi
 # Install the internal default route in table 22
 echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
-# Install all other 10.X and 44.X routes in table 20
+# Install all other 10.X, 44.X and local WAN routes in table 20
 echo "install ip 10.0.0.0/8 ge 24 allow table 20" >> ${C}
 echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
+echo "install ip 0.0.0.0/0 eq 1 allow table 20" >> ${C}
 # Drop everything else
 echo "install ip 0.0.0.0/0 ge 0 deny" >> ${C}
 # Dont accept or send routes for private IP addresses
