@@ -131,8 +131,6 @@ internet="$(uci -q get aredn.@wan[0].mesh_internet)"
 
 # We can choose not to allow internet bound connections thought this node except to our dtd neighbors
 if [ "$internet" = "0" ]; then
-    echo "out if br-dtdlink ip 0.0.0.0/0 eq 0 allow" >> ${C}
-    echo "in if br-dtdlink ip 0.0.0.0/0 eq 0 allow" >> ${C}
     echo "out ip 0.0.0.0/0 eq 0 deny" >> ${C}
     echo "in ip 0.0.0.0/0 eq 0 deny" >> ${C}
 fi
