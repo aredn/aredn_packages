@@ -71,10 +71,14 @@ do
         esac
         ;;
     br-wifi)
-        echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
+        if [ "$(cat /sys/class/net/${i}/operstate)" != "down" ]; then
+            echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false" >> ${C}
+        fi
         ;;
     br-fast)
-        echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcostfast) split-horizon false" >> ${C}
+        if [ "$(cat /sys/class/net/${i}/operstate)" != "down" ]; then
+            echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcostfast) split-horizon false" >> ${C}
+        fi
         ;;
     wg*)
         cost=$(uci -q get network.${i}.cost)
