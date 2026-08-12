@@ -82,16 +82,17 @@ do
         ;;
     wg*)
         cost=$(uci -q get network.${i}.cost)
-        if [ "$cost" = "" ]; then
-            cost=$(uci -q get babel.tunnel.rxcost)
-        fi
-        echo -n "interface ${i} type tunnel rxcost ${cost} split-horizon true" >> ${C}
         if [ "$sn" = "1" ]; then
-            echo -n " hello-interval $(uci -q get babel.supernode.hello_interval) update-interval $(uci -q get babel.supernode.update_interval)" >> ${C}
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.supernode.rxcost)
+            fi
+            echo "interface ${i} type tunnel rxcost ${cost} split-horizon true hello-interval $(uci -q get babel.supernode.hello_interval) update-interval $(uci -q get babel.supernode.update_interval) rtt-min $(uci -q get babel.supernode.rtt_min) rtt-max $(uci -q get babel.supernode.rtt_max) max-rtt-penalty $(uci -q get babel.supernode.max_rtt_penalty)" >> ${C}
         else
-            echo -n " hello-interval $(uci -q get babel.tunnel.hello_interval) update-interval $(uci -q get babel.tunnel.update_interval)" >> ${C}
+            if [ "$cost" = "" ]; then
+                cost=$(uci -q get babel.tunnel.rxcost)
+            fi
+            echo "interface ${i} type tunnel rxcost ${cost} split-horizon true hello-interval $(uci -q get babel.tunnel.hello_interval) update-interval $(uci -q get babel.tunnel.update_interval) rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
         fi
-        echo " rtt-min $(uci -q get babel.tunnel.rtt_min) rtt-max $(uci -q get babel.tunnel.rtt_max) max-rtt-penalty $(uci -q get babel.tunnel.max_rtt_penalty)" >> ${C}
         echo "redistribute anyproto if ${i} deny" >> ${C}
         ;;
     br-*|lo|tunl0|eth*|br0.2|br0.3)
