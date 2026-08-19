@@ -98,6 +98,7 @@ do
     br-lan)
         if [ "$(uci -q get aredn.@babel[0].lan_radio)" = "1" ]; then
             echo "interface ${i} type wireless enable-timestamps true rxcost $(uci -q get babel.lan_radio.rxcost) split-horizon false" >> ${C}
+        fi
         ;;
     br-*|lo|tunl0|eth*|br0.2|br0.3)
         ;;
