@@ -56,7 +56,7 @@ flush interface ${DEVICE}
 interface ${DEVICE} type wireless rxcost ${cost}
 redistribute anyproto if ${DEVICE} deny
 __END__
-        if [ "${INTERFACE}" == "lan" -a $(uci -q get aredn.@babel[0].lan_radio) = "1" ]; then
+        elif [ "${INTERFACE}" == "lan" -a $(uci -q get aredn.@babel[0].lan_radio) = "1" ]; then
             socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.lan_radio.rxcost) split-horizon false
