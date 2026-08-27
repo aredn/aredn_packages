@@ -203,6 +203,7 @@ if [ "$sn" = "1" ]; then
     # and only allow small 44 subnets to be routed between meshes.
     if [ -f /etc/44net.conf ]; then
         while read line; do
+            echo "in ip ${line} le 23 deny" >> ${C}
             echo "install ip ${line} le 23 deny" >> ${C}
         done < /etc/44net.conf
     fi
@@ -213,8 +214,10 @@ else
 fi
 # Install the internal default route in table 22
 echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
-# Install the local default route in table 23
-echo "install ip 0.0.0.0/0 eq 1 allow table 23" >> ${C}
+# Install the local default route in table 23 unless we're a supernode
+if [ "$sn" != "1" ]; then
+    echo "install ip 0.0.0.0/0 eq 1 allow table 23" >> ${C}
+fi
 # Install all other 10.X, 44.X and local WAN routes in table 20
 echo "install ip 10.0.0.0/8 ge 24 allow table 20" >> ${C}
 echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
