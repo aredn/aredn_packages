@@ -49,6 +49,11 @@ else
 fi
 echo "default rxcost $(uci -q get babel.default.rxcost) hello-interval $(uci -q get babel.default.hello_interval) update-interval $(uci -q get babel.default.update_interval) rtt-decay $(uci -q get babel.default.rtt_decay) rtt-min $(uci -q get babel.default.rtt_min) rtt-max $(uci -q get babel.default.rtt_max) max-rtt-penalty $(uci -q get babel.default.max_rtt_penalty)" >> ${C}
 
+# Table 29 has the lan route. We read that if lan is enabled.
+if [ "$(uci -c /etc/config.mesh get setup.globals.lan_dhcp)" != "0" ]; then
+    echo "import-table 29" >> ${C}
+fi
+
 # Always dtdlink so Babel is happy to have one interface
 echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
 # Configure each of the interfaces which are already have as we wont (usually) be dynamically
