@@ -45,7 +45,11 @@ if [ "$sn" = "1" ]; then
     echo "max-update-retry 0" >> ${C}
 else
     echo "smoothing-half-life $(uci -q get babel.default.smoothing_half_life)" >> ${C}
-    echo "protocol-buffer-size $(uci -q get babel.default.buffer_size)" >> ${C}
+    if [ "$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)" -gt 65536 ]; then
+        echo "protocol-buffer-size $(uci -q get babel.default.large_buffer_size)" >> ${C}
+    else
+        echo "protocol-buffer-size $(uci -q get babel.default.buffer_size)" >> ${C}
+    fi
 fi
 echo "default rxcost $(uci -q get babel.default.rxcost) hello-interval $(uci -q get babel.default.hello_interval) update-interval $(uci -q get babel.default.update_interval) rtt-decay $(uci -q get babel.default.rtt_decay) rtt-min $(uci -q get babel.default.rtt_min) rtt-max $(uci -q get babel.default.rtt_max) max-rtt-penalty $(uci -q get babel.default.max_rtt_penalty)" >> ${C}
 

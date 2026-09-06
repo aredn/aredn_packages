@@ -8,6 +8,7 @@ config default 'default'
         option rtt_max '50'
         option max_rtt_penalty '4000'
         option buffer_size '65535'
+        option large_buffer_size '131072'
 
 config wireless 'wireless'
         option rxcost '256'
