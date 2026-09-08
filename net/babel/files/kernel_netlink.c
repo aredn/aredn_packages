@@ -711,6 +711,10 @@ kernel_setup_socket(int setup)
     int rc;
 
     if(setup) {
+        /* Don't reopen */
+        if(nl_listen.sock >= 0) {
+            return 1;
+        }
         rc = netlink_socket(&nl_listen,
                             rtnlgrp_to_mask(RTNLGRP_IPV6_ROUTE)
                           | rtnlgrp_to_mask(RTNLGRP_IPV4_ROUTE)
