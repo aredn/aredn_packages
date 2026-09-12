@@ -63,7 +63,7 @@ for (let i = 0; i < length(metrics); i++) {
         output += render(loadfile(metrics[i], { raw_mode: true }));
     }
     catch (e) {
-        log.syslog(log.LOG_ERR, e);
+        log.syslog(log.LOG_ERR, `${metrics[i]}: ${e} - ${e.stacktrace}`);
     }
 }
 
