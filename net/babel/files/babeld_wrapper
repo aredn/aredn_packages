@@ -59,7 +59,7 @@ if [ "$(uci -c /etc/config.mesh get setup.globals.lan_dhcp)" != "0" ]; then
 fi
 
 # Always dtdlink so Babel is happy to have one interface
-echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
+echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true max-rtt-penalty 0" >> ${C}
 # Configure each of the interfaces which are already have as we wont (usually) be dynamically
 # told about them later. If we are informed again later, it's harmless.
 for p in /sys/class/net/*
