@@ -58,8 +58,8 @@ if [ "$(uci -c /etc/config.mesh get setup.globals.lan_dhcp)" != "0" ]; then
     echo "import-table 29" >> ${C}
 fi
 
-# Always dtdlink so Babel is happy to have one interface
-echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
+# Always br-mesh so Babel is happy to have one interface
+echo "interface br-mesh type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
 # Configure each of the interfaces which are already have as we wont (usually) be dynamically
 # told about them later. If we are informed again later, it's harmless.
 for p in /sys/class/net/*
@@ -78,6 +78,9 @@ do
             *)
                 ;;
         esac
+        ;;
+    br-dtdlink)
+        echo "interface br-dtdlink type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true" >> ${C}
         ;;
     br-wifi)
         if [ "$(cat /sys/class/net/${i}/operstate)" != "down" ]; then

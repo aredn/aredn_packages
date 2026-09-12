@@ -10,7 +10,12 @@ flush interface ${INTERFACE}
 __END__
         ;;
     ifup)
-        if [ "${INTERFACE:0:4}" == "wifi" ]; then
+        if [ "${INTERFACE}" == "dtdlink" ]; then
+            socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
+flush interface ${DEVICE}
+interface ${DEVICE} type wired rxcost $(uci -q get babel.wired.rxcost) enable-timestamps false split-horizon true
+__END__
+        elif [ "${INTERFACE:0:4}" == "wifi" ]; then
             socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
 interface ${DEVICE} type wireless enable-timestamps true rxcost $(uci -q get babel.wireless.rxcost) split-horizon false
