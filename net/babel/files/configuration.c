@@ -626,7 +626,7 @@ parse_anonymous_ifconf(int c, gnc_t gnc, void *closure,
         } else if(strcmp(token, "max-rtt-penalty") == 0) {
             int penalty;
             c = getint(c, &penalty, gnc, closure);
-            if(c < -1 || penalty < 0 || penalty > 0xFFFF)
+            if(c < -1 || penalty <= 0 || penalty > 0xFFFF)
                 goto error;
             if_conf->max_rtt_penalty = penalty;
         } else if(strcmp(token, "v4-via-v6") == 0) {
