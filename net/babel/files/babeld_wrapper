@@ -192,9 +192,10 @@ if [ "$sn" = "1" ]; then
     # Nothing else
     echo "out if br-dtdlink deny" >> ${C}
 else
-    # Redistribute any locally originating 10.X and 44.X routes.
+    # Redistribute any locally originating 10.X.
     echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
-    echo "redistribute anyproto ip 44.0.0.0/8 ge 24 allow" >> ${C}
+    # Redistribute local 44.X routes but only from LAN.
+    echo "redistribute anyproto ip 44.0.0.0/8 ge 24 if br-lan allow" >> ${C}
 fi
 
 # Dont redistribute the LAN. The lan routes could be NAT addresses
