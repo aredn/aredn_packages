@@ -162,6 +162,8 @@ if [ "$gw" = "1" ]; then
 fi
 # Never redistribute our WAN address.
 # Make sure we do this after we allow redistribution of a default route if that's enabled.
+# We have to tell babel about br-wan (with the infinite cost) so we can use it in later rules.
+echo "interface br-wan type wired rxcost 65535" >> ${C}
 echo "redistribute anyproto if br-wan deny" >> ${C}
 
 if [ "$sn" = "1" ]; then

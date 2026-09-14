@@ -18,7 +18,8 @@ __END__
         elif [ "${INTERFACE}" == "wan" ]; then
             socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
 flush interface ${DEVICE}
-redistribute anyproto if br-wan deny
+interface ${DEVICE} type wired rxcost 65535
+redistribute anyproto if ${DEVICE} deny
 __END__
         elif [ "${INTERFACE:0:4}" == "wifi" ]; then
             socat -T 30 -t 30 - UNIX-CONNECT:${BABEL_PATH},interval=5,retry=12 <<__END__
