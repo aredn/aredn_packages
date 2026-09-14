@@ -171,28 +171,19 @@ if [ "$sn" = "1" ]; then
     # as well as a set of 44.X routes.
     echo "import-table 21" >> ${C}
     echo "redistribute anyproto ip 10.0.0.0/8 allow" >> ${C}
-    if [ -f /etc/44net.conf ]; then
-        while read line; do
-            echo "redistribute anyproto ip ${line} allow" >> ${C}
-        done < /etc/44net.conf
-    fi
     # Supernodes do not redistribute everything on their dtdlink, so we only
     # allow our mesh default routes out that way and then deny everything else.
     # We also prevent these default routes going anywhere but to their dtdlink.
     echo "out if br-dtdlink ip 10.0.0.0/8 eq 8 allow" >> ${C}
     echo "out ip 10.0.0.0/8 eq 8 deny" >> ${C}
-    if [ -f /etc/44net.conf ]; then
-        while read line; do
-            prefix=$(/bin/ipcalc.sh ${line}|grep PREFIX|cut -d= -f2)
-            echo "out if br-dtdlink ip ${line} eq ${prefix} allow" >> ${C}
-            echo "out ip ${line} eq ${prefix} deny" >> ${C}
-        done < /etc/44net.conf
-    fi
     # We must include our own main IP address otherwise arednlink wont be able to verify
     # any hosts or services we publish
     echo "out if br-dtdlink ip $(uci -c /etc/config.mesh get setup.globals.wifi_ip) allow" >> ${C}
     # Nothing else
     echo "out if br-dtdlink deny" >> ${C}
+    # Misc. 44.X addresses not okay on the supernode network.
+    echo "out ip 44.0.0.0/8 ge 24 deny" >> ${C}
+    echo "in ip 44.0.0.0/8 ge 24 deny" >> ${C}
 else
     # Redistribute any locally originating 10.X.
     echo "redistribute anyproto ip 10.0.0.0/8 ge 24 allow" >> ${C}
@@ -214,14 +205,6 @@ echo "redistribute deny" >> ${C}
 if [ "$sn" = "1" ]; then
     # Dont install any of the default mesh route if this is a supernode
     echo "install ip 10.0.0.0/8 eq 8 deny" >> ${C}
-    # We deny any large routes which are part of our 44net configuration
-    # and only allow small 44 subnets to be routed between meshes.
-    if [ -f /etc/44net.conf ]; then
-        while read line; do
-            echo "in ip ${line} le 23 deny" >> ${C}
-            echo "install ip ${line} le 23 deny" >> ${C}
-        done < /etc/44net.conf
-    fi
 else
     # Install the mesh default route in table 21
     echo "install ip 10.0.0.0/8 eq 8 allow table 21" >> ${C}
@@ -233,9 +216,12 @@ echo "install ip 0.0.0.0/0 eq 0 allow table 22" >> ${C}
 if [ "$sn" != "1" ]; then
     echo "install ip 0.0.0.0/0 eq 1 allow table 23" >> ${C}
 fi
-# Install all other 10.X, 44.X and local WAN routes in table 20
+# Install all other 10.X routes in table 20
 echo "install ip 10.0.0.0/8 ge 24 allow table 20" >> ${C}
-echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
+# Misc. 44.X addresses okay on local mesh but not on the supernode network.
+if [ "$sn" != "1" ]; then
+    echo "install ip 44.0.0.0/8 ge 24 allow table 20" >> ${C}
+fi
 # Drop everything else
 echo "install ip 0.0.0.0/0 ge 0 deny" >> ${C}
 # Dont accept or send routes for private IP addresses
