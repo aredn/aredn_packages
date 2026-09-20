@@ -515,17 +515,17 @@ uninstall_route(struct babel_route *route)
     if(!route->installed)
         return;
 
-    route->installed = 0;
-
     debugf("uninstall_route(%s from %s)\n",
            format_prefix(route->src->prefix, route->src->plen),
            format_prefix(route->src->src_prefix, route->src->src_plen));
     rc = change_route(ROUTE_FLUSH, route, metric_to_kernel(route_metric(route)),
                       NULL, 0, 0);
-    if(rc < 0) {
+    if(rc < 0 && errno != ESRCH && errno != ENOENT) {
         perror("kernel_route(FLUSH)");
         return;
     }
+
+    route->installed = 0;
 
     local_notify_route(route, LOCAL_CHANGE);
 }
@@ -1215,11 +1215,6 @@ expire_routes(void)
                 flush_route(r);
                 goto again;
             }
-        /* I dont understand how the following can do anything. Updating the neighbor metric
-           happens periodically elsewhere and it doesnt change how route_old(...) evaluates the route
-           so if it wasnt old above it wont be old now.
-        */
-#if 0
             update_route_metric(r, r->neigh, neighbour_cost(r->neigh));
 
             if(r->installed && r->refmetric < INFINITY) {
@@ -1229,7 +1224,6 @@ expire_routes(void)
                                          r->src->prefix, r->src->plen,
                                          r->src->src_prefix, r->src->src_plen);
             }
-#endif
             r = r->next;
         }
         i++;
