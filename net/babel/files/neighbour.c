@@ -223,6 +223,7 @@ neighbour_txcost(struct neighbour *neigh)
     return neigh->txcost;
 }
 
+#if 0
 unsigned
 check_neighbours()
 {
@@ -263,6 +264,58 @@ check_neighbours()
 
     return msecs;
 }
+#else
+unsigned
+check_neighbours()
+{
+    struct neighbour *neigh;
+    unsigned msecs = 50000;
+    int any_changed = 0;
+
+    debugf("Checking neighbours.\n");
+
+    neigh = neighs;
+    while(neigh) {
+        int changed;
+        struct neighbour *nneigh = neigh->next;
+
+        changed = update_neighbour(neigh, &neigh->hello, 0, -1, 0);
+        changed = update_neighbour(neigh, &neigh->uhello, 1, -1, 0) || changed;
+
+        if(neigh->hello.reach == 0 || neigh->hello.time.tv_sec > now.tv_sec || timeval_minus_msec(&now, &neigh->hello.time) > 300000) {
+            flush_neighbour(neigh);
+        }
+        else {
+            changed = reset_txcost(neigh) || changed;
+
+            neigh->temp_cost = changed ? neighbour_cost(neigh) : (unsigned)-1;
+            any_changed = any_changed || changed;
+
+            local_notify_neighbour(neigh, LOCAL_CHANGE);
+
+            if(neigh->hello.interval > 0)
+                msecs = MIN(msecs, neigh->hello.interval * 10);
+            if(neigh->uhello.interval > 0)
+                msecs = MIN(msecs, neigh->uhello.interval * 10);
+            if(neigh->ihu_interval > 0)
+                msecs = MIN(msecs, neigh->ihu_interval * 10);
+        }
+        neigh = nneigh;
+    }
+
+    if(any_changed) {
+        int i;
+        for(i = 0; i < route_slots; i++) {
+            struct babel_route *r;
+            for(r = routes[i]; r; r = r->next)
+                if(r->neigh->temp_cost != (unsigned)-1)
+                    update_route_metric(r, r->neigh, r->neigh->temp_cost);
+        }
+    }
+
+    return msecs;
+}
+#endif
 
 /* To lose one hello is a misfortune, to lose two is carelessness. */
 static int
