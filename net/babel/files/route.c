@@ -887,6 +887,14 @@ update_route(const unsigned char *id,
     if(src == NULL)
         return NULL;
 
+    if (refmetric < INFINITY && seqno_minus(src->seqno, seqno) >= 100) {
+        debugf("Source %s looks restarted (recorded seqno %d, update seqno %d); resetting feasibility distance.\n",
+               format_eui64(src->id), src->seqno, seqno);
+        src->seqno = seqno;
+        src->metric = INFINITY;
+        src->time = now.tv_sec;
+    }
+
     feasible = update_feasible(src, seqno, refmetric);
     metric = MIN((int)refmetric + neighbour_cost(neigh) + add_metric, INFINITY);
 
@@ -1004,6 +1012,9 @@ send_unfeasible_request(struct neighbour *neigh, int force,
                                       src->seqno :
                                       seqno_plus(src->seqno, 1),
                                       src->id, 127);
+        record_resend(RESEND_REQUEST, src->prefix, src->plen,
+                                      src->src_prefix, src->src_plen, seqno, src->id,
+                                      neigh->ifp, resend_delay, RESEND_MAX);
     }
 }
 
