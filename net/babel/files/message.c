@@ -1462,6 +1462,11 @@ flushupdates(struct interface *ifp)
         qsort(b, n, sizeof(struct buffered_update), compare_buffered_updates);
 
         for(i = 0; i < n; i++) {
+
+            /* Ignore duplicates */
+            if(i > 0 && compare_buffered_updates(&b[i], &b[i - 1]) == 0)
+                continue;
+
             xroute = find_xroute(b[i].prefix, b[i].plen,
                                  b[i].src_prefix, b[i].src_plen);
             route = find_installed_route(b[i].prefix, b[i].plen,
@@ -1560,7 +1565,6 @@ buffer_update(struct interface *ifp,
         }
     }
 
-    /* Ordered insertion to avoid duplicates */
     struct buffered_update update = {
         .id = { 0 },
         .plen = plen,
@@ -1569,24 +1573,7 @@ buffer_update(struct interface *ifp,
     memcpy(update.prefix, prefix, sizeof(update.prefix));
     memcpy(update.src_prefix, src_prefix, sizeof(update.src_prefix));
 
-    struct buffered_update *buffered_updates = ifp->buffered_updates;
-    int c = -1, p = 0, g = ifp->num_buffered_updates - 1;
-    while (p <= g) {
-        int m = (p + g) / 2;
-        c = compare_buffered_updates(&update, &buffered_updates[m]);
-        if(c == 0)
-            break;
-        else if(c < 0)
-            g = m - 1;
-        else
-            p = m + 1;
-    }
-    if (c != 0) {
-        if (p < ifp->num_buffered_updates)
-            memmove(&buffered_updates[p + 1], &buffered_updates[p], (ifp->num_buffered_updates - p) * sizeof(struct buffered_update));
-        buffered_updates[p] = update;
-        ifp->num_buffered_updates++;
-    }
+    ifp->buffered_updates[ifp->num_buffered_updates++] = update;
 }
 
 /* Full wildcard update with prefix == src_prefix == NULL,
