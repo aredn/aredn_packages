@@ -890,7 +890,7 @@ babel_main(char **interface_names, int num_interface_names)
     usleep(roughly(10000));
     gettime(&now);
 
-    for (unsigned retrans=0; retrans < 1; retrans++) {
+    for (unsigned retrans=0; retrans < 5; retrans++) {
         FOR_ALL_INTERFACES(ifp) {
             if(!if_up(ifp))
                 continue;
