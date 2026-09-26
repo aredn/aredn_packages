@@ -79,6 +79,7 @@ const FLUSH_POLL            = 10;
 //
 // Connection keepalive
 const KEEPALIVE_POLL        = 20;
+const KEEPALIVE_FIRST_POLL  = 60;
 const KEEPALIVE_LIMIT       = 3;
 //
 // Gray list timers
@@ -725,7 +726,7 @@ function channelProcess(event) {
                         this.state = "CONNECTED";
                         this.polling = POLLIN|POLLOUT|POLLRDHUP;
                         this.keepalive = 0;
-                        this.keepalivetime = when(KEEPALIVE_POLL);
+                        this.keepalivetime = when(KEEPALIVE_FIRST_POLL);
                         this.timer = this.keepalivetime;
                         this.incoming = "";
                         statistics.outgoing.version++;
@@ -817,7 +818,7 @@ function channelProcess(event) {
             this.outgoing = "";
             this.state = "CONNECTED_INCOMING";
             this.keepalive = 0;
-            this.keepalivetime = when(KEEPALIVE_POLL);
+            this.keepalivetime = when(KEEPALIVE_FIRST_POLL);
             this.polling = POLLIN|POLLOUT|POLLRDHUP;
             // No longer grey
             delete graylist[`${this.interface}/${this.address}`];
