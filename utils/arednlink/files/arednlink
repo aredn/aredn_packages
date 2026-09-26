@@ -43,7 +43,6 @@ import * as babel from "aredn.babel";
 // Supported versions
 //
 
-const VERSION_0_0_1 = "0.0.1";
 const VERSION_0_0_2 = "0.0.2";
 //
 // Supported features
@@ -514,23 +513,10 @@ function processMessage(cmd, hop, srcipv4, payload)
     switch (cmd) {
         case CMD_VERSION:
             statistics.incoming.version++;
-            // v0.0.1: A very simply version sync system - they must match or the connection fails.
-            // Downgrade ourselves to v0.0.1 and act appropriately. If we initiated the connection already
-            // then the remote side will terminate because we sent it an invalid version number.
-            if (payload == VERSION_0_0_1) {
-                if (this.state == "CONNECTED_INCOMING") {
-                    this.version = VERSION_0_0_1;
-                    statistics.outgoing.version++;
-                    this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
-                    statistics.outgoing.sync++;
-                    this.outgoing += buildTargettedSyncMessage(this);
-                }
-            }
             // v0.0.2: The initiator send the version number first together with a feature vector of 16 bits.
             // The target sends back its own version and feature vector. Each end will use only the union of
             // the features. Once each end has received the version information, the sync process can begin.
-            else if (substr(payload, 0, 5) == VERSION_0_0_2) {
-                this.downgradable = false;
+            if (substr(payload, 0, 5) == VERSION_0_0_2) {
                 this.features = ((ord(payload, 5) << 24) + (ord(payload, 6) << 16) + (ord(payload, 7) << 8) + ord(payload, 8)) & FEATURES_ALL;
                 if (this.state == "CONNECTED_INCOMING") {
                     statistics.outgoing.version++;
@@ -543,7 +529,6 @@ function processMessage(cmd, hop, srcipv4, payload)
             // to recover the connection by downgrading and reconnecting. From v0.0.2 onward the remote
             // end just sends its version information instead, letting the initiator determine how to proceed.
             else {
-                this.downgradable = false;
                 if (this.state == "CONNECTED_INCOMING") {
                     statistics.outgoing.version++;
                     this.outgoing += buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
@@ -743,7 +728,6 @@ function channelProcess(event) {
                         this.keepalivetime = when(KEEPALIVE_POLL);
                         this.timer = this.keepalivetime;
                         this.incoming = "";
-                        this.downgradable = this.version == VERSION_0_0_1 ? false : true;
                         statistics.outgoing.version++;
                         this.outgoing = buildMessage(this, CMD_VERSION, myipv4address, 1, this.version);
                     }
@@ -799,15 +783,7 @@ function channelProcess(event) {
                     this.polling = 0;
                     this.incoming = "";
                     this.outgoing = "";
-                    if (this.downgradable) {
-                        // Downgrade the version and try the connection again.
-                        this.downgradable = false;
-                        this.version = VERSION_0_0_1;
-                        this.state = "NEW";
-                    }
-                    else {
-                        this.state = "EXIT";
-                    }
+                    this.state = "EXIT";
                     // Force neighbor update
                     neighborhood.timer = 0;
                     this.timer = 0;
@@ -991,7 +967,7 @@ function commandProcess(cmd) {
             }
             for (let id in channels) {
                 const c = channels[id];
-                r += `channel ${id} state ${c.state} v${c.version == VERSION_0_0_1 ? VERSION_0_0_1 : VERSION_0_0_2} interface ${c.interface ?? "-"} address ${c.address ?? "-"} rbest ${c.rbest ?? "-"} features ${featureString(c.features)} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
+                r += `channel ${id} state ${c.state} v${substr(c.version, 0, 5)} interface ${c.interface ?? "-"} address ${c.address ?? "-"} rbest ${c.rbest ?? "-"} features ${featureString(c.features)} polling ${eventString(c.polling)} timer ${c.timer === null ? "-" : c.timer == 0 ? "0" : c.timer - now} keepalive ${c.keepalive ?? "-"} in-len ${length(c.incoming) ?? "-"} out-len ${length(c.outgoing) ?? "-"}\n`;
             }
             for (let k in statistics) {
                 r += `statistics ${k}`;
