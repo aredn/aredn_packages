@@ -26,8 +26,8 @@ endef
 define Package/whenandwhere/install
 	$(INSTALL_DIR) $(1)/usr/local/mgr/
 	$(INSTALL_DIR) $(1)/usr/share/ucode/aredn/
-	$(INSTALL_BIN) ./files/mgr/gps.uc $(1)/usr/local/mgr/
-	$(INSTALL_BIN) ./files/libs/gps.uc $(1)/usr/share/ucode/aredn/
+	$(INSTALL_BIN) ./files/mgr/whenandwhere.uc $(1)/usr/local/mgr/
+	$(INSTALL_BIN) ./files/libs/gps.uc $(1)/usr/share/ucode/external/whenandwhere/
 endef
 
 define Package/whenandwhere/postinst

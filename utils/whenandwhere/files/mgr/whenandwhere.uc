@@ -31,7 +31,7 @@
  * version
  */
 
-import * as gpshardware from "aredn.gps";
+import * as gpshardware from "external.whenandwhere.gps";
 
 const CONFIG0 = "/etc/config.mesh/gpsd";
 const CONFIG1 = "/etc/config/gpsd";
