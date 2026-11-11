@@ -1,5 +1,5 @@
 PKG_NAME:=whenandwhere
-PKG_VERSION:=0.2.0
+PKG_VERSION:=0.3.0
 PKG_RELEASE:=1
 
 include $(TOPDIR)/rules.mk
@@ -24,8 +24,20 @@ define Package/whenandwhere/description
 endef
 
 define Package/whenandwhere/install
-	$(INSTALL_DIR) $(1)/tmp
-	touch $(1)/tmp/whenandwhere
+	$(INSTALL_DIR) $(1)/usr/local/mgr/
+	$(INSTALL_DIR) $(1)/usr/share/ucode/aredn/
+	$(INSTALL_BIN) ./files/mgr/whenandwhere.uc $(1)/usr/local/mgr/
+	$(INSTALL_BIN) ./files/libs/gps.uc $(1)/usr/share/ucode/external/whenandwhere/
+endef
+
+define Package/whenandwhere/postinst
+#!/bin/sh
+[ -n "$${PKG_INSTROOT}" ] || /etc/init.d/manager restart
+endef
+
+define Package/whenandwhere/postrm
+#!/bin/sh
+[ -n "$${PKG_INSTROOT}" ] || /etc/init.d/manager restart
 endef
 
 define Build/Compile
