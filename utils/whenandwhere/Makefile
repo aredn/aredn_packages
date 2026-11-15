@@ -1,6 +1,6 @@
 PKG_NAME:=whenandwhere
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/package.mk
@@ -24,6 +24,8 @@ define Package/whenandwhere/description
 endef
 
 define Package/whenandwhere/install
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/usb
+	$(INSTALL_BIN) ./files/10-gps-detect $(1)/etc/hotplug.d/usb/10-gps-detect
 	$(INSTALL_DIR) $(1)/tmp
 	touch $(1)/tmp/whenandwhere
 endef
