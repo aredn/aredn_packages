@@ -1057,7 +1057,7 @@ function neighborhoodProcess(event) {
         for (let i = 0; i < length(ifaces); i++) {
             const iface = ifaces[i];
             const name = iface.interface;
-            if (name === "br-nomesh") {
+            if (name === "br-mesh" || name == "br-wan") {
                 // Ignore interfaces which cannot have neighbors
             }
             else if (oldinterfaces[name]) {
