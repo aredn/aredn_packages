@@ -77,18 +77,12 @@ country AR:
 	(2400 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
-# AS: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# AS: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country AS: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	(5650 - 5850 @ 160), (1.5e+06 mW)
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	(5650 - 5850 @ 160), (1500000 mW)
 
 # AT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition; max bandwidth 1 MHz (13 cm) and 10 MHz (6 cm).
 country AT:
@@ -115,13 +109,12 @@ country AZ:
 
 # BA: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 country BA:
-	(2304 - 2450 @ 40), (1.5e+06 mW)
-	(5650 - 5850 @ 160), (1.5e+06 mW)
+	(2304 - 2450 @ 40), (1500000 mW)
+	(5650 - 5850 @ 160), (1500000 mW)
 
-# BB: ITU default, Region 2. Not verified against national rules.
+# BB: verified (national regulation). ITU Region 2. Barbados Amateur Radio Handbook, Ministry responsible for Telecommunication, Table D.
+#   Left out: 2300-2310, 2390-2450 and 5650-5925 MHz usable only with the Ministry's prior written consent.
 country BB:
-	(2300 - 2450 @ 40), (100)
-	(5650 - 5925 @ 160), (100)
 
 # BD: ITU default, Region 3. Not verified against national rules.
 country BD:
@@ -201,8 +194,8 @@ country BZ:
 
 # CA: verified (national regulation). ITU Region 2. ISED RBR-4 Issue 3 (2022) Schedule I; RAC band plan; DARC 2024 (2250 W PEP SSB / 750 W carrier).
 country CA:
-	(2300 - 2450 @ 40), (2.25e+06 mW)
-	(5650 - 5925 @ 160), (2.25e+06 mW)
+	(2300 - 2450 @ 40), (2250000 mW)
+	(5650 - 5925 @ 160), (2250000 mW)
 
 # CF: ITU default, Region 1. Not verified against national rules.
 country CF:
@@ -391,18 +384,12 @@ country GT:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
-# GU: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# GU: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country GU: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	(5650 - 5850 @ 160), (1.5e+06 mW)
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	(5650 - 5850 @ 160), (1500000 mW)
 
 # GY: ITU default, Region 2. Not verified against national rules.
 country GY:
@@ -439,10 +426,13 @@ country HU:
 	(5670 - 5760 @ 80), (75000 mW)
 	(5762 - 5850 @ 80), (75000 mW)
 
-# ID: ITU default, Region 3. Not verified against national rules.
+# ID: partly verified. ITU Region 3. Kominfo ministerial regulation on amateur radio, Annex IV (2018, number blank: possibly draft text).
+#   Left out: 2300-2304 limited to 1 MHz and 2304.1-2400 to 3 kHz bandwidth; 2400-2410 satellite; 5650-5670 satellite uplink; 5760-5761 EME/beacons; 5830-5850 satellite downlink.
 country ID:
-	(2300 - 2450 @ 40), (100)
-	(5650 - 5850 @ 160), (100)
+	# 2410-2450 MHz: broadband, 22 MHz
+	(2410 - 2450 @ 22), (100)
+	(5670 - 5760 @ 22), (100)
+	(5761 - 5830 @ 22), (100)
 
 # IE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2400-2450 MHz satellite only, special permission.
@@ -523,7 +513,8 @@ country KP:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
-# KR: ITU default, Region 3. Not verified against national rules.
+# KR: partly verified. ITU Region 3. Korean operating rules for radio stations, Annex 8 (amateur frequencies), as reproduced on hamwiki.kr; national allocation table (MSIT notice 2021-76).
+#   Left out: 2300-2400 status not confirmed from the regulator's own text.
 country KR:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
@@ -634,18 +625,12 @@ country MO:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
-# MP: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# MP: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country MP: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	(5650 - 5850 @ 160), (1.5e+06 mW)
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	(5650 - 5850 @ 160), (1500000 mW)
 
 # MQ: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
 country MQ:
@@ -720,8 +705,8 @@ country NP:
 
 # NZ: verified (national regulation). ITU Region 3. RSM GURL for Amateur Radio Operators; DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 country NZ:
-	(2396 - 2450 @ 40), (1e+06 mW)
-	(5650 - 5850 @ 160), (1e+06 mW)
+	(2396 - 2450 @ 40), (1000000 mW)
+	(5650 - 5850 @ 160), (1000000 mW)
 
 # OM: ITU default, Region 1. Not verified against national rules.
 country OM:
@@ -736,7 +721,7 @@ country PA:
 # PE: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 country PE:
 	(2400 - 2450 @ 40), (100)
-	(5650 - 5925 @ 160), (1e+06 mW)
+	(5650 - 5925 @ 160), (1000000 mW)
 
 # PF: verified (DARC CEPT country list). ITU Region 3. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 3).
 #   Left out: 2415-2450 MHz allowed except on Tahiti and Moorea; omitted.
@@ -769,21 +754,15 @@ country PM:
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
-# PR: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# PR: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country PR: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	# 5650-5850 MHz: secondary to radar (97.303); 5725+ is also ISM
-	(5650 - 5850 @ 160), (1.5e+06 mW), AUTO-BW
-	# 5850-5925 MHz: secondary; overlaps ITS/C-V2X
-	(5850 - 5925 @ 40), (1.5e+06 mW), AUTO-BW
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
+	(5650 - 5850 @ 160), (1500000 mW), AUTO-BW
+	# 5850-5925 MHz: 97.303(r)(2): protect fixed-satellite (Earth-to-space) and ITS
+	(5850 - 5925 @ 40), (1500000 mW), AUTO-BW
 
 # PT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2300-2450 and 5650-5850 MHz both need special permission.
@@ -904,7 +883,8 @@ country TG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
-# TH: ITU default, Region 3. Not verified against national rules.
+# TH: verified (national regulation). ITU Region 3. NBTC notification on amateur radio licensing (Royal Gazette, 23 Jul 2014), Intermediate/Advanced classes (100-200 W; column assignment uncertain, not encoded).
+#   Left out: note: NBTC has since consulted on an IMT frequency plan for 2300-2400 MHz.
 country TH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
@@ -945,21 +925,15 @@ country UG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
-# US: verified (national regulation). ITU Region 2. 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# US: verified (national regulation). ITU Region 2. 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country US: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	# 5650-5850 MHz: secondary to radar (97.303); 5725+ is also ISM
-	(5650 - 5850 @ 160), (1.5e+06 mW), AUTO-BW
-	# 5850-5925 MHz: secondary; overlaps ITS/C-V2X
-	(5850 - 5925 @ 40), (1.5e+06 mW), AUTO-BW
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
+	(5650 - 5850 @ 160), (1500000 mW), AUTO-BW
+	# 5850-5925 MHz: 97.303(r)(2): protect fixed-satellite (Earth-to-space) and ITS
+	(5850 - 5925 @ 40), (1500000 mW), AUTO-BW
 
 # UY: verified (national regulation). ITU Region 2. URSEC Res. 322/022 Reglamento del Servicio de Radioaficionados (10 W PEP, Superior class).
 country UY:
@@ -986,21 +960,15 @@ country VE:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
-# VI: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
+# VI: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
 country VI: DFS-FCC
-	# 2390-2395 MHz: co-primary with Federal/non-Federal mobile (US276)
-	(2390 - 2395 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2395-2400 MHz: primary
-	(2395 - 2400 @ 5), (1.5e+06 mW), AUTO-BW
-	# 2400-2417 MHz: primary; must accept ISM interference
-	(2400 - 2417 @ 10), (1.5e+06 mW), AUTO-BW
-	# 2417-2450 MHz: co-secondary with Federal radiolocation; accept ISM
-	(2417 - 2450 @ 20), (1.5e+06 mW), AUTO-BW
-	# 5650-5850 MHz: secondary to radar (97.303); 5725+ is also ISM
-	(5650 - 5850 @ 160), (1.5e+06 mW), AUTO-BW
-	# 5850-5925 MHz: secondary; overlaps ITS/C-V2X
-	(5850 - 5925 @ 40), (1.5e+06 mW), AUTO-BW
+	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
+	(2390 - 2450 @ 40), (1500000 mW)
+	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
+	(5650 - 5850 @ 160), (1500000 mW), AUTO-BW
+	# 5850-5925 MHz: 97.303(r)(2): protect fixed-satellite (Earth-to-space) and ITS
+	(5850 - 5925 @ 40), (1500000 mW), AUTO-BW
 
 # VN: ITU default, Region 3. Not verified against national rules.
 country VN:
