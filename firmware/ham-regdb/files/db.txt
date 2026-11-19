@@ -1,6 +1,11 @@
 # Amateur Radio Service regulatory database for the AREDN bands, in wireless-regdb
-# db.txt syntax. Covers only 13 cm (2.4 GHz) and 5 cm (5.8 GHz). One stanza per
-# country present in upstream wireless-regdb 2026.05.30.
+# db.txt syntax. Covers 33 cm (900 MHz, 802.11ah HaLow), 13 cm (2.4 GHz) and
+# 5 cm (5.8 GHz). One stanza per country present in upstream wireless-regdb 2026.05.30.
+#
+# 33 cm has its own source line in each stanza ("33 cm: ..."), because many
+# countries are verified for 13/5 cm but not for 900 MHz. 902-928 MHz is an ITU
+# amateur allocation only in Region 2; elsewhere the default is no 33 cm rules.
+# 802.11ah channel widths are 1/2/4/8/16 MHz, so max_bw is capped at 16 there.
 #
 # Field meanings (same syntax as wireless-regdb, ham semantics):
 #   (start - end @ max_bw), (power)[, flags]
@@ -10,7 +15,7 @@
 #              adjacent rules, as in upstream regdb
 #   power      top-licence-class transmitter limit, PEP, in mW where known
 #              (*not* EIRP as upstream). (100) = no verified limit encoded.
-#   A country with no rules has no 13/5 cm spectrum usable for 802.11 without
+#   A country with no rules has no 33/13/5 cm spectrum usable for 802.11 without
 #   a special permit; the reason is in its comment.
 #
 # Inclusion policy: ranges usable by the top licence class without a special
@@ -27,7 +32,7 @@
 #                                     for the ITU region. Treat as an upper
 #                                     bound, not an authorization.
 #
-# Reviewed 2026-11-18.
+# Reviewed 2026-11-18 (13/5 cm), 2026-11-19 (33 cm).
 
 # World: the allocation common to all three ITU regions.
 country 00:
@@ -36,55 +41,68 @@ country 00:
 
 
 # AD: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AD:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # AE: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AE:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # AF: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country AF:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # AI: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country AI:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # AL: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AL:
 	(2300 - 2450 @ 40), (600000 mW)
 	(5660 - 5670 @ 10), (600000 mW)
 	(5725 - 5850 @ 80), (600000 mW)
 
 # AM: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AM:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # AN: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (former Netherlands Antilles; uses Curacao, the most restrictive part).
 #   Left out: Curacao lists no 13 cm band; Caribbean Netherlands has 2300-2400 + 5650-5925.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country AN:
+	(902 - 928 @ 16), (100)
 	(5650 - 5725 @ 40), (150000 mW)
 
 # AR: partly verified. ITU Region 2. ENACOM Res. 1111/2025 recitals (amateur secondary 2390-2400 before 2300-2400 went to mobile).
 #   Left out: 2300-2400 MHz reallocated to mobile (Res. 1111/2025); 2400-2450 and 5 cm assumed ITU, not confirmed.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country AR:
+	(902 - 928 @ 16), (100)
 	(2400 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # AS: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301: 33 cm is Region 2 only [verified (national regulation)].
 country AS: DFS-FCC
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	(5650 - 5850 @ 160), (1500000 mW)
 
 # AT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition; max bandwidth 1 MHz (13 cm) and 10 MHz (6 cm).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AT:
 	(2304 - 2310 @ 1), (200000 mW)
 	(2320 - 2322 @ 1), (200000 mW)
@@ -92,210 +110,268 @@ country AT:
 	(5650 - 5850 @ 10), (200000 mW)
 
 # AU: verified (national regulation). ITU Region 3. ACMA Amateur LCD, Advanced licence (400 W PEP); DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: ACMA: 915-928 MHz is not an amateur band in Australia (radiolocation/ISM) [partly verified].
 country AU:
 	(2300 - 2302 @ 2), (400000 mW)
 	(2400 - 2450 @ 40), (400000 mW)
 	(5650 - 5850 @ 160), (400000 mW)
 
 # AW: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Aruba).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country AW:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (150000 mW)
 	(5650 - 5925 @ 160), (150000 mW)
 
 # AZ: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country AZ:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BA: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BA:
 	(2304 - 2450 @ 40), (1500000 mW)
 	(5650 - 5850 @ 160), (1500000 mW)
 
 # BB: verified (national regulation). ITU Region 2. Barbados Amateur Radio Handbook, Ministry responsible for Telecommunication, Table D.
 #   Left out: 2300-2310, 2390-2450 and 5650-5925 MHz usable only with the Ministry's prior written consent.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BB:
+	(902 - 928 @ 16), (100)
 
 # BD: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country BD:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BE:
 	(2300 - 2450 @ 40), (200000 mW)
 	(5650 - 5850 @ 160), (200000 mW)
 
 # BF: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BF:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BG: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BG:
 	(2300 - 2450 @ 40), (5000 mW)
 	(5650 - 5850 @ 160), (5000 mW)
 
 # BH: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BL: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BL:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # BM: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BM:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # BN: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country BN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BO: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BO:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # BR: verified (national regulation). ITU Region 2. Anatel Resolucao 697/2018 Art. 5.
+#   33 cm: Anatel Res. 697/2018 Art. 5 (907.5-915 MHz is mobile; Res. 757/2022 also gives 905-907.5 to mobile, primary) [verified (national regulation)].
 country BR:
+	(902 - 907.5 @ 4), (100)
+	(915 - 928 @ 8), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # BS: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BS:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # BT: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country BT:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BW: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # BY: partly verified. ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition and DARC CEPT-Laenderliste (DK5JI), 2018-09-18 edition (removed from CEPT list).
 #   Left out: 2400-2450 satellite; sub-range details not read.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country BY:
 	(2300 - 2400 @ 40), (50000 mW)
 	(5650 - 5850 @ 160), (50000 mW)
 
 # BZ: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country BZ:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # CA: verified (national regulation). ITU Region 2. ISED RBR-4 Issue 3 (2022) Schedule I; RAC band plan; DARC 2024 (2250 W PEP SSB / 750 W carrier).
+#   33 cm: ISED RBR-4 Issue 3 Schedule I item 23 (max bandwidth 12 MHz) [verified (national regulation)].
 country CA:
+	(902 - 928 @ 12), (2250000 mW)
 	(2300 - 2450 @ 40), (2250000 mW)
 	(5650 - 5925 @ 160), (2250000 mW)
 
 # CF: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country CF:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # CH: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Switzerland; Liechtenstein table identical).
 #   Left out: 2300-2308, 2312-2450, 5650-5725 MHz need special permission.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country CH:
 	(2308 - 2312 @ 4), (100000 mW)
 	(5725 - 5850 @ 80), (100000 mW)
 
 # CI: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country CI:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # CL: verified (national regulation). ITU Region 2. Subtel Tabla de Frecuencias (amateur secondary 2400-2450, 5650-5850).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country CL:
+	(902 - 928 @ 16), (100)
 	(2400 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # CN: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country CN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # CO: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country CO:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # CR: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country CR:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # CU: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country CU:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # CX: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country CX:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # CY: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country CY:
 	(2300 - 2450 @ 40), (400000 mW)
 	(5650 - 5850 @ 160), (400000 mW)
 
 # CZ: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country CZ:
 	(2300 - 2450 @ 40), (750000 mW)
 	(5650 - 5850 @ 160), (750000 mW)
 
 # DE: verified (national regulation). ITU Region 1. AFuV Anlage 1 (Klasse A 75 W PEP); DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country DE:
 	(2320 - 2450 @ 40), (75000 mW)
 	(5650 - 5850 @ 160), (75000 mW)
 
 # DK: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Denmark/Faroe Islands).
 #   Left out: 2300-2400 MHz no longer listed for Denmark (it was in the 2018 edition).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country DK:
 	(2400 - 2450 @ 40), (250000 mW)
 	(5650 - 5850 @ 160), (250000 mW)
 
 # DM: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country DM:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # DO: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country DO:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # DZ: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country DZ:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # EC: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country EC:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # EE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country EE:
 	(2400 - 2450 @ 40), (100000 mW)
 	(5650 - 5850 @ 160), (100000 mW)
 
 # EG: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country EG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # ES: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2300-2316, 2332-2450, 5650-5700, 5720-5760, 5762-5850 MHz need special permission for Spanish licence holders (500 W EIRP).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country ES:
 	# 2316-2332 MHz: 500 W EIRP; no FM 2320-2321
 	(2316 - 2332 @ 10), (100)
@@ -303,33 +379,39 @@ country ES:
 	(5760 - 5762 @ 2), (100)
 
 # ET: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country ET:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # FI: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (600 W PEP / 150 W carrier).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country FI:
 	(2300 - 2450 @ 40), (600000 mW)
 	(5650 - 5850 @ 160), (600000 mW)
 
 # FM: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country FM:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # FO: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Denmark/Faroe Islands).
 #   Left out: 2300-2400 MHz no longer listed for Denmark (it was in the 2018 edition).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country FO:
 	(2400 - 2450 @ 40), (250000 mW)
 	(5650 - 5850 @ 160), (250000 mW)
 
 # FR: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 1).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country FR:
 	(2300 - 2450 @ 40), (200000 mW)
 	(5650 - 5850 @ 160), (200000 mW)
 
 # GB: verified (national regulation). ITU Region 1. Ofcom Amateur Radio Licence (Full); DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2350-2390 MHz removed (Ofcom PSSR 2014); 2300-2302 MHz only by Notice of Variation.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country GB:
 	# 2310-2350 MHz: Ofcom coordination conditions apply
 	(2310 - 2350 @ 40), (400000 mW)
@@ -340,84 +422,108 @@ country GB:
 	(5820 - 5850 @ 20), (400000 mW)
 
 # GD: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GD:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # GE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class A; digital permitted).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country GE:
 	(2320 - 2450 @ 40), (10000 mW)
 	(5650 - 5850 @ 160), (10000 mW)
 
 # GF: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GF:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # GH: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country GH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # GI: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country GI:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # GL: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Greenland).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GL:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (250000 mW)
 	(5650 - 5925 @ 160), (250000 mW)
 
 # GP: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GP:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # GR: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 5650-5850 MHz needs special permission.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country GR:
 	(2300 - 2450 @ 40), (50000 mW)
 
 # GT: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GT:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # GU: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301: 33 cm is Region 2 only [verified (national regulation)].
 country GU: DFS-FCC
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	(5650 - 5850 @ 160), (1500000 mW)
 
 # GY: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country GY:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # HK: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country HK:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # HN: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country HN:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # HR: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country HR:
 	(2300 - 2450 @ 40), (150000 mW)
 	(5650 - 5850 @ 160), (150000 mW)
 
 # HT: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country HT:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # HU: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2320-2322 CW/SSB/beacon/NBFM; 5668-5670 and 5760-5762 narrowband.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country HU:
 	(2300 - 2320 @ 20), (150000 mW)
 	(2322 - 2450 @ 40), (150000 mW)
@@ -428,6 +534,7 @@ country HU:
 
 # ID: partly verified. ITU Region 3. Kominfo ministerial regulation on amateur radio, Annex IV (2018, number blank: possibly draft text).
 #   Left out: 2300-2304 limited to 1 MHz and 2304.1-2400 to 3 kHz bandwidth; 2400-2410 satellite; 5650-5670 satellite uplink; 5760-5761 EME/beacons; 5830-5850 satellite downlink.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country ID:
 	# 2410-2450 MHz: broadband, 22 MHz
 	(2410 - 2450 @ 22), (100)
@@ -436,18 +543,21 @@ country ID:
 
 # IE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2400-2450 MHz satellite only, special permission.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country IE:
 	(2300 - 2400 @ 40), (158000 mW)
 	(5570 - 5850 @ 160), (158000 mW)
 
 # IL: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2402-2450 satellite only (100 mW); no 6 cm allocation listed.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country IL:
 	(2320 - 2340 @ 20), (15000 mW)
 	(2400 - 2402 @ 2), (15000 mW)
 
 # IM: verified (national regulation). ITU Region 1. Isle of Man (Ofcom licence): Ofcom Amateur Radio Licence (Full); DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2350-2390 MHz removed (Ofcom PSSR 2014); 2300-2302 MHz only by Notice of Variation.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country IM:
 	# 2310-2350 MHz: Ofcom coordination conditions apply
 	(2310 - 2350 @ 40), (400000 mW)
@@ -459,19 +569,23 @@ country IM:
 
 # IN: verified (national regulation). ITU Region 3. WPC amateur band table (General grade).
 #   Left out: no 13 cm allocation; 5725-5840 MHz limited to F1A/F2B/F3C/F3E emissions.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country IN:
 
 # IR: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country IR:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # IS: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country IS:
 	(2300 - 2450 @ 40), (100000 mW)
 	(5650 - 5850 @ 160), (100000 mW)
 
 # IT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class A).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country IT:
 	(2300 - 2450 @ 40), (500000 mW)
 	(5650 - 5670 @ 20), (500000 mW)
@@ -479,120 +593,147 @@ country IT:
 	(5830 - 5850 @ 20), (500000 mW)
 
 # JM: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country JM:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # JO: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country JO:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # JP: verified (national regulation). ITU Region 3. MIC Notice No. 80 (2023) amateur frequency usage table.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country JP:
 	(2400 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KE: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country KE:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KH: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country KH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KN: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country KN:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # KP: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country KP:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KR: partly verified. ITU Region 3. Korean operating rules for radio stations, Annex 8 (amateur frequencies), as reproduced on hamwiki.kr; national allocation table (MSIT notice 2021-76).
 #   Left out: 2300-2400 status not confirmed from the regulator's own text.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country KR:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KW: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country KW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # KY: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country KY:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # KZ: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country KZ:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # LB: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LB:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # LC: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country LC:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # LI: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Switzerland; Liechtenstein table identical).
 #   Left out: 2300-2308, 2312-2450, 5650-5725 MHz need special permission.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LI:
 	(2308 - 2312 @ 4), (100000 mW)
 	(5725 - 5850 @ 80), (100000 mW)
 
 # LK: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country LK:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # LS: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LS:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # LT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class A).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LT:
 	(2300 - 2450 @ 40), (25000 mW)
 	(5660 - 5670 @ 10), (25000 mW)
 	(5725 - 5850 @ 80), (25000 mW)
 
 # LU: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LU:
 	(2300 - 2450 @ 40), (100000 mW)
 	(5650 - 5850 @ 160), (100000 mW)
 
 # LV: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Category A).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country LV:
 	(2300 - 2450 @ 40), (750000 mW)
 	(5650 - 5850 @ 160), (50000 mW)
 
 # MA: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MA:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MC: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MC:
 	(2300 - 2450 @ 40), (100000 mW)
 	(5650 - 5850 @ 160), (100000 mW)
 
 # MD: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (registration with SNMFR required).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MD:
 	(2300 - 2450 @ 40), (5000 mW)
 	(5650 - 5850 @ 160), (5000 mW)
 
 # ME: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2320-2322 CW/SSB/NBFM; 2400-2450 satellite; 5650-5670 uplink; 5700-5720 ATV by permit; 5760-5762 narrowband; 5790-5850 downlink.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country ME:
 	(2300 - 2320 @ 20), (300000 mW)
 	(2322 - 2400 @ 40), (300000 mW)
@@ -600,163 +741,204 @@ country ME:
 	(5762 - 5790 @ 20), (300000 mW)
 
 # MF: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country MF:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # MH: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country MH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MK: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class A).
 #   Left out: 5600-5670 MHz is in the national plan but not the amateur regulations.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MK:
 	(2300 - 2450 @ 40), (75000 mW)
 	(5830 - 5850 @ 20), (30000 mW)
 
 # MN: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MO: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country MO:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MP: verified (national regulation). ITU Region 3. US territory (ITU Region 3 column of 97.301): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301: 33 cm is Region 2 only [verified (national regulation)].
 country MP: DFS-FCC
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	(5650 - 5850 @ 160), (1500000 mW)
 
 # MQ: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country MQ:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # MR: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MR:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MT:
 	(2300 - 2450 @ 40), (400000 mW)
 	(5650 - 5850 @ 160), (400000 mW)
 
 # MU: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MU:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MV: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country MV:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MW: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country MW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # MX: verified (national regulation). ITU Region 2. NOM (emergency standard) 5.1.1 amateur band table.
+#   33 cm: IFT amateur band list (shared, per ITU Region 2), as reproduced on qsl.net/xe1usg [partly verified].
 country MX:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # MY: verified (national regulation). ITU Region 3. MCMC MTSFB TC 2025 amateur equipment specification.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country MY:
 	(2400 - 2450 @ 40), (300000 mW)
 	(5650 - 5850 @ 160), (100000 mW)
 
 # NA: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country NA:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # NG: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country NG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # NI: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country NI:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # NL: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class F).
 #   Left out: 2400-2450 MHz satellite communication only.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country NL:
 	(2300 - 2400 @ 40), (120000 mW)
 	(5650 - 5850 @ 160), (120000 mW)
 
 # NO: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition; 20 MHz bandwidth.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country NO:
 	(2300 - 2450 @ 20), (100000 mW)
 	(5650 - 5850 @ 20), (100000 mW)
 
 # NP: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country NP:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # NZ: verified (national regulation). ITU Region 3. RSM GURL for Amateur Radio Operators; DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: RSM GURL for Amateur Radio Operators, 2016 notice (expanded from 921-928 to 915-928 MHz) [verified (national regulation)].
 country NZ:
+	# 915-928 MHz: 25 W (14 dBW) e.i.r.p. -- EIRP, not PEP
+	(915 - 928 @ 8), (25000 mW)
 	(2396 - 2450 @ 40), (1000000 mW)
 	(5650 - 5850 @ 160), (1000000 mW)
 
 # OM: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country OM:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # PA: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country PA:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # PE: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country PE:
+	(902 - 928 @ 16), (100)
 	(2400 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (1000000 mW)
 
 # PF: verified (DARC CEPT country list). ITU Region 3. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 3).
 #   Left out: 2415-2450 MHz allowed except on Tahiti and Moorea; omitted.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country PF:
 	(2300 - 2415 @ 40), (120000 mW)
 	(5650 - 5850 @ 160), (120000 mW)
 
 # PG: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country PG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # PH: verified (national regulation). ITU Region 3. NTC amateur band allocation as published by PARA.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country PH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # PK: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country PK:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # PL: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country PL:
 	(2300 - 2450 @ 40), (500000 mW)
 	(5650 - 5850 @ 160), (500000 mW)
 
 # PM: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 2).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country PM:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5925 @ 160), (120000 mW)
 
 # PR: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301 (Region 2 column) and 97.303(n): accept ISM interference; CO/WY area 39-42N 103-108W has segment restrictions in 97.303(n)(3), not expressible here [verified (national regulation)].
 country PR: DFS-FCC
+	(902 - 928 @ 16), (1500000 mW)
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
@@ -766,35 +948,43 @@ country PR: DFS-FCC
 
 # PT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2300-2450 and 5650-5850 MHz both need special permission.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country PT:
 
 # PW: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country PW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # PY: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country PY:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # QA: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country QA:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # RE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 1).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country RE:
 	(2300 - 2450 @ 40), (200000 mW)
 	(5650 - 5850 @ 160), (200000 mW)
 
 # RO: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class II); 20 MHz bandwidth.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country RO:
 	(2300 - 2450 @ 20), (100000 mW)
 	(5650 - 5850 @ 20), (100000 mW)
 
 # RS: partly verified. ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: 2320-2322 narrowband; 2400-2450 satellite; 5650-5670 uplink, 5790-5850 downlink; mode notes for 2300-2320/2322-2400/5670-5790 not fully read.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country RS:
 	(2300 - 2320 @ 20), (300000 mW)
 	(2322 - 2400 @ 40), (300000 mW)
@@ -803,35 +993,42 @@ country RS:
 
 # RU: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (removed from CEPT list).
 #   Left out: 2400-2450 space-to-ground only; 5650-5850 segments limited to a narrowband emission list (note 28).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country RU:
 
 # RW: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country RW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # SA: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SA:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # SE: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: power above 200 W PEP on 5 cm (up to 1 kW) only by annual permit.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SE:
 	(2400 - 2450 @ 40), (100 mW)
 	(5650 - 5850 @ 160), (200000 mW)
 
 # SG: verified (national regulation). ITU Region 3. IMDA Amateur Handbook as summarized by SARTS.
 #   Left out: 2300-2400 removed 2019; 2400-2450 and 5650 MHz bands only on application.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country SG:
 
 # SI: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SI:
 	(2300 - 2450 @ 40), (300000 mW)
 	(5650 - 5830 @ 160), (100000 mW)
 
 # SK: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Class E).
 #   Left out: 2300-2320 and 2321-2322 limited to 20 kHz; 2400-2450 note 7 (satellite); 5650-5670 and 5760-5762 narrowband; 5670-5700 note 17 (unknown).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SK:
 	(2320 - 2320.8 @ 0.8), (750000 mW)
 	(2322 - 2400 @ 40), (750000 mW)
@@ -839,95 +1036,119 @@ country SK:
 	(5762 - 5850 @ 80), (750000 mW)
 
 # SM: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SM:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # SN: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # SR: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country SR:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # SV: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country SV:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # SX: verified (DARC CEPT country list). ITU Region 2. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (Sint Maarten).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country SX:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (150000 mW)
 	(5650 - 5925 @ 160), (150000 mW)
 
 # SY: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country SY:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # TC: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country TC:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # TD: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country TD:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # TG: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country TG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # TH: verified (national regulation). ITU Region 3. NBTC notification on amateur radio licensing (Royal Gazette, 23 Jul 2014), Intermediate/Advanced classes (100-200 W; column assignment uncertain, not encoded).
 #   Left out: note: NBTC has since consulted on an IMT frequency plan for 2300-2400 MHz.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country TH:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # TN: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country TN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # TR: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (mode restrictions in note 4 not checked).
 #   Left out: no 13 cm allocation.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country TR:
 	(5650 - 5670 @ 20), (400000 mW)
 	(5820 - 5850 @ 20), (400000 mW)
 
 # TT: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country TT:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # TW: verified (national regulation). ITU Region 3. Table of frequency bands for amateur radio stations (attached table to the amateur radio rules).
 #   Left out: no 5 cm allocation.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country TW:
 	(2440 - 2450 @ 10), (200000 mW)
 
 # TZ: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country TZ:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # UA: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition.
 #   Left out: no 13 cm allocation; 5660-5670 and 5830-5850 satellite/EME only.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country UA:
 	(5650 - 5660 @ 10), (5000 mW)
 
 # UG: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country UG:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # US: verified (national regulation). ITU Region 2. 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301 (Region 2 column) and 97.303(n): accept ISM interference; CO/WY area 39-42N 103-108W has segment restrictions in 97.303(n)(3), not expressible here [verified (national regulation)].
 country US: DFS-FCC
+	(902 - 928 @ 16), (1500000 mW)
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
@@ -936,33 +1157,43 @@ country US: DFS-FCC
 	(5850 - 5925 @ 40), (1500000 mW), AUTO-BW
 
 # UY: verified (national regulation). ITU Region 2. URSEC Res. 322/022 Reglamento del Servicio de Radioaficionados (10 W PEP, Superior class).
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country UY:
+	(902 - 928 @ 16), (100)
 	(2400 - 2450 @ 40), (10000 mW)
 	(5725 - 5850 @ 80), (10000 mW)
 
 # UZ: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country UZ:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # VA: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country VA:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # VC: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country VC:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # VE: ITU default, Region 2. Not verified against national rules.
+#   33 cm: ITU default (Region 2: 902-928 MHz amateur secondary), not verified.
 country VE:
+	(902 - 928 @ 16), (100)
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5925 @ 160), (100)
 
 # VI: verified (national regulation). ITU Region 2. US territory (ITU Region 2): 47 CFR Part 97 (97.301, 97.303 as currently published, 97.313); spread spectrum limited to 10 W PEP (97.311), not expressible here.
 #   Left out: 2300-2310 MHz omitted: no 802.11 channels there.
+#   33 cm: 47 CFR 97.301 (Region 2 column) and 97.303(n): accept ISM interference; CO/WY area 39-42N 103-108W has segment restrictions in 97.303(n)(3), not expressible here [verified (national regulation)].
 country VI: DFS-FCC
+	(902 - 928 @ 16), (1500000 mW)
 	# 2390-2450 MHz: 97.303(p): must not interfere with, and must accept interference from, other nations' fixed and mobile services; 2400-2450 accept ISM (97.303(e))
 	(2390 - 2450 @ 40), (1500000 mW)
 	# 5650-5850 MHz: 5650-5725 97.303(r)(1): protect other nations' mobile; 5725+ accept ISM
@@ -971,41 +1202,49 @@ country VI: DFS-FCC
 	(5850 - 5925 @ 40), (1500000 mW), AUTO-BW
 
 # VN: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country VN:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # VU: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country VU:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # WF: partly verified. ITU Region 3. Assumed same as French Polynesia (France ITU Region 3, DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition); not listed separately.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country WF:
 	(2300 - 2450 @ 40), (120000 mW)
 	(5650 - 5850 @ 160), (120000 mW)
 
 # WS: ITU default, Region 3. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 3), not verified nationally.
 country WS:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # YE: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country YE:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
 
 # YT: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (France, ITU Region 1).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country YT:
 	(2300 - 2450 @ 40), (200000 mW)
 	(5650 - 5850 @ 160), (200000 mW)
 
 # ZA: verified (DARC CEPT country list). ITU Region 1. DARC CEPT-Laenderliste (DK5JI), 2024-06-19 edition (any mode except pulse).
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country ZA:
 	(2300 - 2450 @ 40), (400000 mW)
 	(5650 - 5850 @ 160), (400000 mW)
 
 # ZW: ITU default, Region 1. Not verified against national rules.
+#   33 cm: no amateur allocation (ITU Region 1), not verified nationally.
 country ZW:
 	(2300 - 2450 @ 40), (100)
 	(5650 - 5850 @ 160), (100)
